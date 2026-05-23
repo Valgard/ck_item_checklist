@@ -7,9 +7,7 @@
   "summary": "Track which items you've found in this world.",
   "description": "Item Checklist — auto-checked on pickup or initial container scan, manually correctable, with spoiler-hidden undiscovered items. Per world × per player.",
   "requiredOn": 3,
-  "modDependencies": [
-    { "name_id": "corelib", "minVersion": "4.0.0" }
-  ],
+  "modDependencies": [],
   "modAssemblyData": {
     "ignoreModScript": false,
     "skipSafetyChecks": false

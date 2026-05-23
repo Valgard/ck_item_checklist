@@ -1,5 +1,5 @@
 using CoreLib;
-using CoreLib.Submodules.ControlMapping;
+using CoreLib.Submodule.ControlMapping;
 using PugMod;
 using UnityEngine;
 

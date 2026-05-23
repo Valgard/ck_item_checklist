@@ -19,3 +19,17 @@ tag here AND in this mod's `ModManifest.json` `modDependencies` entry.
 
 After this one-time edit, regular builds via `../utils/build.sh` work
 as usual — the change stays uncommitted in the SDK repo by design.
+
+## Note on ModManifest vs .asset
+
+The runtime mod's CoreLib dependency is declared in
+`unity/ItemChecklist.asset`'s `metadata.dependencies` (the
+`ModBuilderSettings` block), not in `ModManifest.json`. Pugstorm's
+`ModBuilder.BuildMod` overwrites the published `ModManifest.json`
+from the `.asset` at build time, so any `modDependencies` in
+the source `ModManifest.json` is silently dropped.
+
+The schema in the `.asset` is `dependencies: [{modName, required}]`
+(case-sensitive `modName`, e.g. `CoreLib`, not `corelib`).
+Because `required` is a C# `bool`, Unity YAML serializes it as
+`1` for true / `0` for false.
