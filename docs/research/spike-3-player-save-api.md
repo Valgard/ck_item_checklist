@@ -104,3 +104,33 @@ These must be done in-game before `ChecklistStore` ships:
   `GetCurrentWorldId()` resolutions are the live-verification TODOs
   above — they belong in the implementation phase, not as code stubs
   today.
+
+## Sandbox lesson learned (2026-05-24)
+
+The Editor's C# compile and the in-game RoslynCSharp sandbox apply
+**different rules**. The Editor only checks that types resolve (so
+`System.IO.MemoryStream` compiles fine because `System.IO.dll` is in
+the asmdef's precompiled references). The in-game sandbox refuses to
+load any assembly that references the `System.IO` namespace AT ALL —
+even purely in-memory types like `MemoryStream`, `BinaryWriter`,
+`BinaryReader`, `EndOfStreamException`. The loader marks the assembly
+as "failed code security verification" with counts that match the
+banned-type footprint and refuses to compile any scripts in that mod.
+
+Symptom: `Assembly 'ItemChecklist' has failed code security
+verification. Illegal Namespace References = '1', Illegal Type
+References = '4', Illegal Member References = '13'` followed by `mod
+ItemChecklist load error: CompileFailed` in Player.log.
+
+Concrete rule for this mod: **No `System.IO` references anywhere,
+period.** Persistence encoding/decoding is hand-rolled byte packing
+via bit-shifts. `Convert.FromBase64String` / `Convert.ToBase64String`
+live in `System` (not `System.IO`) and are allowed. `PlayerPrefs` is
+in `UnityEngine` and is allowed.
+
+Likely also banned without testing (don't reach for them): `System.IO.*`
+of any kind, `System.Diagnostics.Process`, `System.Reflection.Emit.*`,
+reflection-emit, anything that would let scripts touch the filesystem
+or escape the managed sandbox. When in doubt, check sandbox status
+with the same "load and grep Player.log for code security
+verification" probe.
