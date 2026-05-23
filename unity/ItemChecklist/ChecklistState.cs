@@ -74,10 +74,14 @@ namespace ItemChecklist
         /// </summary>
         internal void LoadFromSnapshot(IEnumerable<int> ownedIds, IEnumerable<int> discoveredIds)
         {
+            if (ownedIds == null) throw new ArgumentNullException(nameof(ownedIds));
+            if (discoveredIds == null) throw new ArgumentNullException(nameof(discoveredIds));
+
             owned.Clear();
             discovered.Clear();
             foreach (var id in ownedIds) owned.Add(id);
             foreach (var id in discoveredIds) discovered.Add(id);
+            discovered.UnionWith(owned); // enforce owned ⊆ discovered invariant
         }
 
         /// <summary>
