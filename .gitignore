@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Worktrees
+.worktrees/
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts
+bin/
+obj/
+build/
+*.dll
+*.pdb
+
+# Unity (if SDK ends up vendored as submodule, ignore its generated dirs locally)
+Library/
+Temp/
+Logs/
+UserSettings/
+*.csproj
+*.sln
+
+# Env / secrets
+.env
+.envrc
+.envrc.local
