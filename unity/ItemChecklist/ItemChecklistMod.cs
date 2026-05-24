@@ -95,15 +95,9 @@ namespace ItemChecklist
             // Fall back to "default" if any hop is null so the mod still
             // works (single PlayerPrefs key for the whole machine) when
             // we get called before SaveManager is fully wired.
-            try
-            {
-                if (Manager.saves != null)
-                    return Manager.saves.GetWorldId().ToString();
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning($"[ItemChecklist] ResolveCurrentWorldId fell back to 'default': {ex.GetType().Name}: {ex.Message}");
-            }
+            // DIAGNOSTIC: Manager.saves.GetWorldId() temporarily disabled to
+            // confirm the sandbox-fail hypothesis. If the mod loads cleanly
+            // with this hardcoded "default", SaveManager is the culprit.
             return "default";
         }
     }
