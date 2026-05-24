@@ -51,22 +51,33 @@ namespace ItemChecklist
         {
             if (__instance == null || __instance.discoveredObjects2 == null) return;
 
-            string name;
-            try { name = __instance.CharacterCustomization.name.Value; }
-            catch { return; }
-            if (string.IsNullOrEmpty(name)) return;
+            string guid = __instance.characterGuid;
+            if (string.IsNullOrEmpty(guid)) return;
 
             int count = __instance.discoveredObjects2.Count;
+            int[] ids;
             if (count == 0)
             {
-                Cache[name] = System.Array.Empty<int>();
-                return;
+                ids = System.Array.Empty<int>();
+            }
+            else
+            {
+                ids = new int[count];
+                for (int i = 0; i < count; i++)
+                    ids[i] = (int) __instance.discoveredObjects2[i].objectID;
             }
 
-            var ids = new int[count];
-            for (int i = 0; i < count; i++)
-                ids[i] = (int) __instance.discoveredObjects2[i].objectID;
-            Cache[name] = ids;
+            // Cache by guid for later lookup.
+            Cache[guid] = ids;
+
+            // Active-char detection: if SetCharacterId(id) was just called,
+            // this deserialize is for the active char.
+            if (SaveManagerActiveSelectHook.AwaitingActiveDeserialize)
+            {
+                SaveManagerActiveSelectHook.ActiveGuid = guid;
+                SaveManagerActiveSelectHook.AwaitingActiveDeserialize = false;
+                UnityEngine.Debug.Log($"[ItemChecklist] Captured active char guid: {guid} (count={count})");
+            }
         }
     }
 }
