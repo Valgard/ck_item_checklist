@@ -60,7 +60,9 @@ namespace ItemChecklist
             if (ModInfo != null && ModInfo.AssetBundles != null && ModInfo.AssetBundles.Count > 0)
             {
                 AssetBundle = ModInfo.AssetBundles[0];
-                Debug.Log($"[ItemChecklist] AssetBundle loaded with {AssetBundle.GetAllAssetNames().Length} assets");
+                var names = AssetBundle.GetAllAssetNames();
+                Debug.Log($"[ItemChecklist] AssetBundle loaded with {names.Length} assets:");
+                foreach (var n in names) Debug.Log($"[ItemChecklist]   asset: {n}");
             }
             else
             {

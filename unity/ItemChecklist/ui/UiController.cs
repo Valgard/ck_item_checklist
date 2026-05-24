@@ -80,12 +80,30 @@ namespace ItemChecklist.UI
 
         private static Sprite LoadSprite(string name)
         {
-            if (ItemChecklistMod.AssetBundle == null) return null;
-            var path = $"Assets/ItemChecklist/Art/Bridge/{name}";
-            var sprite = ItemChecklistMod.AssetBundle.LoadAsset<Sprite>(path);
-            if (sprite == null)
-                Debug.LogWarning($"[ItemChecklist] Sprite not in bundle: {path}");
-            return sprite;
+            // Unity AssetBundles lowercase all paths and may strip the
+            // canonical `Assets/...` prefix depending on how the bundle
+            // was built. Try the canonical path first, then a lowercase
+            // variant, then fall back to a basename scan over
+            // GetAllAssetNames() — robust against either packaging.
+            var bundle = ItemChecklistMod.AssetBundle;
+            if (bundle == null) return null;
+
+            var canonical = $"Assets/ItemChecklist/Art/Bridge/{name}";
+            var sprite = bundle.LoadAsset<Sprite>(canonical)
+                      ?? bundle.LoadAsset<Sprite>(canonical.ToLowerInvariant());
+            if (sprite != null) return sprite;
+
+            var needle = name.ToLowerInvariant();
+            foreach (var asset in bundle.GetAllAssetNames())
+            {
+                if (asset.EndsWith(needle))
+                {
+                    sprite = bundle.LoadAsset<Sprite>(asset);
+                    if (sprite != null) return sprite;
+                }
+            }
+            Debug.LogWarning($"[ItemChecklist] Sprite not in bundle (tried canonical + lowercase + basename scan): {name}");
+            return null;
         }
 
         private void BuildUi()
