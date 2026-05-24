@@ -96,11 +96,15 @@ namespace ItemChecklist
                 Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
             }
 
-            // Hotkey poll. Rewired is captured asynchronously via
-            // ControlMappingModule.rewiredStart, so it may still be null in
-            // the first few frames after launch.
-            if (rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName))
+            // Hotkey poll — dual-path while we're verifying which one
+            // actually fires in-game. Rewired is the production target
+            // (rebindable via game settings); raw Input is the diagnostic
+            // fallback. Whichever fires first wins.
+            bool rewiredFired = rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName);
+            bool rawFired = Input.GetKeyDown(KeyCode.F1);
+            if (rewiredFired || rawFired)
             {
+                Debug.Log($"[ItemChecklist] Hotkey: rewired={rewiredFired} raw={rawFired} — toggling UI");
                 Ui.Toggle();
             }
         }
