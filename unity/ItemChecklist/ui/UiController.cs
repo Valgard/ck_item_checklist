@@ -1,4 +1,3 @@
-using PugMod;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -41,26 +40,18 @@ namespace ItemChecklist.UI
 
         private void BuildUi()
         {
-            Debug.Log("[ItemChecklist] BuildUi: starting");
-            // API.Rendering.UICamera is a PugCamera (MonoBehaviour). Its
-            // GameObject also carries a UnityEngine.Camera which is what
-            // Canvas.worldCamera expects. If the UICamera isn't ready yet
-            // (very early Toggle press), bail out silently — the next press
-            // will retry.
-            var uiCamMb = API.Rendering.UICamera;
-            if (uiCamMb == null) { Debug.LogWarning("[ItemChecklist] BuildUi: UICamera (PugCamera) is null"); return; }
-            var uiCam = uiCamMb.GetComponent<Camera>();
-            if (uiCam == null) { Debug.LogWarning("[ItemChecklist] BuildUi: UICamera GameObject has no Camera component"); return; }
-            Debug.Log($"[ItemChecklist] BuildUi: UICamera resolved, building canvas");
+            Debug.Log("[ItemChecklist] BuildUi: starting (ScreenSpaceOverlay mode)");
 
-            // Root canvas, attached to the game's existing UI camera.
+            // Top-level root, no camera parenting — ScreenSpaceOverlay
+            // canvases render independently of any camera and survive
+            // scene changes by default. DontDestroyOnLoad so we don't
+            // get destroyed on a world-load.
             root = new GameObject("ItemChecklist.Root");
-            root.transform.SetParent(uiCamMb.transform, worldPositionStays: false);
+            UnityEngine.Object.DontDestroyOnLoad(root);
 
             var canvas = root.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = uiCam;
-            canvas.sortingOrder = 1000;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 32000;     // well above CK's HUD (<500)
             root.AddComponent<CanvasScaler>();
             root.AddComponent<GraphicRaycaster>();
 
