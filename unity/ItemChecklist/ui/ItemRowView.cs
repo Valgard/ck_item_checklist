@@ -89,9 +89,11 @@ namespace ItemChecklist.UI
             else
             {
                 checkboxImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);    // grey
-                iconImage.sprite = icon;
-                iconImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
-                iconImage.enabled = icon != null;
+                // Spoiler-mask: hide the icon entirely (per spec) — undiscovered
+                // items should not leak their visual identity. F3 may swap this
+                // for a "???" silhouette sprite if we ship one.
+                iconImage.sprite = null;
+                iconImage.enabled = false;
                 label.text = "???";
                 label.color = new Color(0.6f, 0.6f, 0.6f, 1f);
             }

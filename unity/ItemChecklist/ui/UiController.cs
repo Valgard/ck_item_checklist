@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ItemChecklist.UI
@@ -52,6 +53,23 @@ namespace ItemChecklist.UI
             canvas.sortingOrder = 32000;
             root.AddComponent<CanvasScaler>();
             root.AddComponent<GraphicRaycaster>();
+
+            // CK uses Rewired for input — it likely has no standard
+            // UnityEngine.EventSystems.EventSystem in the scene, so our
+            // uGUI controls (InputField, Dropdown) get no clicks/keys
+            // routed to them. Create our own EventSystem if none exists.
+            if (EventSystem.current == null)
+            {
+                var esGo = new GameObject("ItemChecklist.EventSystem");
+                UnityEngine.Object.DontDestroyOnLoad(esGo);
+                esGo.AddComponent<EventSystem>();
+                esGo.AddComponent<StandaloneInputModule>();
+                Debug.Log("[ItemChecklist] Created own EventSystem (no existing one found)");
+            }
+            else
+            {
+                Debug.Log($"[ItemChecklist] EventSystem already present: {EventSystem.current.name}");
+            }
 
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
