@@ -39,22 +39,19 @@ namespace ItemChecklist
         [HarmonyPostfix]
         static void After(CharacterData __instance)
         {
+            // DIAGNOSTIC: log every fire to understand the timing
+            int instanceCount = __instance?.discoveredObjects2?.Count ?? -1;
+            string thisName = "<null>";
+            try { thisName = __instance.CharacterCustomization.name.Value; } catch { thisName = "<error>"; }
+
+            bool playerReady = Manager.main != null && Manager.main.player != null;
+            string activeName = playerReady ? Manager.main.player.playerName : "<no-player>";
+
+            Debug.Log($"[ItemChecklist] DIAG OnAfterDeserialize: count={instanceCount} thisName='{thisName}' playerReady={playerReady} activeName='{activeName}'");
+
             if (__instance == null || __instance.discoveredObjects2 == null) return;
-
-            // Filter to active character. If player isn't spawned yet
-            // (boot time), ignore — the active char will deserialize
-            // again on world load.
-            if (Manager.main == null || Manager.main.player == null) return;
-
-            string activeName = Manager.main.player.playerName;
+            if (!playerReady) return;
             if (string.IsNullOrEmpty(activeName)) return;
-
-            // CharacterData.CharacterCustomization is a property returning
-            // characterCustomizationNew; .name is a FixedString32Bytes whose
-            // .Value getter materialises a string. Comparing via .ToString()
-            // is equally valid; .Value is more explicit about intent.
-            var customization = __instance.CharacterCustomization;
-            string thisName = customization.name.Value;
             if (string.IsNullOrEmpty(thisName)) return;
             if (thisName != activeName) return;
 
