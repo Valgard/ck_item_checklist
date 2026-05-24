@@ -1,3 +1,4 @@
+using PugMod;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -19,6 +20,12 @@ namespace ItemChecklist.UI
         private InputField searchField;
         private Dropdown filterDropdown;
 
+        // Sprites loaded from our AssetBundle (Item-Browser pattern).
+        // Cached on first BuildUi so we don't re-load per show/hide.
+        public static Sprite WindowBgSprite;
+        public static Sprite TextBgSprite;
+        public static Sprite UnknownItemSprite;
+
         public bool IsVisible => root != null && root.activeSelf;
 
         public void Toggle()
@@ -36,6 +43,27 @@ namespace ItemChecklist.UI
             if (root == null) { Debug.LogWarning("[ItemChecklist] root null after BuildUi"); return; }
             root.SetActive(!root.activeSelf);
             Debug.Log($"[ItemChecklist] window {(root.activeSelf ? "shown" : "hidden")}");
+
+            // TODO Input-freeze: Manager.input.SetActiveInputField needs
+            // an InputManager.TextInputInterface adapter (CK-internal type),
+            // not a UnityEngine.UI.InputField. Needs decompile-spike to
+            // figure out how to construct/wrap one — Item Browser's
+            // OnShow uses Manager.input.SetActiveInputField(null) on
+            // open and never sets it to non-null itself, suggesting their
+            // input-freeze comes from being a UIelement (CK base class)
+            // rather than the input-field call. Until we adopt UIelement
+            // (Phase F2'), WASD will continue to drive the player when
+            // our window is open.
+        }
+
+        private static Sprite LoadSprite(string name)
+        {
+            if (ItemChecklistMod.AssetBundle == null) return null;
+            var path = $"Assets/ItemChecklist/Art/Bridge/{name}";
+            var sprite = ItemChecklistMod.AssetBundle.LoadAsset<Sprite>(path);
+            if (sprite == null)
+                Debug.LogWarning($"[ItemChecklist] Sprite not in bundle: {path}");
+            return sprite;
         }
 
         private void BuildUi()
@@ -44,6 +72,11 @@ namespace ItemChecklist.UI
 
             var catalog = ItemChecklistMod.Catalog;
             if (catalog == null) { Debug.LogWarning("[ItemChecklist] Catalog not baked yet"); return; }
+
+            // Lazy-load bridge sprites on first build.
+            if (WindowBgSprite == null) WindowBgSprite = LoadSprite("ui_classic.png");
+            if (TextBgSprite == null) TextBgSprite = LoadSprite("ui_text_background.png");
+            if (UnknownItemSprite == null) UnknownItemSprite = LoadSprite("ui_unknown_item.png");
 
             root = new GameObject("ItemChecklist.Root");
             UnityEngine.Object.DontDestroyOnLoad(root);
@@ -73,14 +106,24 @@ namespace ItemChecklist.UI
 
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            // Window background
+            // Window background — wood-theme 9-slice from bridge bundle.
             var window = new GameObject("Window", typeof(RectTransform), typeof(Image));
             window.transform.SetParent(root.transform, worldPositionStays: false);
             var wrt = (RectTransform) window.transform;
             wrt.anchorMin = new Vector2(0.7f, 0.1f);
             wrt.anchorMax = new Vector2(0.95f, 0.9f);
             wrt.offsetMin = Vector2.zero; wrt.offsetMax = Vector2.zero;
-            window.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+            var windowImg = window.GetComponent<Image>();
+            if (WindowBgSprite != null)
+            {
+                windowImg.sprite = WindowBgSprite;
+                windowImg.type = Image.Type.Sliced;
+                windowImg.color = Color.white;
+            }
+            else
+            {
+                windowImg.color = new Color(0.1f, 0.1f, 0.1f, 0.95f);     // fallback
+            }
 
             // Top bar
             var topBar = new GameObject("TopBar", typeof(RectTransform));
@@ -153,7 +196,17 @@ namespace ItemChecklist.UI
             var rt = (RectTransform) go.transform;
             rt.anchorMin = amin; rt.anchorMax = amax;
             rt.offsetMin = omin; rt.offsetMax = omax;
-            go.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.2f, 1f);
+            var bg = go.GetComponent<Image>();
+            if (TextBgSprite != null)
+            {
+                bg.sprite = TextBgSprite;
+                bg.type = Image.Type.Sliced;
+                bg.color = Color.white;
+            }
+            else
+            {
+                bg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+            }
 
             var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textGo.transform.SetParent(go.transform, worldPositionStays: false);
@@ -178,7 +231,17 @@ namespace ItemChecklist.UI
             var rt = (RectTransform) go.transform;
             rt.anchorMin = amin; rt.anchorMax = amax;
             rt.offsetMin = omin; rt.offsetMax = omax;
-            go.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.2f, 1f);
+            var bg = go.GetComponent<Image>();
+            if (TextBgSprite != null)
+            {
+                bg.sprite = TextBgSprite;
+                bg.type = Image.Type.Sliced;
+                bg.color = Color.white;
+            }
+            else
+            {
+                bg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+            }
 
             // Dropdown requires a Label child for the displayed option text
             var labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
