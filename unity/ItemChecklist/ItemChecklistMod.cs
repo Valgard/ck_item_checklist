@@ -45,24 +45,24 @@ namespace ItemChecklist
 
         public void Update()
         {
-            string activeGuid = SaveManagerActiveCharHook.ActiveGuid;
-
-            // No active character (main menu) — clear "applied for"
-            // memory so the next char-load gets its own snapshot pushed.
-            if (string.IsNullOrEmpty(activeGuid))
+            // Player went away — clear "applied for" memory so the next
+            // character-load gets its own snapshot pushed.
+            if (Manager.main == null || Manager.main.player == null)
             {
                 if (lastAppliedFor != null) lastAppliedFor = null;
                 return;
             }
 
-            if (activeGuid == lastAppliedFor) return;       // already applied
+            string name = Manager.main.player.playerName;
+            if (string.IsNullOrEmpty(name)) return;
+            if (name == lastAppliedFor) return;     // already applied this load
 
-            if (!CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
+            if (!CharacterDataDiscoverySnapshot.Cache.TryGetValue(name, out var ids))
                 return;     // cache miss — wait until CK deserializes this char
 
             DiscoveredState.Instance.Snapshot(ids);
-            lastAppliedFor = activeGuid;
-            Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
+            lastAppliedFor = name;
+            Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for '{name}'");
         }
     }
 }
