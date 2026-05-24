@@ -23,22 +23,35 @@ namespace ItemChecklist.UI
 
         public void Toggle()
         {
-            if (root == null) BuildUi();
-            if (root == null) return;     // BuildUi may have bailed out (UICamera not ready)
-            root.SetActive(!root.activeSelf);
+            Debug.Log($"[ItemChecklist] Toggle() called (root={(root == null ? "null" : "exists")})");
+            if (root == null)
+            {
+                try { BuildUi(); }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[ItemChecklist] BuildUi threw: {e}");
+                    return;
+                }
+            }
+            if (root == null) { Debug.LogWarning("[ItemChecklist] root is still null after BuildUi"); return; }
+            bool wasActive = root.activeSelf;
+            root.SetActive(!wasActive);
+            Debug.Log($"[ItemChecklist] window {(wasActive ? "hidden" : "shown")}");
         }
 
         private void BuildUi()
         {
+            Debug.Log("[ItemChecklist] BuildUi: starting");
             // API.Rendering.UICamera is a PugCamera (MonoBehaviour). Its
             // GameObject also carries a UnityEngine.Camera which is what
             // Canvas.worldCamera expects. If the UICamera isn't ready yet
             // (very early Toggle press), bail out silently — the next press
             // will retry.
             var uiCamMb = API.Rendering.UICamera;
-            if (uiCamMb == null) return;
+            if (uiCamMb == null) { Debug.LogWarning("[ItemChecklist] BuildUi: UICamera (PugCamera) is null"); return; }
             var uiCam = uiCamMb.GetComponent<Camera>();
-            if (uiCam == null) return;
+            if (uiCam == null) { Debug.LogWarning("[ItemChecklist] BuildUi: UICamera GameObject has no Camera component"); return; }
+            Debug.Log($"[ItemChecklist] BuildUi: UICamera resolved, building canvas");
 
             // Root canvas, attached to the game's existing UI camera.
             root = new GameObject("ItemChecklist.Root");
