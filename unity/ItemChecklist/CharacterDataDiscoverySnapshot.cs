@@ -1,66 +1,63 @@
+using System.Collections.Generic;
 using HarmonyLib;
-using UnityEngine;
 
 namespace ItemChecklist
 {
     /// <summary>
-    /// Harmony postfix on <c>CharacterData.OnAfterDeserialize</c>. Fires
-    /// once per character slot on boot/save-load — CK deserializes all
-    /// ~60 character slots, most of which are empty (Count=0). We only
-    /// care about the ACTIVE character.
+    /// Harmony postfix on <c>CharacterData.OnAfterDeserialize</c>.
     ///
-    /// <para>Filter strategy: only snapshot when <c>Manager.main.player</c>
-    /// exists (i.e. we are past boot and a player is spawned) and the
-    /// deserialized <c>CharacterData</c> matches the active player. Boot-
-    /// time deserialize calls (before any player is spawned) are ignored —
-    /// the active character will deserialize again later when the world
-    /// loads.</para>
+    /// <para>Timing reality (verified live 2026-05-24): CK fires this for
+    /// ALL ~60 character slots on boot / char-select / world-load.
+    /// EVERY fire happens BEFORE <c>Manager.main.player</c> is spawned
+    /// (verified: <c>playerReady=False</c> in every DIAG line of the
+    /// instrumented build). So we cannot filter by "active player" here.</para>
     ///
-    /// <para>Active-character match: the plan called for matching on
-    /// <c>characterGuid</c>, but decompiling <c>PlayerController</c> shows
-    /// it does not expose <c>characterGuid</c> (only <c>playerName</c> and
-    /// <c>networkName</c>; the canonical lookup <c>Manager.saves.
-    /// GetCharacterGuid()</c> is blocked by the Roslyn sandbox). We fall
-    /// back to comparing the character-customization <c>name</c>
-    /// (<c>FixedString32Bytes</c>, accessible from sandbox) against
-    /// <c>PlayerController.playerName</c>. This is correct for the
-    /// single-player target use-case; if two characters share a name, the
-    /// snapshot can over-trigger ("last-wins" between same-name characters)
-    /// — acceptable because real new pickups still flow through the
-    /// <see cref="SaveManagerDiscoveryHook"/> postfix.</para>
+    /// <para>Strategy: cache every non-empty deserialized character by name
+    /// into <see cref="Cache"/>. The active-character resolution happens
+    /// later in <see cref="ItemChecklistMod.Update"/> — when the player
+    /// finally spawns, we look up the cached ids by
+    /// <c>Manager.main.player.playerName</c> and push them into
+    /// <see cref="DiscoveredState"/>.</para>
     ///
-    /// Hook validated live on 2026-05-24: fired ~12 times during boot
-    /// (Count=0 for empty slots), then once with Count=25 after world
-    /// load for the active character.
+    /// <para>Same-name characters last-wins. Acceptable for the single-
+    /// player target use-case; if two characters share a display name on
+    /// the same save, the snapshot may be wrong by one save's worth of
+    /// discoveries until CK re-discovers any missing items live (which it
+    /// will on the very next pickup since CK's <c>SetObjectAsDiscovered</c>
+    /// is the source of truth).</para>
     /// </summary>
     [HarmonyPatch(typeof(CharacterData), nameof(CharacterData.OnAfterDeserialize))]
     internal static class CharacterDataDiscoverySnapshot
     {
+        /// <summary>character-name → discovered objectIDs, populated as CK
+        /// deserializes each character slot. Read by
+        /// <see cref="ItemChecklistMod.Update"/> once the active player
+        /// spawns.</summary>
+        internal static readonly Dictionary<string, int[]> Cache = new Dictionary<string, int[]>();
+
         [HarmonyPostfix]
         static void After(CharacterData __instance)
         {
-            // DIAGNOSTIC: log every fire to understand the timing
-            int instanceCount = __instance?.discoveredObjects2?.Count ?? -1;
-            string thisName = "<null>";
-            try { thisName = __instance.CharacterCustomization.name.Value; } catch { thisName = "<error>"; }
-
-            bool playerReady = Manager.main != null && Manager.main.player != null;
-            string activeName = playerReady ? Manager.main.player.playerName : "<no-player>";
-
-            Debug.Log($"[ItemChecklist] DIAG OnAfterDeserialize: count={instanceCount} thisName='{thisName}' playerReady={playerReady} activeName='{activeName}'");
-
             if (__instance == null || __instance.discoveredObjects2 == null) return;
-            if (!playerReady) return;
-            if (string.IsNullOrEmpty(activeName)) return;
-            if (string.IsNullOrEmpty(thisName)) return;
-            if (thisName != activeName) return;
 
-            // Project DiscoveredObjectData.objectID to ints for our set.
-            var ids = new System.Collections.Generic.List<int>(__instance.discoveredObjects2.Count);
-            foreach (var d in __instance.discoveredObjects2)
-                ids.Add((int) d.objectID);
-            DiscoveredState.Instance.Snapshot(ids);
-            Debug.Log($"[ItemChecklist] Snapshot: {ids.Count} discovered ids for char '{activeName}'");
+            string name;
+            try { name = __instance.CharacterCustomization.name.Value; }
+            catch { return; }
+            if (string.IsNullOrEmpty(name)) return;
+
+            int count = __instance.discoveredObjects2.Count;
+            if (count == 0)
+            {
+                // Empty slot — still cache as empty-array so a no-discoveries
+                // character resolves correctly (rather than missing-key).
+                Cache[name] = System.Array.Empty<int>();
+                return;
+            }
+
+            var ids = new int[count];
+            for (int i = 0; i < count; i++)
+                ids[i] = (int) __instance.discoveredObjects2[i].objectID;
+            Cache[name] = ids;
         }
     }
 }
