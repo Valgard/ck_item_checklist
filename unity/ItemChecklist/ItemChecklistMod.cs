@@ -1,6 +1,8 @@
 using CoreLib;
 using CoreLib.Submodule.ControlMapping;
+using ItemChecklist.UI;
 using PugMod;
+using Rewired;
 using UnityEngine;
 
 namespace ItemChecklist
@@ -24,6 +26,17 @@ namespace ItemChecklist
     {
         public static ItemCatalog Catalog { get; private set; }
 
+        // F1-Toggle UI controller. Single instance; builds the window on
+        // first Toggle() call.
+        private static readonly UiController Ui = new UiController();
+
+        // Rewired player captured via ControlMappingModule.rewiredStart
+        // (Rewired is not ready at EarlyInit). Used to poll the bound
+        // toggle action each frame.
+        private static Player rewiredPlayer;
+
+        private const string ToggleActionName = "ItemChecklist.Toggle";
+
         // Last character name we applied a snapshot for. Reset when
         // Manager.main.player goes back to null (main menu) so the next
         // char-load gets its own snapshot pushed.
@@ -33,6 +46,26 @@ namespace ItemChecklist
         {
             Debug.Log("[ItemChecklist] EarlyInit");
             CoreLibMod.LoadSubmodule(typeof(ControlMappingModule));
+
+            // Register the toggle keybind (default F1). CoreLib's
+            // ControlMappingModule wires this into Rewired's UserData so the
+            // user can rebind it through the game's input-settings UI.
+            ControlMappingModule.AddKeyboardBind(
+                keyBindName: ToggleActionName,
+                defaultKeyCode: KeyboardKeyCode.F1,
+                modifier: ModifierKey.None,
+                modifier2: ModifierKey.None,
+                modifier3: ModifierKey.None,
+                categoryId: -1);     // -1 = default "Mods" category
+
+            // Rewired isn't initialized at EarlyInit; subscribe to the
+            // rewiredStart hook so we grab the player handle as soon as it
+            // exists. Mirrors CoreLib's own CommandModule pattern.
+            ControlMappingModule.rewiredStart += () =>
+            {
+                rewiredPlayer = ReInput.players.GetPlayer(0);
+                Debug.Log("[ItemChecklist] Rewired player captured");
+            };
         }
 
         public void Init()
@@ -54,17 +87,22 @@ namespace ItemChecklist
             if (string.IsNullOrEmpty(activeGuid))
             {
                 if (lastAppliedFor != null) lastAppliedFor = null;
-                return;
+            }
+            else if (activeGuid != lastAppliedFor
+                && CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
+            {
+                DiscoveredState.Instance.Snapshot(ids);
+                lastAppliedFor = activeGuid;
+                Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
             }
 
-            if (activeGuid == lastAppliedFor) return;     // already applied
-
-            if (!CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
-                return;     // cache miss — wait until CK deserializes this char
-
-            DiscoveredState.Instance.Snapshot(ids);
-            lastAppliedFor = activeGuid;
-            Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
+            // Hotkey poll. Rewired is captured asynchronously via
+            // ControlMappingModule.rewiredStart, so it may still be null in
+            // the first few frames after launch.
+            if (rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName))
+            {
+                Ui.Toggle();
+            }
         }
     }
 }
