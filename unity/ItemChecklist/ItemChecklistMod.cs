@@ -1,7 +1,6 @@
 using CoreLib;
 using CoreLib.Submodule.ControlMapping;
 using PugMod;
-using Unity.Entities;
 using UnityEngine;
 
 namespace ItemChecklist
@@ -16,16 +15,18 @@ namespace ItemChecklist
     /// timing gap between CK's <c>OnAfterDeserialize</c> (which fires
     /// before <c>Manager.main.player</c> exists) and the active player's
     /// spawn. Each frame, if a player has spawned, look up the cached
-    /// snapshot by the player's <c>CharacterGuidCD</c> (ECS component on
-    /// the player entity, same-name-resilient).</para>
+    /// snapshot by <c>playerName</c> and apply it. See
+    /// <see cref="CharacterDataDiscoverySnapshot"/> for the rationale
+    /// behind the name-based cache key (more accurate alternatives all
+    /// turned out sandbox-blocked).</para>
     /// </summary>
     public sealed class ItemChecklistMod : IMod
     {
         public static ItemCatalog Catalog { get; private set; }
 
-        // Last character GUID we applied a snapshot for. Reset when the
-        // player goes back to null (main menu) so the next char-load
-        // gets its own snapshot pushed.
+        // Last character name we applied a snapshot for. Reset when
+        // Manager.main.player goes back to null (main menu) so the next
+        // char-load gets its own snapshot pushed.
         private string lastAppliedFor;
 
         public void EarlyInit()
@@ -44,65 +45,24 @@ namespace ItemChecklist
         public void ModObjectLoaded(Object obj) { }
         public void Shutdown() { }
 
-        // Single-step diagnostic for the Update loop. Logs ONCE per state
-        // change so we can see why the snapshot isn't applying without
-        // spamming the log every frame.
-        private string lastLoggedDiag;
-
         public void Update()
         {
             if (Manager.main == null || Manager.main.player == null)
             {
                 if (lastAppliedFor != null) lastAppliedFor = null;
-                LogDiag("no-player");
                 return;
             }
 
-            string activeGuid = null;
-            string diag = "ok";
-            try
-            {
-                var playerEntity = Manager.main.player.entity;
-                if (playerEntity == Entity.Null) { LogDiag("entity-null"); return; }
-                var world = World.DefaultGameObjectInjectionWorld;
-                if (world == null || !world.IsCreated) { LogDiag("world-not-ready"); return; }
-                var em = world.EntityManager;
-                bool hasGuid = em.HasComponent<CharacterGuidCD>(playerEntity);
-                if (!hasGuid)
-                {
-                    LogDiag($"no-CharacterGuidCD on entity {playerEntity.Index}");
-                    return;
-                }
-                var hash = em.GetComponentData<CharacterGuidCD>(playerEntity).Value;
-                if (hash == default(Unity.Entities.Hash128)) { LogDiag("default-hash"); return; }
-                activeGuid = hash.ToString();
-            }
-            catch (System.Exception e)
-            {
-                LogDiag($"exception: {e.GetType().Name}: {e.Message}");
-                return;
-            }
+            string name = Manager.main.player.playerName;
+            if (string.IsNullOrEmpty(name)) return;
+            if (name == lastAppliedFor) return;     // already applied
 
-            if (string.IsNullOrEmpty(activeGuid)) { LogDiag("empty-guid"); return; }
-            if (activeGuid == lastAppliedFor) return;     // already applied, silent
-
-            if (!CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
-            {
-                LogDiag($"cache-miss for guid {activeGuid} (cache has {CharacterDataDiscoverySnapshot.Cache.Count} entries)");
-                return;
-            }
+            if (!CharacterDataDiscoverySnapshot.Cache.TryGetValue(name, out var ids))
+                return;     // cache miss — wait until CK deserializes this char
 
             DiscoveredState.Instance.Snapshot(ids);
-            lastAppliedFor = activeGuid;
-            Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for char {activeGuid}");
-            lastLoggedDiag = diag;
-        }
-
-        private void LogDiag(string reason)
-        {
-            if (reason == lastLoggedDiag) return;
-            lastLoggedDiag = reason;
-            Debug.Log($"[ItemChecklist] Update diag: {reason}");
+            lastAppliedFor = name;
+            Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for '{name}'");
         }
     }
 }
