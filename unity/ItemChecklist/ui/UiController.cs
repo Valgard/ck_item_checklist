@@ -143,7 +143,7 @@ namespace ItemChecklist.UI
             int total = model.VisibleIndices.Length;
             int disc = model.DiscoveredInFilter;
             float pct = total == 0 ? 0f : 100f * disc / total;
-            view.counterLabel.text = $"{disc} / {total} ({pct:F1}%)";
+            view.counterLabel.SetText($"{disc} / {total} ({pct:F1}%)");
         }
     }
 }

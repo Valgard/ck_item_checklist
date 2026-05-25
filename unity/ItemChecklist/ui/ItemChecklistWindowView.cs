@@ -16,7 +16,7 @@ namespace ItemChecklist.UI
         [SerializeField] public ScrollRect scrollRect;
         [SerializeField] public RectTransform rowContainer;
         [SerializeField] public ItemRowView rowPrefab;
-        [SerializeField] public Text counterLabel;
+        [SerializeField] public PugText counterLabel;
         [SerializeField] public Button closeButton;
     }
 }

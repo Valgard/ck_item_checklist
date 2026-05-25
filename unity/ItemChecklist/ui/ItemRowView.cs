@@ -15,8 +15,8 @@ namespace ItemChecklist.UI
 
         [SerializeField] public Image checkboxImage;
         [SerializeField] public Image iconImage;
-        [SerializeField] public Text iconPlaceholderText;
-        [SerializeField] public Text label;
+        [SerializeField] public PugText iconPlaceholderText;
+        [SerializeField] public PugText label;
 
         public void Bind(int objectId, Sprite icon, string name, bool isDiscovered)
         {
@@ -27,8 +27,8 @@ namespace ItemChecklist.UI
                 iconImage.color = Color.white;
                 iconImage.enabled = icon != null;
                 iconPlaceholderText.enabled = false;
-                label.text = name;
-                label.color = Color.white;
+                label.SetText(name);
+                label.SetTempColor(Color.white);
             }
             else
             {
@@ -47,8 +47,8 @@ namespace ItemChecklist.UI
                     iconImage.enabled = true;
                     iconPlaceholderText.enabled = true;
                 }
-                label.text = "???";
-                label.color = new Color(0.6f, 0.6f, 0.6f, 1f);
+                label.SetText("???");
+                label.SetTempColor(new Color(0.6f, 0.6f, 0.6f, 1f));
             }
         }
     }
