@@ -134,26 +134,33 @@ prefab.
 
 ### 4.2 `Window` panel
 
-The window is **modal-style**: centered on screen, fixed 400×700,
-intentionally blocks the play view. (Live-tracking the progress
-counter without opening the modal is a separate, future
-`LiveTrackerBar` prefab — see Phase 5 stub at the end.)
+The window is **modal-style, full-screen with margin**: stretches over
+the entire UI surface with a fixed pixel padding on all sides. The
+content blocks the play view fully — intentional, because the
+checklist is meant to take over while open, not be a side-panel.
+(Live-tracking the progress counter without opening the modal is a
+separate, future `LiveTrackerBar` prefab — see Phase 5 stub.)
 
 Select `Window`, set in Inspector:
 
 | Component       | Setting           | Value                                 |
 |-----------------|-------------------|---------------------------------------|
-| Rect Transform  | Anchors Min       | X 0.5, Y 0.5                          |
-| Rect Transform  | Anchors Max       | X 0.5, Y 0.5                          |
+| Rect Transform  | Anchors Min       | X 0, Y 0                              |
+| Rect Transform  | Anchors Max       | X 1, Y 1                              |
 | Rect Transform  | Pivot             | X 0.5, Y 0.5                          |
-| Rect Transform  | Pos X / Y / Z     | 0 / 0 / 0                             |
-| Rect Transform  | Width / Height    | 400 / 700                             |
+| Rect Transform  | Left / Right      | 80 / 80                               |
+| Rect Transform  | Top / Bottom      | 80 / 80                               |
 | Image           | Source Image      | `ui_panel` (sub-sprite of `ui_classic`)|
 | Image           | Image Type        | `Sliced`                              |
 | Image           | Fill Center       | ✓ (checked)                           |
 
-This centers `Window` in the Canvas (screen middle), fixed size, both
-axes single-point-anchored to the parent's middle.
+Inspector shows `Left / Top / Right / Bottom` (instead of `Pos X /
+Width`) once both anchor axes are stretched.
+
+This scales resolution-independent: on 1920×1080 you get a 1760×920
+effective window, on 4K (3840×2160) a 3680×2000 window — always 80 px
+margin around. The 9-slice borders stay pixel-crisp, only the dark
+center fills more.
 
 ### 4.3 `Header` (title bar)
 
