@@ -91,7 +91,7 @@ its appearance at runtime.
 **Hierarchy goal:**
 
 ```
-ItemChecklistWindow      [Canvas + CanvasScaler + GraphicRaycaster]
+ItemChecklistWindow      [RectTransform + ItemChecklistWindowView (UIelement subclass)]
 └─ Window                [RectTransform + Image(sprite=ui_panel, Sliced)]
    ├─ Header             [RectTransform + Image(sprite=ui_tab, Sliced)]
    │   ├─ Title          [PugText  "Item Checklist"]
@@ -107,16 +107,30 @@ ItemChecklistWindow      [Canvas + CanvasScaler + GraphicRaycaster]
 
 ### 4.1 Scene scaffold
 
+The window root does **not** have its own Canvas. At runtime we parent
+it under `API.Rendering.UICamera.transform`, which provides:
+- CK's UI Canvas + Layer-Sortierung (cursor stays on top automatically)
+- Modal-UI registration via UIelement (gameplay input gets blocked when shown)
+
+That removes the need for our own Canvas, CanvasScaler, GraphicRaycaster
+or EventSystem.
+
 1. In **Hierarchy**: right-click in empty area → `UI → Image`. This
-   creates `Canvas` + child `Image` + `EventSystem`.
+   creates `Canvas` + child `Image` + `EventSystem`. We'll dismantle
+   most of this.
 2. **Rename `Canvas`** to `ItemChecklistWindow` (single click + F2, or
    double-click the name).
 3. Select `ItemChecklistWindow`, in Inspector:
-   - `Canvas` → Render Mode: `Screen Space - Overlay` (default; keep)
-   - `Canvas` → **Sort Order: `100`** (so we render above CK's own UI)
-   - `Canvas Scaler` → UI Scale Mode: `Constant Pixel Size` (default; keep)
+   - **Remove `Canvas` component** (⋮ → Remove Component)
+   - **Remove `Canvas Scaler` component**
+   - **Remove `Graphic Raycaster` component**
+   - The RectTransform cannot be removed and stays.
 4. **Rename the auto-created `Image` child** (currently selected) to
    `Window`. This is now our main visible panel.
+
+You can also leave the temporary `EventSystem` in the scene for now —
+it's only there for the scene preview, won't be part of the saved
+prefab.
 
 ### 4.2 `Window` panel
 
@@ -269,9 +283,12 @@ Remove Text component, Add Component → PugText.
 ### 4.8 Attach `ItemChecklistWindowView` + wire slots
 
 1. Select `ItemChecklistWindow` (the root) in Hierarchy
-2. Inspector → `Add Component` → "Item Checklist Window View"
-3. The component appears with 7 empty drop-slots. Drag GameObjects from
-   Hierarchy into them:
+2. Inspector → `Add Component` → "Item Checklist Window View" (this is
+   a UIelement subclass — Editor auto-shows the inherited UIelement
+   fields like `topUIElements` / `bottomUIElements` etc. below our own;
+   leave those empty for now)
+3. The component appears with 7 empty drop-slots **for our SerializeField
+   members**. Drag GameObjects from Hierarchy into them:
 
 | Slot in Inspector  | Drag-Source from Hierarchy                       |
 |--------------------|--------------------------------------------------|
