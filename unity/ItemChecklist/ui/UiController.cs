@@ -92,7 +92,12 @@ namespace ItemChecklist.UI
                 return;
             }
 
-            var canvas = root.GetComponent<Canvas>();
+            // Use GetComponentInChildren — the Canvas may be on the root
+            // (clean layout) or on a child GameObject (what Unity creates
+            // when you pick UI → Canvas inside the prefab edit mode and
+            // existing children get re-parented under it). Both wire up
+            // correctly here.
+            var canvas = root.GetComponentInChildren<Canvas>();
             if (canvas != null)
             {
                 var uiCameraPug = API.Rendering.UICamera;
