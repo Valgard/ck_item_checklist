@@ -178,9 +178,11 @@ Right-click `Window` → `UI → Image`. Rename to `Header`. Settings:
 
 #### 4.3.1 `Title` text
 
-Right-click `Header` → `UI → Legacy → Text`. Rename to `Title`. Then on
-the new GameObject:
-1. Remove the auto-added `Text` component (⋮ → Remove Component)
+Right-click `Header` → `UI → Image`. Rename to `Title`. Then on the new
+GameObject:
+1. Remove the auto-added `Image` component (⋮ → Remove Component) — we
+   only wanted the RectTransform + UI-layer setup that "UI → Image"
+   gives us for free; the Image itself is unwanted
 2. `Add Component → Pug Text`
 3. PugText settings:
    - Text String: `Item Checklist`
@@ -223,8 +225,15 @@ Right-click `Window` → `UI → Legacy → Input Field`. Rename to
 | Input Field     | Content Type      | `Standard`                            |
 
 The `Input Field` template auto-creates two children, `Placeholder` and
-`Text`. Both keep their default Legacy Text components for now (we don't
-SerializeField them, so Legacy is fine here).
+`Text`. **Both keep their default Legacy Text components** (we don't
+SerializeField them in our View class, so the InputField only needs the
+right outward type — its internal children stay as Unity ships them).
+
+Note: SearchField and FilterDropdown themselves stay as Legacy
+`InputField` and `Dropdown` — our `ItemChecklistWindowView` references
+them by those exact types in `[SerializeField]`. PugText only replaces
+standalone text labels (Title, CounterLabel, ItemRow's Label /
+Placeholder).
 
 - `Placeholder` → set its Text to `Search…`
 - `Text` → leave empty
@@ -271,8 +280,9 @@ The ScrollView template creates three nested children: `Viewport` →
 
 ### 4.7 `CounterLabel`
 
-Right-click `Window` → `UI → Legacy → Text`. Rename to `CounterLabel`.
-Remove Text component, Add Component → PugText.
+Right-click `Window` → `UI → Image`. Rename to `CounterLabel`. Remove
+the auto-added `Image` component (⋮ → Remove Component), then `Add
+Component → Pug Text`.
 
 | Component       | Setting           | Value                                 |
 |-----------------|-------------------|---------------------------------------|
