@@ -88,71 +88,205 @@ its appearance at runtime.
 
 ## 4. Create `ItemChecklistWindow.prefab` (the main window)
 
-1. Project → `Assets/ItemChecklist/Prefabs/` → right-click → **Create →
-   Prefab** (or design in scene as above and drag in).
-2. Open the prefab for editing (double-click).
-3. Build the hierarchy:
+**Hierarchy goal:**
 
-   ```
-   ItemChecklistWindow              [Canvas + CanvasScaler + GraphicRaycaster]
-   └─ Window                        [RectTransform + Image(sprite=ui_panel, Sliced)]
-      ├─ Header                     [RectTransform + Image(sprite=ui_tab, Sliced)]
-      │   ├─ Title                  [Text "Item Checklist"]
-      │   └─ CloseButton            [Button + Image]
-      ├─ SearchField                [InputField + Image(sprite=ui_slot_background, Sliced)]
-      │   └─ Text                   [Text — InputField's text component]
-      │   └─ Placeholder            [Text "Search…"]
-      ├─ FilterDropdown             [Dropdown + Image(sprite=ui_slot_background, Sliced)]
-      ├─ ScrollView                 [ScrollRect]
-      │   ├─ Viewport               [RectTransform + Image (Mask) + RectMask2D]
-      │   │   └─ Content            [RectTransform + VerticalLayoutGroup + ContentSizeFitter]
-      │   ├─ Scrollbar Vertical     [Scrollbar — sprite=ui_scrollbar_handle for the handle]
-      │   └─ (Scrollbar Horizontal — optional, can remove)
-      └─ CounterLabel               [Text — bottom-center "0 / 0 (0%)"]
-   ```
+```
+ItemChecklistWindow      [Canvas + CanvasScaler + GraphicRaycaster]
+└─ Window                [RectTransform + Image(sprite=ui_panel, Sliced)]
+   ├─ Header             [RectTransform + Image(sprite=ui_tab, Sliced)]
+   │   ├─ Title          [PugText  "Item Checklist"]
+   │   └─ CloseButton    [Button + Image]
+   ├─ SearchField        [InputField + Image(sprite=ui_slot_background, Sliced)]
+   ├─ FilterDropdown     [Dropdown + Image(sprite=ui_slot_background, Sliced)]
+   ├─ ScrollView         [ScrollRect]
+   │   ├─ Viewport       [Image + RectMask2D]
+   │   │   └─ Content    [VerticalLayoutGroup + ContentSizeFitter]
+   │   └─ Scrollbar      [Scrollbar Vertical]
+   └─ CounterLabel       [PugText]
+```
 
-4. **Sprite assignment** (for each Image with a sprite column above):
-   - Click the Image component → next to `Source Image` → click the
-     small ⊙ button → search for the sub-sprite by name (e.g.
-     `ui_panel`)
-   - Set `Image Type: Sliced` (borders come from the atlas meta
-     automatically — 8/7/7/8 for `ui_panel`, 3/3/3/3 for
-     `ui_slot_background`)
+### 4.1 Scene scaffold
 
-5. **Anchor + size suggestions** (RectTransform-relative to parent):
-   - Window: anchorMin (0, 0), anchorMax (1, 1), full stretch — let
-     Canvas Scaler handle on-screen size; or anchor top-right to a
-     fixed 400×800 panel if you prefer a side-window
-   - Header: top-stretch, height 40
-   - SearchField: top-stretch, height 32, offset down by 48
-   - FilterDropdown: same row as SearchField (split horizontally if you
-     want — anchor SearchField (0,1)-(0.65,1), FilterDropdown
-     (0.65,1)-(1,1))
-   - ScrollView: stretch fill the middle, leave room for CounterLabel
-     at bottom
-   - CounterLabel: bottom-stretch, height 24
+1. In **Hierarchy**: right-click in empty area → `UI → Image`. This
+   creates `Canvas` + child `Image` + `EventSystem`.
+2. **Rename `Canvas`** to `ItemChecklistWindow` (single click + F2, or
+   double-click the name).
+3. Select `ItemChecklistWindow`, in Inspector:
+   - `Canvas` → Render Mode: `Screen Space - Overlay` (default; keep)
+   - `Canvas` → **Sort Order: `100`** (so we render above CK's own UI)
+   - `Canvas Scaler` → UI Scale Mode: `Constant Pixel Size` (default; keep)
+4. **Rename the auto-created `Image` child** (currently selected) to
+   `Window`. This is now our main visible panel.
 
-6. **Add the `ItemChecklistWindowView` component** to the root
-   (`ItemChecklistWindow` GameObject) → Inspector → **Add Component →
-   Item Checklist Window View**.
+### 4.2 `Window` panel
 
-7. **Wire the SerializeField slots** by dragging GameObjects from the
-   Hierarchy:
-   - `searchField` ← SearchField (the InputField component)
-   - `filterDropdown` ← FilterDropdown
-   - `scrollRect` ← ScrollView
-   - `rowContainer` ← Content (the inner GameObject with
-     VerticalLayoutGroup, not the Viewport or ScrollRect itself)
-   - `rowPrefab` ← drag `ItemRow.prefab` from Project window
-   - `counterLabel` ← CounterLabel (the Text component)
-   - `closeButton` ← CloseButton (optional — can leave empty)
+Select `Window`, set in Inspector:
 
-8. **Configure the FilterDropdown options**:
-   - Select FilterDropdown → in its Dropdown component, expand
-     `Options` and set 3 entries: `All`, `Discovered`, `Undiscovered`
-     (must match the order of `DiscoveryFilter` enum)
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors Min       | X 1, Y 0                              |
+| Rect Transform  | Anchors Max       | X 1, Y 1                              |
+| Rect Transform  | Pivot             | X 1, Y 0.5                            |
+| Rect Transform  | Pos X / Y / Z     | 0 / 0 / 0                             |
+| Rect Transform  | Width             | 400                                   |
+| Image           | Source Image      | `ui_panel` (sub-sprite of `ui_classic`)|
+| Image           | Image Type        | `Sliced`                              |
+| Image           | Fill Center       | ✓ (checked)                           |
 
-9. **Save** the prefab (`CMD+S`) and exit prefab edit mode.
+This anchors `Window` to the **right edge of the screen**, full height,
+400 px wide. (Inspector shows `Top 0, Bottom 0` since it's Y-stretched.)
+
+### 4.3 `Header` (title bar)
+
+Right-click `Window` → `UI → Image`. Rename to `Header`. Settings:
+
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors Min       | X 0, Y 1                              |
+| Rect Transform  | Anchors Max       | X 1, Y 1                              |
+| Rect Transform  | Pivot             | X 0.5, Y 1                            |
+| Rect Transform  | Pos X / Y         | 0 / 0                                 |
+| Rect Transform  | Width / Height    | (Width from stretch) / 40             |
+| Image           | Source Image      | `ui_tab`                              |
+| Image           | Image Type        | `Sliced`                              |
+
+#### 4.3.1 `Title` text
+
+Right-click `Header` → `UI → Legacy → Text`. Rename to `Title`. Then on
+the new GameObject:
+1. Remove the auto-added `Text` component (⋮ → Remove Component)
+2. `Add Component → Pug Text`
+3. PugText settings:
+   - Text String: `Item Checklist`
+   - Style → Font Face: `Bold Large`
+   - Style → Horizontal Alignment: `Center`
+   - Style → Vertical Alignment: `Center`
+   - Style → Color: white
+4. Rect Transform: Anchors stretch (Min 0/0, Max 1/1), Left/Top/Right/Bottom = 0/0/40/0 (leave 40px on the right for the close button)
+
+#### 4.3.2 `CloseButton`
+
+Right-click `Header` → `UI → Legacy → Button`. Rename to `CloseButton`.
+
+| Setting         | Value                                  |
+|-----------------|----------------------------------------|
+| Anchors Min     | X 1, Y 0.5                             |
+| Anchors Max     | X 1, Y 0.5                             |
+| Pivot           | X 1, Y 0.5                             |
+| Pos X / Y       | -8 / 0                                 |
+| Width / Height  | 32 / 32                                |
+| Image source    | `ui_slot_background` (or leave for now)|
+
+Delete the `Text` child the Button-template auto-creates (we just need
+the click-target; the close icon can be added later).
+
+### 4.4 `SearchField`
+
+Right-click `Window` → `UI → Legacy → Input Field`. Rename to
+`SearchField`.
+
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors Min       | X 0, Y 1                              |
+| Rect Transform  | Anchors Max       | X 0.65, Y 1                           |
+| Rect Transform  | Pivot             | X 0.5, Y 1                            |
+| Rect Transform  | Pos X / Y         | 0 / -48                               |
+| Rect Transform  | Width / Height    | (from stretch) / 32                   |
+| Image           | Source Image      | `ui_slot_background`                  |
+| Image           | Image Type        | `Sliced`                              |
+| Input Field     | Content Type      | `Standard`                            |
+
+The `Input Field` template auto-creates two children, `Placeholder` and
+`Text`. Both keep their default Legacy Text components for now (we don't
+SerializeField them, so Legacy is fine here).
+
+- `Placeholder` → set its Text to `Search…`
+- `Text` → leave empty
+
+### 4.5 `FilterDropdown`
+
+Right-click `Window` → `UI → Legacy → Dropdown`. Rename to
+`FilterDropdown`.
+
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors Min       | X 0.65, Y 1                           |
+| Rect Transform  | Anchors Max       | X 1, Y 1                              |
+| Rect Transform  | Pivot             | X 0.5, Y 1                            |
+| Rect Transform  | Pos X / Y         | 0 / -48                               |
+| Rect Transform  | Width / Height    | (from stretch) / 32                   |
+| Image           | Source Image      | `ui_slot_background`                  |
+| Image           | Image Type        | `Sliced`                              |
+| Dropdown        | Options           | 3 entries: `All`, `Discovered`, `Undiscovered` |
+
+The Dropdown auto-creates an internal `Template` GameObject for the
+dropdown menu — leave that as-is for now (Legacy Text inside).
+
+### 4.6 `ScrollView`
+
+Right-click `Window` → `UI → Scroll View`. Rename to `ScrollView`.
+
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors stretch   | Min 0/0, Max 1/1                      |
+| Rect Transform  | Left/Top/Right/Bottom | 4 / 88 / 4 / 32                  |
+| Scroll Rect     | Horizontal        | ☐ (unchecked)                         |
+| Scroll Rect     | Vertical          | ✓ (checked)                           |
+
+The ScrollView template creates three nested children: `Viewport` →
+`Content`, plus `Scrollbar Horizontal` and `Scrollbar Vertical`.
+
+- **Delete `Scrollbar Horizontal`** (we only scroll vertically)
+- On `Viewport`: leave the `Image` (used as mask) and `Mask` components
+- On `Content`:
+  - Anchors: Min 0/1, Max 1/1, Pivot 0/1 (top-stretch, top-anchored)
+  - Add Component → `Vertical Layout Group` (Padding/Spacing 0 is fine)
+  - Add Component → `Content Size Fitter` → Vertical Fit: `Preferred Size`
+
+### 4.7 `CounterLabel`
+
+Right-click `Window` → `UI → Legacy → Text`. Rename to `CounterLabel`.
+Remove Text component, Add Component → PugText.
+
+| Component       | Setting           | Value                                 |
+|-----------------|-------------------|---------------------------------------|
+| Rect Transform  | Anchors Min       | X 0, Y 0                              |
+| Rect Transform  | Anchors Max       | X 1, Y 0                              |
+| Rect Transform  | Pivot             | X 0.5, Y 0                            |
+| Rect Transform  | Pos X / Y         | 0 / 4                                 |
+| Rect Transform  | Width / Height    | (from stretch) / 24                   |
+| PugText         | Text String       | `0 / 0 (0%)`                          |
+| PugText         | Style → Font Face | `Bold Medium` (or `Score` for tabular numerals) |
+| PugText         | Horizontal Alignment | `Center`                           |
+| PugText         | Vertical Alignment | `Center`                             |
+| PugText         | Color             | white                                 |
+
+### 4.8 Attach `ItemChecklistWindowView` + wire slots
+
+1. Select `ItemChecklistWindow` (the root) in Hierarchy
+2. Inspector → `Add Component` → "Item Checklist Window View"
+3. The component appears with 7 empty drop-slots. Drag GameObjects from
+   Hierarchy into them:
+
+| Slot in Inspector  | Drag-Source from Hierarchy                       |
+|--------------------|--------------------------------------------------|
+| `Search Field`     | `SearchField` (the GameObject — Unity auto-picks the InputField) |
+| `Filter Dropdown`  | `FilterDropdown`                                 |
+| `Scroll Rect`      | `ScrollView`                                     |
+| `Row Container`    | `Content` (inside ScrollView → Viewport → Content)|
+| `Row Prefab`       | drag `ItemRow.prefab` **from the Project window** (not from Hierarchy) |
+| `Counter Label`    | `CounterLabel`                                   |
+| `Close Button`     | `CloseButton` (optional — can leave empty)       |
+
+### 4.9 Save as Prefab
+
+1. **Drag `ItemChecklistWindow` from Hierarchy** → into `Assets/ItemChecklist/Prefabs/` in Project window
+2. The Hierarchy entry turns blue (= prefab instance)
+3. Delete the temporary Canvas + EventSystem from the Hierarchy
+   (`ItemChecklistWindow` and `EventSystem` — both no longer needed
+   once the Prefab Asset exists)
+4. `File → Save` to persist the scene (just to avoid the "unsaved
+   changes" warning when closing the editor)
 
 ## 5. Build and test
 
