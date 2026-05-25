@@ -1,6 +1,7 @@
 using System.Linq;
 using CoreLib;
 using CoreLib.Submodule.ControlMapping;
+using CoreLib.Submodule.UserInterface;
 using ItemChecklist.UI;
 using PugMod;
 using Rewired;
@@ -69,6 +70,7 @@ namespace ItemChecklist
                 Debug.LogWarning("[ItemChecklist] AssetBundle not available — UI will fall back to default Unity sprites");
             }
 
+            CoreLibMod.LoadSubmodule(typeof(UserInterfaceModule));
             CoreLibMod.LoadSubmodule(typeof(ControlMappingModule));
 
             // Register the toggle keybind (default F1). CoreLib's
@@ -99,7 +101,13 @@ namespace ItemChecklist
             Catalog.Bake();
         }
 
-        public void ModObjectLoaded(Object obj) { }
+        public void ModObjectLoaded(Object obj)
+        {
+            if (obj is GameObject go)
+            {
+                UserInterfaceModule.RegisterModUI(go);
+            }
+        }
         public void Shutdown() { }
 
         public void Update()
@@ -134,16 +142,22 @@ namespace ItemChecklist
                 // when another text input has focus, or when the chat
                 // window is open. Skip the guard when our own window is
                 // already visible so the user can always close it.
-                if (!Ui.IsVisible
-                    && (Manager.menu.IsAnyMenuActive()
-                        || Manager.input.textInputIsActive
-                        || ReferenceEquals(Manager.input.activeInputField, Manager.ui.chatWindow)))
+                if (!Manager.menu.IsAnyMenuActive()
+                    && !Manager.input.textInputIsActive
+                    && !ReferenceEquals(Manager.input.activeInputField, Manager.ui.chatWindow))
+                {
+                    Debug.Log($"[ItemChecklist] Hotkey: rewired={rewiredFired} raw={rawFired} — opening UI");
+                    UserInterfaceModule.OpenModUI("ItemChecklist:Window");
+                }
+                else
                 {
                     Debug.Log("[ItemChecklist] Hotkey ignored (other menu/input active)");
-                    return;
                 }
-                Debug.Log($"[ItemChecklist] Hotkey: rewired={rewiredFired} raw={rawFired} — toggling UI");
-                Ui.Toggle();
+                // Disconnected per docs/superpowers/specs/2026-05-25-itemchecklist-ui-pivot-iter1-design.md.
+                // Old UiController-based toggle path is kept as Iter-2 reference but is no longer called.
+                // The new window is registered via CoreLib's UserInterfaceModule and instantiated by
+                // CoreLib at UIManager.Init time.
+                // Ui.Toggle();
             }
         }
     }
