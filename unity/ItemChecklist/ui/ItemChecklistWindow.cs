@@ -97,6 +97,12 @@ namespace ItemChecklist.UI
                     content.RowCount = _spawnedRows.Count;
                     API.Reflection.SetValue(MiScrollable, scrollWindow, content);
                     API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
+                    // Reset scroll to top after content change. Per Spike-5
+                    // decompile: UIScrollWindow uses a lerp anchor convention
+                    // where 0f = bottom and 1f = top. ResetScroll() calls
+                    // SetScrollValue(1f) internally + activates the scroll
+                    // system for mouse-wheel input.
+                    scrollWindow.ResetScroll();
                 }
             }
         }

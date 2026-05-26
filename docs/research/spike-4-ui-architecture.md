@@ -11,11 +11,11 @@ dead, multi-open PugText pool leak, viewport clipping.
 **Iter-3 PARTIAL DONE 2026-05-26**: `pugText.Clear()` loop in `ClearRows`
 fixes the pool leak under current mod.io CoreLib runtime (4.0.3-Code).
 Phase 3 PASS verified (13× F1 + disconnect, texts persist; main menu
-texts intact after first open). Scroll-fix and background-bug deferred:
-- **Iter-3.5** (Scroll): `SetScrollValue(0f)` was tested and has
-  destructive side-effects on layout (rows start at window-top instead
-  of below title). Needs decompile-spike on `Pug.UnityExtensions.dll`'s
-  `UIScrollWindow` for a side-effect-free activation path.
+texts intact after first open). Scroll-fix and background-bug deferred.
+**Iter-3.5 DONE (2026-05-26):** Mouse-wheel scroll fix. Root cause was TWO-FOLD: (1) `UIScrollWindow.Awake` reads `scrollable` (public serialized field), NOT `_scrollable` (private) — our Iter-2 `[DefaultExecutionOrder(-100)]` + API.Reflection on `_scrollable` was wiring the wrong field; UIScrollWindow disabled itself permanently at Awake because public `scrollable` was null in the prefab. (2) Even with scrollable wired, scroll system needs an explicit initial-value via `SetScrollValue(1f)` or `ResetScroll()` to activate. Fix: prefab YAML edit (`scrollable: {fileID: 0}` → ItemChecklistContent component-id) + `scrollWindow.ResetScroll()` call in SpawnRows. Iter-2-bug-#3 (clipping) remains open as Iter-3.5b — UIScrollWindow handles scroll-position but NOT clipping automatically; vermutlich Mask/RectMask2D-Component im Prefab fehlt.
+Scroll-fix and background-bug deferred:
+- **Iter-3.5b** (Clipping): Scroll activates but rows render over window-edge;
+  vermutlich Mask/RectMask2D-Component auf ItemChecklistContent nötig.
 - **Iter-3.6** (Background quadrat small): empirically falsified all
   reachable hypotheses (Iter-1+2+3 code, CoreLib 4.0.0 vs 4.0.3 vs 4.0.4
   in every Build-Time/Runtime combination, all other 17 mods disabled).
