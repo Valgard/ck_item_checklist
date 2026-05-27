@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ItemChecklist
 {
     /// <summary>
-    /// TEMPORARY — Phase-0 diagnose for Iter-3.6. Logs three things:
+    /// TEMPORARY — Phase-0 diagnose for Iter-3.6. Logs four things:
     ///   D1: outcome of PlayerController.GetObjectName called in Init()
     ///   D2a: when PugDatabase.UpdateEntityMonos first runs + GetObjectName result there
     ///   D2b: when SaveManager.SetWorldId first runs + GetObjectName result there
@@ -52,7 +52,7 @@ namespace ItemChecklist
     // method when the player selects a world to load, which is the earliest reliable
     // signal that a save is being entered (fires before the world scene loads).
     [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.SetWorldId))]
-    internal static class Iter36DiagD2B_OnSaveLoaded
+    internal static class Iter36DiagD2B_SetWorldId
     {
         private static bool fired;
         [HarmonyPostfix]
@@ -70,7 +70,7 @@ namespace ItemChecklist
     // CK invokes on PlayerController when the local player entity is spawned into
     // the world.
     [HarmonyPatch(typeof(PlayerController), nameof(PlayerController.OnOccupied))]
-    internal static class Iter36DiagD2C_OnSpawn
+    internal static class Iter36DiagD2C_OnOccupied
     {
         private static bool fired;
         [HarmonyPostfix]
