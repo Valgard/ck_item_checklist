@@ -1,8 +1,8 @@
 # ItemChecklist UI Pivot — Iteration 3.5b Design (Clipping-Fix via SpriteMask)
 
 **Date:** 2026-05-27
-**Status:** Design approved (3 blocks). Pending: spec self-review → user review → writing-plans.
-**Branch:** `iter-3-5b` (Worktree `REPO_ROOT/.worktrees/iter-3-5b/` aus `main` @ `968eef7`)
+**Status:** **ABORTED 2026-05-27** — Pre-Flight (Plan-Task 1 + 2 + ad-hoc PugText-Decompile) hat zwei Grundannahmen widerlegt: (a) Row-Prefab-SpriteRenderer leben in Sorting-Layer `Default` (ID 0) mit Orders 15-20, (b) Row-Prefab-PugTexts resolven sentinel `int.MinValue` zur Runtime auf Sorting-Layer `GUI` mit Order 9999. Mit drei verschiedenen Render-Domänen (`Default`/`GUI`/`UI`) ist die Pure-Runtime-SpriteMask-Strategie ohne entweder (i) hochinvasives Layer-Konsolidieren aller Renderer ODER (ii) Prefab-Edits nicht praktikabel. Pivot zu Iter-3.5c (IB-1:1 inklusive Prefab-Edits) — siehe `docs/superpowers/specs/2026-05-27-itemchecklist-ui-pivot-iter3-5c-design.md`. Plan-Task 0+1+2 wurden vollständig ausgeführt und liefern die Pre-Flight-Daten als Reference für Iter-3.5c. Tasks 3-14 nicht ausgeführt.
+**Branch:** `iter-3-5b` (Worktree `REPO_ROOT/.worktrees/iter-3-5b/` aus `main` @ `968eef7`) — keine Code-Commits; Worktree wird in Iter-3.5b-Abort-Cleanup entfernt.
 **Prerequisite reading:**
 - Iter-3.5 Spec: `docs/superpowers/specs/2026-05-26-itemchecklist-ui-pivot-iter3-5-design.md`
 - Iter-3 Spec: `docs/superpowers/specs/2026-05-26-itemchecklist-ui-pivot-iter3-design.md`
@@ -230,3 +230,17 @@ HideUI / Cleanup
   - `Prefabs/Browser/ItemBrowserUI.prefab` (Z3037-3123: ContentsMask + SpriteMask)
   - `Scripts/Common/Api/ItemBrowserRegistry.cs` (Z66-77: AddEntryDisplay-Mask-Hook)
 - Memory: `[[reference-analysis-mandatory-when-provided]]`, `[[deep-spike-unfamiliar-internals]]`, `[[subagent-build-verify-install]]`, `[[worktree-remove-preflight-check]]`, `[[frequent-wip-commits-for-bisect]]`, `[[item-checklist-ui-pivot-state]]`, `[[corekeeper-ui-pattern]]`, `[[pugstorm-sandbox-rules]]`, `[[pugstorm-modbuilder-sprite-meta]]`, `[[corekeeper-compile-fail-cascade]]`
+
+---
+
+## Abort-Addendum (2026-05-27) — Warum Pure-Runtime nicht praktikabel war
+
+Pre-Flight (Plan-Tasks 1+2 + ad-hoc PugText-Decompile) hat drei Findings produziert. Die volle Detail-Dokumentation lebt im Plan-Doc-Addendum: `docs/superpowers/plans/2026-05-27-itemchecklist-ui-pivot-iter3-5b.md` (Sektion "Findings-Addendum"). Kurz:
+
+1. **UIScrollWindow-Felder sind public** (`windowHeight`, `windowWidth`, `windowLocalCenter`) — wie angenommen, kein Reflection-Fallback nötig.
+2. **Row-Prefab-Renderer leben in `Default` (ID 0) Layer mit Orders 15-20**, NICHT in Layer `UI` mit Orders 40-55 (wie IB-Convention). Eine einzige SpriteMask mit IB-Range würde diese Renderer ignorieren.
+3. **PugText resolved Sentinel `int.MinValue` auf Layer `GUI`** zur Runtime (`PugText.cs:849`), nicht auf `UI` oder `Default`. Damit gibt es drei aktive Render-Domänen (`Default`/`GUI`/`UI`), die nicht von einer einzigen Mask abdeckbar sind ohne Runtime-Konsolidierung.
+
+Pure-Runtime (Decision-3 der Spec) hätte bedeutet: Task 5 muss **alle** Row-SpriteRenderer + PugText auf einen einzigen Sorting-Layer + Order-Range konsolidieren — invasiv für jeden Renderer auf jedem Spawn. Plus: das könnte Render-Order-Beziehungen zum Wood-Theme-Background brechen (CK Project-Settings für Layer-Reihenfolge unbekannt). Risiko zu hoch für "Strict Clipping-Fix only" Scope.
+
+**Pivot: Iter-3.5c (IB-1:1 inklusive Prefab-Edits)** — Decision-3 wird invertiert (statisch im Prefab statt Pure Runtime). ItemRow.prefab + ItemChecklistWindow.prefab werden im Unity Editor angepasst, sodass Renderer-Sorting + ContentsMask-Setup als Prefab-State leben — wie in IB's `ItemBrowserUI.prefab` + `EntriesDivider.prefab`. Spec für Iter-3.5c wird separat geschrieben.

@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add viewport-clipping to the ItemChecklist UI by porting IB's `SpriteMask` + Sorting-Layer-Custom-Range mechanism 1:1, runtime-materialized — rows that scroll out of the wood-theme rectangle become invisible, while Title/Background and other UI remain unaffected.
+**STATUS: ABORTED 2026-05-27** — Plan-Task 1 + 2 + ad-hoc PugText-Decompile haben die Pure-Runtime-Strategie systemisch widerlegt. Tasks 0-2 wurden ausgeführt und produzieren die Pre-Flight-Daten als Reference für Iter-3.5c (IB-1:1 inkl. Prefab-Edits). Tasks 3-14 nicht ausgeführt. Worktree `iter-3-5b` wird abgebaut. Begründung im Findings-Addendum am Ende dieses Dokuments.
+
+**Goal (original — nicht erreicht):** Add viewport-clipping to the ItemChecklist UI by porting IB's `SpriteMask` + Sorting-Layer-Custom-Range mechanism 1:1, runtime-materialized — rows that scroll out of the wood-theme rectangle become invisible, while Title/Background and other UI remain unaffected.
 
 **Architecture:** New static helper `ContentsMaskInstaller` owns mask creation (one-shot per window) and per-row `MaskInteraction` propagation (mirrors `ItemBrowserRegistry.AddEntryDisplay`). Two hooks added to `ItemChecklistWindow`: one in `Awake()` (install mask), one in `SpawnRows()` (set `VisibleInsideMask` on every freshly-instantiated row). Mask geometry is runtime-derived from `UIScrollWindow.windowWidth/Height/LocalCenter`; the 1×1 white-rect mask sprite is generated in-memory via `Texture2D` + `Sprite.Create` (no asset roundtrip).
 
@@ -75,14 +77,20 @@ ls /Users/valgard/Projects/private/core_keeper/item-checklist/unity/ItemChecklis
 
 Expected: at least `ui_classic.png`, `ui_stone.png`, `ui_unknown_item.png`. If missing: STOP, BLOCKED.
 
-- [ ] **Step 5: Verify `ilspycmd` available**
+- [ ] **Step 5: Verify `ilspycmd` available via project `.envrc`**
+
+`ilspycmd` is a **.NET global tool**, not a Homebrew package. macOS does not put `~/.dotnet/tools` on PATH by default. The project `.envrc` includes a project-local `export PATH="$HOME/.dotnet/tools:$PATH"` line — so sourcing `.envrc` (which builds already do) makes `ilspycmd` available without polluting any shell rc.
 
 ```bash
-which ilspycmd || brew install ilspycmd
+cd /Users/valgard/Projects/private/core_keeper/item-checklist/.worktrees/iter-3-5b
+source .envrc
+which ilspycmd || dotnet tool install -g ilspycmd
 ilspycmd --version
 ```
 
-Expected: `ICSharpCode.Decompiler 10.x` or similar. Used in Task 1 for the public-field check.
+Expected: `ICSharpCode.Decompiler 10.x` or similar (currently `10.1.0.8386`). If the binary is missing, the `dotnet tool install` line installs it under `~/.dotnet/tools` and the `.envrc` PATH-export picks it up immediately on the next `source`. Used in Task 1 for the public-field check.
+
+**Never modify `~/.zshrc` or other shell rc files** to make `ilspycmd` available — the project-local `.envrc` is the correct mechanism.
 
 - [ ] **Step 6: Commit Pre-Flight checkpoint** (no code change yet; commit only if `.worktrees/` was modified by previous tasks — typically nothing to commit at this point)
 
@@ -98,7 +106,7 @@ If nothing staged: skip commit. The worktree creation is recorded by git itself.
 ### Task 1: ILSpyCmd Pre-Flight — UIScrollWindow public-access verify
 
 **Files:**
-- Output: `/tmp/iter-3-5b-spike/UIScrollWindow.cs` (decompiled)
+- Output: `/tmp/iter-3-5b-spike/UIScrollWindow.decompiled.cs` (decompiled)
 - No code changes in repo.
 
 - [ ] **Step 1: Locate `Pug.Other.dll`** (contains UIScrollWindow)
@@ -111,7 +119,11 @@ Expected: file exists. If missing, locate via `find` in the bottle's `Managed/` 
 
 - [ ] **Step 2: Decompile UIScrollWindow class**
 
+`ilspycmd` is provided by `~/.dotnet/tools` — make sure `.envrc` is sourced so it's on PATH.
+
 ```bash
+cd /Users/valgard/Projects/private/core_keeper/item-checklist/.worktrees/iter-3-5b
+source .envrc
 mkdir -p /tmp/iter-3-5b-spike
 ilspycmd -t UIScrollWindow -o /tmp/iter-3-5b-spike \
   "/Users/valgard/Library/Application Support/CrossOver/Bottles/Core Keeper/drive_c/Program Files (x86)/Steam/steamapps/common/Core Keeper/CoreKeeper_Data/Managed/Pug.Other.dll"
@@ -123,7 +135,7 @@ Expected: file `UIScrollWindow.cs` exists (~350 lines). If `ilspycmd` returns mu
 - [ ] **Step 3: Verify public access for the three serialized fields**
 
 ```bash
-grep -nE '\bwindowHeight\b|\bwindowWidth\b|\bwindowLocalCenter\b' /tmp/iter-3-5b-spike/UIScrollWindow.cs
+grep -nE '\bwindowHeight\b|\bwindowWidth\b|\bwindowLocalCenter\b' /tmp/iter-3-5b-spike/UIScrollWindow.decompiled.cs
 ```
 
 Expected: three lines like `public float windowHeight;`, `public float windowWidth;`, `public Vector2 windowLocalCenter;` (or equivalent with property accessors). If they're `private`: continue to Step 4 for the Reflection fallback decision; otherwise skip Step 4.
@@ -878,3 +890,72 @@ git commit -m "docs(spike-5): close ContentsMask gap addendum from iter-3.5b"
 **Placeholder scan:** searched for `TBD`, `TODO`, "appropriate", "similar to" — none found. The only `<fill>` placeholders are in Task 2 Step 4 (scratchpad notes), which is intentional — they're recorded at execution time.
 
 **Type consistency:** `ContentsMaskInstaller.Install(Transform, UIScrollWindow)` → `SpriteMask` used identically in Tasks 4 and 6. `SetMaskInteractionRecursive(GameObject, SpriteMaskInteraction)` used identically in Tasks 5 and 7. `_contentsMask` field type matches Install's return type. ✅
+
+---
+
+## Findings-Addendum (Abort 2026-05-27) — Reference für Iter-3.5c
+
+Pre-Flight (Plan-Tasks 0-2) hat drei Findings produziert, die für Iter-3.5c als Grundwissen verfügbar sein müssen:
+
+### Finding 1 — `UIScrollWindow` Public-Access (Plan-Task 1)
+
+**Status:** PASS, kein Re-Spike nötig.
+
+`windowHeight`, `windowWidth`, `windowLocalCenter` sind in `Pug.Other.dll` als public serialized Fields deklariert:
+```csharp
+public float windowHeight = 9.25f;       // line 16 of UIScrollWindow.decompiled.cs
+public float windowWidth  = 9.25f;       // line 18
+public Vector2 windowLocalCenter;        // line 20
+```
+
+Default-Werte (9.25f) sind SDK-Defaults; im Window-Prefab Editor-set überschrieben. Direkt-Field-Access in Iter-3.5c-Code OK; kein Reflection-Fallback nötig.
+
+Decompile-Output: `/tmp/iter-3-5b-spike/UIScrollWindow.decompiled.cs` (360 Zeilen).
+
+### Finding 2 — Sorting-Layer/Order Realität (Plan-Task 2)
+
+**Status:** FAIL für Pure-Runtime-Annahme — Spec-bruchend.
+
+Drei Render-Domänen im aktuellen Prefab-Stack:
+
+| Renderer | Prefab-File | SortingLayer (resolved) | Order |
+|---|---|---|---|
+| Window.Background (SpriteRenderer) | ItemChecklistWindow.prefab | `Default` (ID 0) | 10 |
+| Window.Title (PugText, sentinel) | ItemChecklistWindow.prefab | `GUI` (via PugText.cs:849 resolve) | 9999 |
+| Row.Background (SpriteRenderer) | ItemRow.prefab | `Default` (ID 0) | 15 |
+| Row.Icon (SpriteRenderer) | ItemRow.prefab | `Default` (ID 0) | 20 |
+| Row.Label (PugText, sentinel) | ItemRow.prefab | `GUI` | 9999 |
+| Row.Placeholder (PugText, sentinel) | ItemRow.prefab | `GUI` | 9999 |
+| Row.Checkmark (SpriteRenderer) | ItemRow.prefab | `Default` (ID 0) | 20 |
+
+**Konsequenz:** Eine einzige `SpriteMask` mit Custom-Range `40..55` in Layer `UI` würde keine dieser Renderer erfassen. Beide IB-1:1-Anker (Layer `UI`, Range `40..55`) wären für unsere Prefabs ohne Layer-Konsolidierung wirkungslos.
+
+**Audit-Methodik-Bug:** Der Plan-Grep-Pattern (`m_SortingLayer|m_SortingOrder|m_Name:`) findet PugText nicht — PugText speichert sortieren-Felder unter `style.sortingLayer` / `style.orderInLayer` (lowercase `s`). Extended Pattern für Iter-3.5c: `m_SortingLayer|m_SortingOrder|m_Name:|sortingLayer:|orderInLayer:`.
+
+### Finding 3 — PugText Sentinel-Resolve (ad-hoc Decompile)
+
+**Status:** Bestätigung des PugText-Verhaltens.
+
+`PugText.decompiled.cs:849` (Z849-850 nach `dynamicTextMeshRenderer`):
+```csharp
+dynamicTextMeshRenderer.sortingLayerID =
+    ((style.sortingLayer == int.MinValue)
+        ? SortingLayer.NameToID("GUI")
+        : style.sortingLayer);
+dynamicTextMeshRenderer.sortingOrder = style.orderInLayer;
+```
+
+Konsequenzen:
+- Ein PugText mit `style.sortingLayer = int.MinValue` (= `-2147483648`, der `unset` Sentinel im Editor) wird zur Runtime auf Sorting-Layer `GUI` resolved.
+- `style.orderInLayer = 9999` wird direkt als `sortingOrder` verwendet.
+- `PugText.SetOrderInLayer(int)` (Z440-443) ist ein public Setter für `orderInLayer`. Setzt sowohl `style.orderInLayer` als auch `defaultStyle.orderInLayer`.
+- **Es gibt kein `SetSortingLayer`-Public-Setter** — `style.sortingLayer` muss direkt geschrieben werden (PugText.style ist public Field).
+
+Implikation für Iter-3.5c: Bei Prefab-Edit-Approach muss PugText im Editor neben `orderInLayer` auch `sortingLayer` (numerisch) gesetzt werden — der Unity Inspector zeigt int-Field, nicht Dropdown.
+
+### Lessons für Iter-3.5c
+
+1. **Reference-Analyse-Pflicht greift selbst bei "Pre-Flight"** ([[reference-analysis-mandatory-when-provided]]): Spike-5 hatte ein Mask-Finding versteckt; Plan-Task 2 hat ein Sorting-Finding versteckt. Beide via gezieltes Grep. Pre-Flight-Phasen müssen genauso ernst genommen werden wie Spike-Phasen.
+2. **`pgrep`-PugText/style-Detail** (PugText-spezifisch): Für jede zukünftige Sorting-Analyse von CK-UI-Prefabs der erweiterte Grep-Pattern: `m_SortingLayer|m_SortingOrder|m_Name:|sortingLayer:|orderInLayer:`.
+3. **Pure-Runtime hat Grenzen**: Funktioniert für GameObjects/Components, die wir vollständig kontrollieren. Endet, wo wir externe Konventionen (Sorting-Layer-Project-Settings, PugText-Sentinel-Resolve-Verhalten) berücksichtigen müssen.
+4. **3-Layer-Realität**: ItemChecklist-Mod hat **drei** aktive Sorting-Layer (`Default` für SpriteRenderer, `GUI` für PugText-Sentinels, jetzt potenziell `UI` für Mask). Jede Iter-3.5c-Strategie muss alle drei adressieren oder konsolidieren.

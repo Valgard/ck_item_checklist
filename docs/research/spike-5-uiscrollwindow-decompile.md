@@ -470,3 +470,60 @@ components that we lack. The hierarchy and component setup are structurally equi
 | `ItemBrowserUI.prefab` | Partial — UIScrollWindow blocks + parent hierarchy only | File is 991 KB; full read would exceed memory limits. Extracted: UIScrollWindow component field values, scrollingContent/container/scrollable fileID cross-references, parent Transform blocks. The filter panel, history panel, and display prefabs were deliberately skipped — irrelevant to the scroll-reset bug. |
 | `EntriesDivider.cs`, `EntriesUnavailableHeader.cs`, `EntriesView.cs`, `SwapCategoryButton.cs`, `EntryDescriptionButton.cs` | Skipped | Not referenced by `SetEntries` call-graph; irrelevant to scroll-position bug |
 | `LootTable*` files | Skipped | Separate renderer type; not in primary `BasicEntriesListRenderer` path |
+
+---
+
+## Addendum 2026-05-27 — Iter-3.5b Pre-Flight schliesst zwei Spike-5-Lücken
+
+Spike-5's "Reference Coverage" markierte `ItemBrowserUI.prefab` als `Partial — 991 KB`. Iter-3.5b Pre-Flight (Plan-Tasks 1+2 + ad-hoc PugText-Decompile) hat genau diese Lücke + zwei weitere für unsere eigenen Prefabs geschlossen. Volldetail im Plan-Doc-Addendum: `docs/superpowers/plans/2026-05-27-itemchecklist-ui-pivot-iter3-5b.md` (Sektion "Findings-Addendum"). Kurzfassung:
+
+### A — IB nutzt SpriteMask + Sorting-Layer-Custom-Range (NICHT uGUI-RectMask2D)
+
+`ContentsMask` ist ein Geschwister vom scrollenden `Scroll`-Container (beide Kinder von `ScrollAnchor`). SpriteMask-Component mit:
+- `m_Sprite`: CK-internes white-rect (`guid: 18b2bc60e2d9dde45bf94c39a2194e12`)
+- `m_IsCustomRangeActive: 1`
+- `m_FrontSortingLayer: 5` (UI) `m_FrontSortingOrder: 55`
+- `m_BackSortingLayer: 5` (UI) `m_BackSortingOrder: 40`
+- `m_MaskAlphaCutoff: 0.2`
+
+Per-Row `MaskInteraction` wird in IB **runtime** gesetzt (`ItemBrowserRegistry.AddEntryDisplay` Z66-77) — Display-Prefabs selbst haben `m_MaskInteraction: 0`. Das ist ein Pool-Reuse-Pattern, das wir nicht haben.
+
+IB-Display-Prefabs (z.B. `EntriesDivider.prefab` Z77-79) tragen **im Prefab** `m_SortingLayer: 5` (UI) + `m_SortingOrder: 49` — passt in den `40..55`-Range, deshalb greift die Mask.
+
+### B — ItemChecklist-Prefabs sind NICHT IB-konform
+
+| Renderer (unsere Prefabs) | SortingLayer | Order |
+|---|---|---|
+| Window.Background (SpriteRenderer) | `Default` (ID 0) | 10 |
+| Window.Title (PugText, sentinel) | `GUI` (runtime-resolved) | 9999 |
+| Row.Background (SpriteRenderer) | `Default` (ID 0) | 15 |
+| Row.Icon (SpriteRenderer) | `Default` (ID 0) | 20 |
+| Row.Label (PugText, sentinel) | `GUI` (runtime-resolved) | 9999 |
+| Row.Placeholder (PugText, sentinel) | `GUI` (runtime-resolved) | 9999 |
+| Row.Checkmark (SpriteRenderer) | `Default` (ID 0) | 20 |
+
+Drei aktive Render-Domänen (`Default`/`GUI`/`UI`). Eine einzige IB-Style-Mask in Layer `UI` Range `40..55` würde NICHTS davon erfassen.
+
+### C — PugText resolved Sentinel `int.MinValue` auf Layer `GUI`
+
+`PugText.decompiled.cs:849-850`:
+```csharp
+dynamicTextMeshRenderer.sortingLayerID =
+    ((style.sortingLayer == int.MinValue)
+        ? SortingLayer.NameToID("GUI")
+        : style.sortingLayer);
+dynamicTextMeshRenderer.sortingOrder = style.orderInLayer;
+```
+
+- Sentinel `style.sortingLayer == int.MinValue` (= `-2147483648`) → Layer `GUI` zur Runtime
+- `style.orderInLayer = 9999` → wird direkt als `sortingOrder` verwendet
+- Public Setter: `PugText.SetOrderInLayer(int)` (Z440) für `orderInLayer`, kein Setter für `sortingLayer` (direktes `style.sortingLayer = ...` nötig)
+- `PugText.style` ist public Field (`PugText.cs:95`)
+
+### Audit-Methodik-Lesson
+
+Plan-Grep `m_SortingLayer|m_SortingOrder|m_Name:` findet **kein** PugText-Sorting (PugText nutzt YAML-Schlüssel `sortingLayer:` / `orderInLayer:`). Erweiterter Pattern für künftige CK-UI-Audits: `m_SortingLayer|m_SortingOrder|m_Name:|sortingLayer:|orderInLayer:`.
+
+### Konsequenz für Iter-3.5c
+
+Spec für Iter-3.5c (separat) basiert auf IB-1:1-mit-Prefab-Edits: ItemRow.prefab + ItemChecklistWindow.prefab werden im Unity Editor IB-konform (Layer `UI`, Orders in `40..55`-Range, MaskInteraction prefab-set). Pure Runtime wird verworfen.
