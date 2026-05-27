@@ -95,6 +95,7 @@ namespace ItemChecklist
             Debug.Log("[ItemChecklist] Init");
             Catalog = new ItemCatalog();
             Catalog.Bake();
+            Iter36DiagnoseSpike.LogProbe("D1:Init");   // Phase-0 diagnose — removed in Plan-Task 9
         }
 
         public void ModObjectLoaded(Object obj)
