@@ -928,7 +928,7 @@ Drei Render-Domänen im aktuellen Prefab-Stack:
 | Row.Placeholder (PugText, sentinel) | ItemRow.prefab | `GUI` | 9999 |
 | Row.Checkmark (SpriteRenderer) | ItemRow.prefab | `Default` (ID 0) | 20 |
 
-**Konsequenz:** Eine einzige `SpriteMask` mit Custom-Range `40..55` in Layer `UI` würde keine dieser Renderer erfassen. Beide IB-1:1-Anker (Layer `UI`, Range `40..55`) wären für unsere Prefabs ohne Layer-Konsolidierung wirkungslos.
+**Konsequenz:** Eine einzige `SpriteMask` mit Custom-Range `40..55` in dem Layer, den IB nutzt (uniqueID `1241602095` = named Layer **`GUI`** per `CoreKeeperModSDK/ProjectSettings/TagManager.asset` — frühere Iter-3.5b-Aussagen "UI" waren ein Layer-Name-Mythos; "UI" existiert nicht als named Layer in CK), würde keine dieser Renderer erfassen. Beide IB-1:1-Anker (Layer `GUI`, Range `40..55`) wären für unsere Prefabs ohne Layer-Konsolidierung wirkungslos.
 
 **Audit-Methodik-Bug:** Der Plan-Grep-Pattern (`m_SortingLayer|m_SortingOrder|m_Name:`) findet PugText nicht — PugText speichert sortieren-Felder unter `style.sortingLayer` / `style.orderInLayer` (lowercase `s`). Extended Pattern für Iter-3.5c: `m_SortingLayer|m_SortingOrder|m_Name:|sortingLayer:|orderInLayer:`.
 

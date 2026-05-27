@@ -238,7 +238,7 @@ HideUI / Cleanup
 Pre-Flight (Plan-Tasks 1+2 + ad-hoc PugText-Decompile) hat drei Findings produziert. Die volle Detail-Dokumentation lebt im Plan-Doc-Addendum: `docs/superpowers/plans/2026-05-27-itemchecklist-ui-pivot-iter3-5b.md` (Sektion "Findings-Addendum"). Kurz:
 
 1. **UIScrollWindow-Felder sind public** (`windowHeight`, `windowWidth`, `windowLocalCenter`) — wie angenommen, kein Reflection-Fallback nötig.
-2. **Row-Prefab-Renderer leben in `Default` (ID 0) Layer mit Orders 15-20**, NICHT in Layer `UI` mit Orders 40-55 (wie IB-Convention). Eine einzige SpriteMask mit IB-Range würde diese Renderer ignorieren.
+2. **Row-Prefab-Renderer leben in `Default` (ID 0) Layer mit Orders 15-20**, NICHT in Layer `GUI` (uniqueID 1241602095) mit Orders 40-55 (wie IB-Convention; verifiziert via `CoreKeeperModSDK/ProjectSettings/TagManager.asset` 2026-05-27 — "UI" existiert nicht als named Layer, der von IB referenzierte Layer ist `GUI`). Eine einzige SpriteMask mit IB-Range würde diese Renderer ignorieren.
 3. **PugText resolved Sentinel `int.MinValue` auf Layer `GUI`** zur Runtime (`PugText.cs:849`), nicht auf `UI` oder `Default`. Damit gibt es drei aktive Render-Domänen (`Default`/`GUI`/`UI`), die nicht von einer einzigen Mask abdeckbar sind ohne Runtime-Konsolidierung.
 
 Pure-Runtime (Decision-3 der Spec) hätte bedeutet: Task 5 muss **alle** Row-SpriteRenderer + PugText auf einen einzigen Sorting-Layer + Order-Range konsolidieren — invasiv für jeden Renderer auf jedem Spawn. Plus: das könnte Render-Order-Beziehungen zum Wood-Theme-Background brechen (CK Project-Settings für Layer-Reihenfolge unbekannt). Risiko zu hoch für "Strict Clipping-Fix only" Scope.

@@ -482,13 +482,15 @@ Spike-5's "Reference Coverage" markierte `ItemBrowserUI.prefab` als `Partial —
 `ContentsMask` ist ein Geschwister vom scrollenden `Scroll`-Container (beide Kinder von `ScrollAnchor`). SpriteMask-Component mit:
 - `m_Sprite`: CK-internes white-rect (`guid: 18b2bc60e2d9dde45bf94c39a2194e12`)
 - `m_IsCustomRangeActive: 1`
-- `m_FrontSortingLayer: 5` (UI) `m_FrontSortingOrder: 55`
-- `m_BackSortingLayer: 5` (UI) `m_BackSortingOrder: 40`
+- `m_FrontSortingLayerID: 1241602095` (= **`GUI`** per `CoreKeeperModSDK/ProjectSettings/TagManager.asset`) `m_FrontSortingOrder: 55`
+- `m_BackSortingLayerID: 1241602095` (= **`GUI`**) `m_BackSortingOrder: 40`
 - `m_MaskAlphaCutoff: 0.2`
+
+> **Layer-Name-Korrektur (verifiziert via TagManager-asset 2026-05-27):** Frühe Iter-3.5b-Iterationen dieses Addendums sprachen von Layer `"UI"`. Die TagManager-Liste in CoreKeeperModSDK kennt aber kein "UI" — sie kennt nur `Background, Default, Back, Main, Front, PreGUI, GUI`. Die `uniqueID: 1241602095` matched eindeutig `GUI`. Der numerische Wert war immer korrekt, nur der menschen-lesbare Name war Mythos. Konsequenz auch für die Iter-3.5c-Spec: Mask + Row-Renderer leben auf Layer **`GUI`**, nicht "UI".
 
 Per-Row `MaskInteraction` wird in IB **runtime** gesetzt (`ItemBrowserRegistry.AddEntryDisplay` Z66-77) — Display-Prefabs selbst haben `m_MaskInteraction: 0`. Das ist ein Pool-Reuse-Pattern, das wir nicht haben.
 
-IB-Display-Prefabs (z.B. `EntriesDivider.prefab` Z77-79) tragen **im Prefab** `m_SortingLayer: 5` (UI) + `m_SortingOrder: 49` — passt in den `40..55`-Range, deshalb greift die Mask.
+IB-Display-Prefabs (z.B. `EntriesDivider.prefab` Z77-79) tragen **im Prefab** `m_SortingLayerID: 1241602095` (`GUI`) + `m_SortingOrder: 49` — passt in den `40..55`-Range, deshalb greift die Mask. Weitere IB-Display-Element-Orders (verifiziert in `EntriesUnavailableHeader.prefab`): Background SpriteRenderer = 45, Label PugText-style.orderInLayer = 48.
 
 ### B — ItemChecklist-Prefabs sind NICHT IB-konform
 
@@ -502,7 +504,7 @@ IB-Display-Prefabs (z.B. `EntriesDivider.prefab` Z77-79) tragen **im Prefab** `m
 | Row.Placeholder (PugText, sentinel) | `GUI` (runtime-resolved) | 9999 |
 | Row.Checkmark (SpriteRenderer) | `Default` (ID 0) | 20 |
 
-Drei aktive Render-Domänen (`Default`/`GUI`/`UI`). Eine einzige IB-Style-Mask in Layer `UI` Range `40..55` würde NICHTS davon erfassen.
+Zwei aktive Render-Domänen in unserer Prefab-Realität: `Default` (SpriteRenderer prefab-set Orders 10-20) + `GUI` (PugText-sentinel-resolved Order 9999). Eine IB-Style-Mask auf Layer `GUI` Range `40..55` würde aktuell weder SpriteRenderer (falscher Layer) noch PugTexts (Order out-of-range) erfassen.
 
 ### C — PugText resolved Sentinel `int.MinValue` auf Layer `GUI`
 
@@ -526,4 +528,4 @@ Plan-Grep `m_SortingLayer|m_SortingOrder|m_Name:` findet **kein** PugText-Sortin
 
 ### Konsequenz für Iter-3.5c
 
-Spec für Iter-3.5c (separat) basiert auf IB-1:1-mit-Prefab-Edits: ItemRow.prefab + ItemChecklistWindow.prefab werden im Unity Editor IB-konform (Layer `UI`, Orders in `40..55`-Range, MaskInteraction prefab-set). Pure Runtime wird verworfen.
+Spec für Iter-3.5c (separat) basiert auf IB-1:1-mit-Prefab-Edits: ItemRow.prefab + ItemChecklistWindow.prefab werden IB-konform angepasst (Layer `GUI` per TagManager-Verifikation, Orders in `40..55`-Range matched IB's EntriesDivider+UnavailableHeader, MaskInteraction prefab-set). Pure Runtime wird verworfen.
