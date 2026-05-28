@@ -115,6 +115,7 @@ namespace ItemChecklist.UI
             var state = DiscoveredState.Instance;
             if (catalog == null || state == null || rowPrefab == null) return;
 
+            float perfT0 = UnityEngine.Time.realtimeSinceStartup;
             float y = 0f;
             for (int i = 0; i < catalog.Count; i++)
             {
@@ -147,6 +148,10 @@ namespace ItemChecklist.UI
                     scrollWindow.ResetScroll();
                 }
             }
+
+            float perfMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
+            UnityEngine.Debug.Log(
+                $"[ItemChecklist] PERF spawn={perfMs:F0}ms rows={_spawnedRows.Count}");
         }
 
         private void ClearRows()

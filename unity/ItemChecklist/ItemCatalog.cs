@@ -87,6 +87,8 @@ namespace ItemChecklist
             baking = true;
             try
             {
+                float perfT0 = UnityEngine.Time.realtimeSinceStartup;
+
                 // PugDatabase.objectsByType is null until UpdateEntityMonos runs at
                 // least once. Bake() called too early (before the world is ready)
                 // hits this — fail soft so the consumer can retry.
@@ -249,6 +251,9 @@ namespace ItemChecklist
                     keyToIndex[DiscoveredState.PackKey(entries[i].ObjectId, entries[i].Variation)] = i;
 
                 Debug.Log($"[ItemChecklist] ItemCatalog baked: {entries.Length} items");
+                float perfTotalMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
+                UnityEngine.Debug.Log(
+                    $"[ItemChecklist] PERF bake-total={perfTotalMs:F0}ms catalog-size={entries.Length}");
             }
             finally
             {
