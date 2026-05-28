@@ -147,6 +147,29 @@ namespace ItemChecklist
                     if (locDontLocalize && !string.IsNullOrEmpty(rawText))
                         locText = rawText;
 
+                    // ItemBrowser variation-awareness adaptation: if the localized name
+                    // starts with "-" (typically a "{ingredient}-Suppe"-style I2.Loc
+                    // template where the placeholder is empty for variation 0), probe
+                    // variations 1..10 for a non-leading-dash resolution and adopt the
+                    // first one as this objectID's representative. ItemBrowser handles
+                    // this structurally by listing every variation as a separate item
+                    // (ObjectUtility.cs:67-160); we collapse to the first valid variation
+                    // to keep Iter-3.6 scope at one row per objectID. Per-variation
+                    // listing is Iter-5 material.
+                    if (!string.IsNullOrEmpty(locText) && locText.StartsWith("-"))
+                    {
+                        for (int v = 1; v <= 10; v++)
+                        {
+                            var probe = new ObjectDataCD { objectID = od.objectID, variation = v };
+                            var (probeText, _) = ResolveOne(probe, localize: true);
+                            if (!string.IsNullOrEmpty(probeText) && !probeText.StartsWith("-"))
+                            {
+                                locText = probeText;
+                                break;
+                            }
+                        }
+                    }
+
                     // PascalCaseSplitter fallback when both passes failed to produce a name.
                     if (string.IsNullOrEmpty(locText))
                         locText = PascalCaseSplitter.Split(od.objectID.ToString());
