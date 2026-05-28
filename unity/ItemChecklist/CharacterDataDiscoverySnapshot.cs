@@ -11,39 +11,36 @@ namespace ItemChecklist
     /// happens BEFORE <c>Manager.main.player</c> is spawned. We cannot
     /// filter live; we cache and resolve later.</para>
     ///
-    /// <para>Cache key: <c>playerName</c> from <c>CharacterCustomization</c>.
+    /// <para>Cache key: <c>characterGuid</c> from <c>CharacterData</c>.
     /// The active-character resolution happens in
-    /// <see cref="ItemChecklistMod.Update"/> once the player spawns and
-    /// exposes <c>playerName</c>.</para>
+    /// <see cref="ItemChecklistMod.Update"/> via the
+    /// <c>SaveManagerActiveSelectHook.ActiveGuid</c> set by the
+    /// sequential <c>SetCharacterId</c> → file-read → <c>JsonOverwrite</c>
+    /// → <c>OnAfterDeserialize</c> path.</para>
     ///
-    /// <para><b>Same-name trade-off:</b> if two characters share a
-    /// display name on the same save, the cache key collides and the
-    /// last deserialized "Hans" wins. We tried three more accurate
-    /// alternatives — ALL sandbox-blocked:</para>
-    /// <list type="bullet">
-    ///   <item><c>PlayerController.characterGuid</c> — does not exist</item>
-    ///   <item><c>Manager.saves.GetCharacterGuid()</c> — whole
-    ///     <c>SaveManager</c> instance-access banned</item>
-    ///   <item><c>HarmonyLib.Traverse</c> on the private
-    ///     <c>characterData[]</c> field — 1 type + 3 member illegal refs
-    ///     (verified live 2026-05-24)</item>
-    ///   <item><c>EntityManager.HasComponent&lt;CharacterGuidCD&gt;(playerEntity)</c>
-    ///     + <c>GetComponentData&lt;CharacterGuidCD&gt;</c> — 1 namespace +
-    ///     1 type + 1 member illegal refs (verified live 2026-05-24)</item>
-    /// </list>
-    /// <para>Acceptable for single-player target use-case. Mitigation:
-    /// real new pickups still flow through <see cref="SaveManagerDiscoveryHook"/>
-    /// and CK's <c>SetObjectAsDiscovered</c> is the source of truth — so
-    /// a wrong initial snapshot self-heals on the next pickup of any
-    /// not-yet-cached item.</para>
+    /// <para><b>History:</b> the original Iter-3.6 cache keyed on
+    /// <c>playerName</c> from <c>CharacterCustomization</c> — vulnerable
+    /// to same-name collisions on multi-char saves ("last deserialized
+    /// 'Hans' wins"). Subsequent migration to <c>characterGuid</c>
+    /// removes the collision risk. Earlier attempts to use sandbox-banned
+    /// alternatives all failed: <c>PlayerController.characterGuid</c>
+    /// does not exist, <c>Manager.saves.GetCharacterGuid()</c> is
+    /// instance-access-banned, <c>HarmonyLib.Traverse</c> on the private
+    /// <c>characterData[]</c> field gives 1 type + 3 member illegal refs,
+    /// and <c>EntityManager.HasComponent&lt;CharacterGuidCD&gt;</c> gives
+    /// 1 namespace + 1 type + 1 member illegal refs (all verified live
+    /// 2026-05-24). The breakthrough was reading
+    /// <c>__instance.characterGuid</c> directly off the patched-instance
+    /// — a plain field access that is sandbox-safe.</para>
     /// </summary>
     [HarmonyPatch(typeof(CharacterData), nameof(CharacterData.OnAfterDeserialize))]
     internal static class CharacterDataDiscoverySnapshot
     {
-        /// <summary>player-name → discovered objectIDs, populated as CK
-        /// deserializes each character slot. Read by
+        /// <summary>characterGuid → packed (objectId, variation) keys,
+        /// populated as CK deserializes each character slot. Read by
         /// <see cref="ItemChecklistMod.Update"/> once the active player
-        /// spawns.</summary>
+        /// spawns and <c>SaveManagerActiveSelectHook.ActiveGuid</c>
+        /// is set.</summary>
         internal static readonly Dictionary<string, long[]> Cache = new Dictionary<string, long[]>();
 
         [HarmonyPostfix]

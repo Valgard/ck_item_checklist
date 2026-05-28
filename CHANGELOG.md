@@ -16,9 +16,12 @@ cooked-food tracking) and will accumulate forward.
 - **Variation-aware Cooked-Food tracking.** Each concrete `(ingredient1,
   ingredient2)`-permutation is now a separate discovery token in the
   checklist (e.g. Mushroom-Soup ≠ Tomato-Soup), mirroring CK's own
-  per-permutation tracking. Catalog grows from ~1750 to ~10720 entries
-  (15 base recipes × 3 tier-items × 3160 symmetric ingredient pairs,
-  filtered by `IsIngredientObsolete`).
+  per-permutation tracking. Catalog grows from ~1750 to ~10720 entries:
+  3160 symmetric ingredient pairs × 3 tier-variants (Base/Rare/Epic) =
+  9480 cooked-food permutations, plus ~1240 non-cooked items. Each pair
+  maps deterministically to one of 15 base-recipe families via
+  `primary.turnsIntoFood`; obsolete ingredients
+  (`GiantMushroom`, `AmberLarva`) are filtered out.
 - **Discovery-quote display in window title:** `"Item Checklist — N / M
   (X.Y%)"` where N = discovered count, M = catalog total. Percent
   rendered in current locale (DE: `0,3%` / EN: `0.3%`).
