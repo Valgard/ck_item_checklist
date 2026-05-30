@@ -120,13 +120,24 @@ must equal the SpriteMask height (and the mask top align to row 0's top)
 for the first/last rows to sit flush. F1 already opens the window (wired
 since Iter-1 via the CoreLib `ControlMappingModule` keybind); it does
 **not** close it (`UserInterfaceModule.OpenModUI` is not toggle-capable) —
-ESC closes. Pending: Iter-4 (real F1 *toggle* — open-and-close on one key),
-Iter-5 (Listen-Sortierung), Iter-6 (Filter+Suche — a discovered-only filter was
+ESC closes. Pending: Iter-4 (real F1 *toggle* — open-and-close on one key);
+**Iter-4.5 — functional scrollbar (planned before Iter-5)**: wire a working,
+draggable scrollbar using the existing `Art/Bridge/` placeholder sprites
+(e.g. `mask_sprite.png`, a 1×1 white sprite tinted, as track + handle); full
+visual polish (real sprites) folds into Iter-7. De-risked contract (ILSpy):
+CK's `ScrollBar : UIelement` needs `scrollWindow` + `root` (GameObject) +
+`background` (SpriteRenderer) + `handle` (a `ScrollBarHandle : ButtonUIElement`
+with `handleSpriteRenderer`, `handleCollider` BoxCollider, `handleSpritesToResize`);
+`ScrollBar.Update()` self-shows on `ScrollHeight > 0`, drag maps mouse-Y →
+`SetScrollValue`, handle size ∝ `VisibleRatio` (min 0.625). Wire
+`UIScrollWindow.scrollBar` to it (prefab fields `scrollBar`/`arrowUp`/`arrowDown`
+are currently `fileID: 0`; scroll arrows stay optional/unused). Iter-5
+(Listen-Sortierung); Iter-6 (Filter+Suche — a discovered-only filter was
 prototyped as a throwaway test scaffold in Iter-3.8 and removed; it can
-seed Iter-6), Iter-7 (Window-/Style-Polish inkl. Footer-Move + perfectly
-flush window needs a panel/mask resize to an integer row multiple, and a
-scrollbar is not yet wired in the prefab). See `git log` for canonical
-per-iter merge points and `docs/superpowers/specs/` for design docs.
+seed Iter-6); Iter-7 (Window-/Style-Polish inkl. Footer-Move + perfectly
+flush window needs a panel/mask resize to an integer row multiple + scrollbar
+*visual* polish/real sprites). See `git log` for canonical per-iter merge
+points and `docs/superpowers/specs/` for design docs.
 
 ## Conventions
 
