@@ -8,7 +8,7 @@ guidance (build setup, sandbox rules, macOS/CrossOver workflow,
 **ItemChecklist-specific** detail that other Core Keeper mods would not
 need.
 
-## Architecture (post-Iter-3.7)
+## Architecture (post-Iter-3.8)
 
 Discovery state is split across four collaborating classes:
 
@@ -20,7 +20,9 @@ Discovery state is split across four collaborating classes:
 | `CharacterDataDiscoverySnapshot` | Harmony postfix on `CharacterData.OnAfterDeserialize`. Cache keyed on `characterGuid` (read directly via `__instance.characterGuid` field-access — the sandbox-safe path after several banned alternatives). Active-char resolution piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`. |
 
 Lifecycle:
-- `IMod.EarlyInit` loads the CoreLib `UserInterfaceModule` submodule.
+- `IMod.EarlyInit` loads the CoreLib `UserInterfaceModule` **and**
+  `ControlMappingModule` submodules — the latter registers the F1 keybind
+  (polled in `IMod.Update` to open the window).
 - `IMod.ModObjectLoaded` registers the window prefab via
   `UserInterfaceModule.RegisterModUI`.
 - `IMod.Init` subscribes the loc-change hook; **no Bake-call here** (too
@@ -77,28 +79,22 @@ Epic) are looked up via `tierMap[baseFamily]` from `CookedFoodCD`.
   field-access on serialized struct-fields (e.g.
   `__instance.characterGuid`, `objectData.variation`) is OK. This
   unlocks the character-GUID cache key.
-- **PugText pool-leak fix** in `ItemChecklistWindow.ClearRows`: each
-  spawned row's `PugText`-children get `Clear()` called before
-  `Object.Destroy(go)`. Without this, the shared pool leaks per Destroy
-  and main-menu PugTexts go blank after the first window-open. As of
-  Iter-3.8 this inverted: rows live in a persistent pool and are no
-  longer destroyed on Hide, so the per-Destroy `Clear()` moved to
-  `ItemChecklistContent.OnDestroy` (pool teardown only). Because rows
-  are not destroyed per close, the original main-menu-blanking symptom
-  can no longer occur.
+- **PugText pool-leak:** spawned rows must `Clear()` their `PugText`
+  children, or the shared pool leaks and main-menu PugTexts go blank. As
+  of Iter-3.8 rows live in a persistent pool (no per-close Destroy), so
+  the `Clear()` moved to `ItemChecklistContent.OnDestroy` (teardown only)
+  and the blanking symptom can no longer occur. Detail in
+  `docs/architecture.md § Viewport Virtualization`.
 - **`ex.GetType().Name` inside a catch block is sandbox-banned.** `Type.Name`
   resolves to `MemberInfo.get_Name()` which is blocked by Roslyn's code-security
   verification. Symptom: `Illegal Member References = '1'`, `CompileFailed`.
   Fix: use typed catches (`catch (NullReferenceException ex)`) or log only
   `ex.Message` (sandbox-safe). Never call any `.Name` property on a reflected
   type in mod code.
-- **uGUI (Canvas/Image) structurally fails in CK.** CK's `UIMouse` does
-  `Physics.Raycast` in the UI layer; `Canvas/Image` have no `Collider` and
-  are invisible to the raycast. Input passes through and the cursor stays
-  under the window regardless of Canvas Render Mode. This is not a
-  configuration problem — it is a structural incompatibility. All 10 surveyed
-  CK UI mods use `SpriteRenderer` + Layer 5 + `UIelement`. Do not attempt
-  Canvas-based UI.
+- **uGUI (Canvas/Image) structurally fails in CK** — no `Collider`, so
+  CK's `Physics.Raycast`-based `UIMouse` never sees it. Use
+  `SpriteRenderer` + Layer 5 + `UIelement` (all 10 surveyed CK UI mods do).
+  Full explanation: `docs/gotchas.md § uGUI structurally fails in CK`.
 - **`PugMod.MemberInfo` vs `System.Reflection.MemberInfo` conflict.** Adding
   `using System.Reflection;` in any mod file causes `CS0104` ambiguity because
   `PugMod` also exports a `MemberInfo`. Solution: never add
@@ -107,36 +103,10 @@ Epic) are looked up via `tierMap[baseFamily]` from `CookedFoodCD`.
 
 ## UI Clipping Pattern
 
-Clipping in CK `SpriteRenderer` UI: use `SpriteMask` with a **Custom
-Sorting-Layer Range**. The working recipe (Iter-3.5c):
-
-- **Sorting layer:** `"GUI"` (uniqueID `1241602095` — verify against
-  `CoreKeeperModSDK/ProjectSettings/TagManager.asset` before hardcoding).
-- **Custom Range:** `FrontOrder = 55`, `BackOrder = 40`. All row
-  renderers must have their `sortingOrder` within this range.
-- **IB reference orders:** Background=45, Icon=48, Label=49,
-  Placeholder=49, Checkmark=50. Row renderers sit between Background
-  and mask front-order.
-- **`mask_sprite.png`:** 1×1 white PNG. **Must** set
-  `spritePixelsToUnits: 1` in the `.meta` (NOT the SDK default of 16
-  — at PPU=16 the sprite is 0.0625 units and Transform scale produces
-  a tiny mask instead of full window coverage).
-- **Mask geometry:** place the SpriteMask as a child of RowsContainer.
-  If RowsContainer has a Y offset (e.g. `localPosition.y = 1.5`), the
-  mask needs the inverse Y offset (`-1.5`) to stay centered on the
-  background.
-- **PugText clipping:** `PugText` has no public `SetSortingLayer`
-  setter. Write `style.sortingLayer = 1241602095` directly (`PugText.style`
-  is a public field). Prefab YAML keys for PugText are `sortingLayer:` /
-  `orderInLayer:` (NOT `m_SortingLayer` / `m_SortingOrder` — those are
-  SpriteRenderer YAML keys).
-- **Layer pre-condition:** a mask with Custom Range `40..55` only clips
-  renderers that are already in the `"GUI"` sorting layer. If any
-  SpriteRenderer is still in `"Default"`, the mask clips nothing for that
-  renderer. Prefab-edit ALL renderers to `"GUI"` before installing the mask.
-
-See `docs/gotchas.md § SpriteMask Clipping` for the aborted Iter-3.5b
-lessons that led to this recipe.
+SpriteMask + Custom Sorting-Layer Range (`"GUI"` layer, range `40..55`, all
+renderers + PugText `style.sortingLayer` forced to `"GUI"`, mask sprite
+`spritePixelsToUnits: 1`). Full working recipe (Iter-3.5c) and the aborted
+Iter-3.5b lessons: `docs/gotchas.md § SpriteMask Clipping`.
 
 ## Iter-Roadmap (live)
 
@@ -147,8 +117,11 @@ pool recycled from `IScrollable.UpdateContainingElements`, reporting the
 full catalog height via `GetCurrentWindowHeight`. Open latency dropped to
 ~0-7 ms. Invariant from the geometry fix: `UIScrollWindow.windowHeight`
 must equal the SpriteMask height (and the mask top align to row 0's top)
-for the first/last rows to sit flush. Pending: Iter-4 (F1-Toggle), Iter-5
-(Listen-Sortierung), Iter-6 (Filter+Suche — a discovered-only filter was
+for the first/last rows to sit flush. F1 already opens the window (wired
+since Iter-1 via the CoreLib `ControlMappingModule` keybind); it does
+**not** close it (`UserInterfaceModule.OpenModUI` is not toggle-capable) —
+ESC closes. Pending: Iter-4 (real F1 *toggle* — open-and-close on one key),
+Iter-5 (Listen-Sortierung), Iter-6 (Filter+Suche — a discovered-only filter was
 prototyped as a throwaway test scaffold in Iter-3.8 and removed; it can
 seed Iter-6), Iter-7 (Window-/Style-Polish inkl. Footer-Move + perfectly
 flush window needs a panel/mask resize to an integer row multiple, and a
@@ -167,6 +140,10 @@ per-iter merge points and `docs/superpowers/specs/` for design docs.
   worktree hygiene, and the canonical per-iter test-phase structure.
 - File layout: `docs/conventions.md § File Layout` for the authoritative
   `unity/ItemChecklist/` directory map.
+- Build-verify (Editor compile ≠ sandbox pass): after a build, grep
+  `Player.log` for the load/compile markers —
+  `grep -iE "error CS|Build complete|Install complete|CompileFailed" Player.log`.
+  A clean Editor build can still `CompileFailed` in the runtime sandbox.
 - Spec lives in `docs/superpowers/specs/`, plan in
   `docs/superpowers/plans/`, exploratory research in `docs/research/`.
   Every iter has a 1:1:1 spec/plan/(optional)research mapping.

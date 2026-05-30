@@ -37,6 +37,15 @@ describe what shipped per release, not every commit.
 - **Removed DE-locale TrimStart-workaround** (no longer needed since
   family-items with variation=0 are filtered out via `IsCookedFood()`
   before name resolution).
+- **Viewport virtualization (Iter-3.8).** The checklist no longer
+  instantiates one GameObject per catalog entry on open (the old
+  `SpawnRows` froze the window ~905 ms for ~10720 entries). A fixed ~N-row
+  pool (`ItemChecklistContent`) is now recycled from the per-frame
+  `IScrollable.UpdateContainingElements(scroll)` callback, while
+  `GetCurrentWindowHeight()` reports the full catalog height so the
+  scroll range still covers every entry. Open latency dropped from
+  ~905 ms to ~0–7 ms. Rows persist across close (`HideUI` only deactivates
+  the window root) instead of being destroyed and re-spawned.
 
 ### Notes
 

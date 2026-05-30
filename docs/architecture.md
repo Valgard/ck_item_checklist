@@ -27,21 +27,29 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
 
 **Open path (F1 → visible window):**
 
-4. F1 hotkey (Iter-4 — deferred) calls
-   `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`.
+4. F1 opens the window (wired since Iter-1, via the CoreLib
+   `ControlMappingModule` keybind polled in `IMod.Update`) and calls
+   `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`. Note F1 only
+   *opens* — it does not close (`UserInterfaceModule.OpenModUI` is not
+   toggle-capable); ESC closes. A real F1 toggle remains Iter-4.
 5. CoreLib calls `ItemChecklistWindow.ShowUI()`.
-6. `ShowUI` triggers `SpawnRows()`: iterates `ItemCatalog.AllEntries`,
-   instantiates `ItemRow.prefab` for each entry, calls `ItemRow.Bind(entry,
-   discoveredState)`, then wires the scroll list (see UIScrollWindow
-   Reference below).
+6. `ShowUI` delegates to `ItemChecklistContent.PopulateContent` (Iter-3.8):
+   it lazily grows the fixed row pool (`EnsurePool`), sets the catalog count
+   (`SetCount`), reflection-wires the scrollable + invokes `UpdateScrollHeight`,
+   then `ResetScroll` + forced `RefreshVisible`. No per-entry instantiation
+   happens anymore — the persistent ~N-row pool is recycled by the scroll
+   system. See § Viewport Virtualization and the UIScrollWindow Reference
+   below.
 
 **Close path (Escape → hidden window):**
 
 7. Player presses Escape → `HideAllInventoryAndCraftingUI` is called.
 8. CoreLib's postfix on `HideAllInventoryAndCraftingUI` calls
    `IModUI.HideUI()` for every registered mod UI.
-9. `ItemChecklistWindow.HideUI()` calls `ClearRows()` — Destroys all row
-   GameObjects (with `pugText.Clear()` pre-destroy leak fix) and resets scroll.
+9. `ItemChecklistWindow.HideUI()` calls `root.SetActive(false)` only
+   (Iter-3.8) — the persistent row pool is **not** destroyed on close. The
+   `PugText.Clear()` pool-teardown (the old per-destroy leak fix) moved to
+   `ItemChecklistContent.OnDestroy`, which runs only on full pool teardown.
 
 **Auto-hide/cursor/WASD-block/Escape handling:** all handled by CoreLib
 and CK's `isAnyInventoryShowing` postfix chain. Zero additional Harmony
@@ -125,7 +133,7 @@ cursor is inside the window bounds (checked via `bounds.Contains`).
 ```csharp
 public interface IScrollable
 {
-    void UpdateContainingElements();  // no-op in IB — content manages itself
+    void UpdateContainingElements(float scroll);  // per-frame recycle callback
     bool IsBottomElementSelected { get; }
     bool IsTopElementSelected { get; }
     float GetCurrentWindowHeight();
@@ -133,10 +141,13 @@ public interface IScrollable
 }
 ```
 
-**Key implementation notes (ItemBrowser reference):**
+**Key implementation notes:**
 
-- `UpdateContainingElements` is a no-op in IB's `EntriesList` — do not
-  try to use it for layout updates.
+- `UpdateContainingElements(float scroll)` is the per-frame callback the
+  scroll system invokes with the current scroll offset. IB's `EntriesList`
+  treats it as a no-op (content manages itself), but ItemChecklist's
+  `ItemChecklistContent` uses it as the **viewport recycle driver** — see
+  § Viewport Virtualization. Do not mistake it for arg-less.
 - `TotalHeight` is negative and grows more negative as rows are added.
   Row placement formula: `row.localY = TotalHeight` before adding each
   row's height. TotalHeight starts at 0 and goes negative.
@@ -147,6 +158,124 @@ public interface IScrollable
   - **ItemChecklist:** `RowsContainer` → `Content` → individual row GameObjects
   Both hierarchies work; the key is that `Content` is the object whose
   `localY` is manipulated by the scroll system.
+
+---
+
+## Viewport Virtualization (Iter-3.8)
+
+The catalog grows to ~10720 entries. The pre-Iter-3.8 design instantiated one
+`ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
+window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
+GameObjects recycled as the user scrolls, so the GameObject count is bounded
+by the *visible* window, not the catalog size. Open latency dropped from
+~905 ms to ~0–7 ms.
+
+**Why hand-built — CK ships no recycler template.** `CookBookUI` (CK's own
+cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
+of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
+`num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
+scrolls by translating the whole pool under the clip mask, recycling nothing.
+That is fine for ≤250 recipes but unusable for ~10720 entries. No CK class
+recycles rows by index, so ItemChecklist implements its own on top of the
+`IScrollable` contract.
+
+### Pool model
+
+`ItemChecklistContent` (the `IScrollable` implementor, which sits on
+`scrollingContent`) owns a fixed pool of
+
+```
+N = ceil(windowHeight / RowHeight) + 2     // ~5–6 rows (RowHeight = 2.5)
+```
+
+row GameObjects. The pool only ever *grows* — `EnsurePool` grows toward
+`ComputePoolSize()` and never early-returns short (an early-return bug would
+leave the pool undersized after a window resize). Pool rows are children of
+`scrollingContent` and are positioned at content-local `-(idx * RowHeight)`.
+
+### Recycle driver — `UpdateContainingElements(float scroll)`
+
+The scroll system invokes `IScrollable.UpdateContainingElements(scroll)` every
+frame with the current scroll offset. `ItemChecklistContent` uses it as the
+recycle driver:
+
+```
+firstIndex = floor(scroll / RowHeight)
+if firstIndex == _lastFirstIndex: return    // per-frame no-op guard
+_lastFirstIndex = firstIndex
+// rebind each of the N pool rows to catalog entry (firstIndex + i)
+```
+
+The `_lastFirstIndex` guard skips the rebind when the first-visible index has
+not changed since the last frame (most frames). A separate `RefreshVisible()`
+forces an unconditional rebind (it resets `_lastFirstIndex = -1` first), used
+on window-open, on a discovery event, and on re-bake — cases where the catalog
+*contents* changed even though the scroll offset did not.
+
+### Full-height reporting
+
+Only ~N row GameObjects exist, but the scrollbar / scroll range must reflect
+the whole catalog. `ItemChecklistContent.GetCurrentWindowHeight()` returns
+
+```
+count * RowHeight
+```
+
+i.e. the height the full catalog *would* occupy. `UIScrollWindow.UpdateScrollHeight`
+(`scrollHeight = TotalHeight - windowHeight`) then computes a scroll range that
+spans every entry, so scrolling reaches the last row even though no GameObject
+exists for it until it scrolls into view.
+
+### Open/close lifecycle
+
+`ItemChecklistWindow` no longer spawns or destroys rows; it delegates to
+`ItemChecklistContent.PopulateContent`:
+
+1. `EnsurePool` — lazily grows the pool to `ComputePoolSize()` (grows-only).
+2. `SetCount(catalogCount)` — records the full entry count for height reporting.
+3. Reflection-wire the scrollable + invoke `UpdateScrollHeight` (the
+   `UIScrollWindow` post-content-spawn sequence; see § Post-Content-Spawn
+   Sequence). Order matters: `UpdateScrollHeight` **before** `ResetScroll`.
+4. `ResetScroll()` — go to top.
+5. `RefreshVisible()` — forced rebind so the pool shows the correct entries.
+
+`HideUI` no longer destroys anything — it calls `root.SetActive(false)` only,
+so the pool survives across opens. The `PugText.Clear()` pool-teardown (the
+former per-destroy leak fix) moved to `ItemChecklistContent.OnDestroy`, which
+runs only on full pool teardown. Because rows are no longer destroyed per
+close, the old main-menu-PugText-blanking symptom can no longer occur.
+
+> **Load-bearing invariant:** `UIScrollWindow.Awake` sets `enabled = false`
+> *permanently* if its serialized `scrollable` reference does not resolve to a
+> component on the same GameObject. The doc-comment recording this in the code
+> is load-bearing — do not remove it.
+
+### Prefab geometry invariant
+
+For the first and last rows to sit flush against the window edges:
+
+- `UIScrollWindow.windowHeight` **must equal** the SpriteMask height.
+- The mask top **must align** to row 0's top.
+
+To grow the mask **top-only** (keeping the bottom edge fixed), change both the
+scale and the position in a 2:1 ratio:
+
+```
+mask.scale.y    += X
+mask.localPos.y += X / 2
+```
+
+Changing only one of the two shifts the whole mask instead of extending it
+upward. This was settled by empirical 4-build calibration, not by a static
+reading of the prefab — the final values are `windowHeight = 6.5`,
+mask `scale.y = 6.5`, mask `localPos.y = -2.0`.
+
+### Scrollbar not wired
+
+The prefab has no wired scrollbar (`scrollBar: {fileID: 0}`), so
+`UpdateScrollbar` early-returns. This is pre-existing, **not** an Iter-3.8
+regression — mouse-wheel scrolling works. Wiring a visible scrollbar is
+deferred to Iter-7.
 
 ---
 
@@ -187,8 +316,12 @@ for i1 in ingredients:
 **Resulting catalog size:** ~10720 entries (~1240 standard + ~9480
 cooked-food permutations: 3160 pairs × 3 tiers).
 
-**Expected bake time:** < 200 ms on a typical machine. If bake time
-exceeds 500 ms, consider the Iter-3.8 async-bake strategy.
+**Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
+on this machine for the full ~10720-entry bake). Bake time is independent
+of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
+*rendering* (the open-latency fix — see § Viewport Virtualization), not the
+catalog bake. The bake still runs once per world-load in the
+`PlayerController.OnOccupied` coroutine.
 
 ### DiscoveredState Packed-Long Key Schema
 

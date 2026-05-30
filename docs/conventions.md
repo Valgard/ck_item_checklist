@@ -42,6 +42,15 @@ rsync -a unity/ItemChecklist/Art/ .worktrees/<branch>/unity/ItemChecklist/Art/
 and is never tracked in git. The Art directory carries the bridge sprites
 (also gitignored) needed to build.
 
+**superpowers specs/plans live only in the worktree.** The
+`superpowers:brainstorming` / `writing-plans` skills default their spec and
+plan output to `docs/superpowers/`, which is **gitignored** in this repo (to
+avoid colliding with that default location). Because the worktree's
+`docs/superpowers/` is not tracked, the per-iter spec and plan must be copied
+back to the main checkout **before** `git worktree remove` destroys the
+worktree — otherwise they are lost. Treat copying `docs/superpowers/specs/`
+and `docs/superpowers/plans/` to main as part of worktree teardown.
+
 **Before destroying a worktree:**
 
 ```bash
@@ -76,6 +85,26 @@ structure (established in Iter-3.6/3.7):
 **Failure budget:** 3 sandbox-compile attempts (Phase 1) before escalating to
 a fresh batchmode build from a clean state. 1-strike for Phase 2 and later.
 
+### Throwaway test-scaffold pattern
+
+To accelerate a manual in-game test, it is acceptable to layer a *throwaway*
+debug scaffold *in front of* the reviewed core — then remove it via
+`git restore` before merge so the merged code stays byte-identical to the
+reviewed version.
+
+Iter-3.8 example: reaching the end of the ~10720-entry list by scrolling takes
+too long to verify flush-geometry on the last row. A throwaway
+`DebugDiscoveredOnly` index-remap was added in front of the recycler
+(`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of the list
+reachable in seconds while exercising the identical flush-geometry path. The
+scaffold lived only in uncommitted working-tree edits; the reviewed row logic
+was already committed, so a `git restore` of the modified `.cs` removed the
+scaffold cleanly without touching reviewed code. (The same remap can later
+seed the real Iter-6 discovered-only filter.)
+
+Rule: scaffolds never get committed onto a story commit. Add them to the
+working tree, use them, then `git restore` before the iter's ff-merge.
+
 **Recovery:** if Core Keeper hangs on the loading screen (quit-deadlock in
 `ModManager` — symptom: `Exit blocked by ModManager` in Player.log), use:
 
@@ -94,22 +123,28 @@ tree):
 unity/ItemChecklist/
   ItemChecklistMod.cs             IMod bootstrap (EarlyInit/Init/Update/Shutdown)
   ItemCatalog.cs                  catalog bake + lookup
+  ItemCatalogLocChangeHook.cs     Harmony patch — re-bake on language change
+  ItemCatalogWorldLoadHook.cs     Harmony patch — kick bake on world load (OnOccupied)
   DiscoveredState.cs              in-memory mirror of CK discovery state
   SaveManagerDiscoveryHook.cs     Harmony patch on SaveManager.SetObjectAsDiscovered
   SaveManagerActiveSelectHook.cs  Harmony patch for active-character resolution
   CharacterDataDiscoverySnapshot.cs  initial-state reader on OnAfterDeserialize
   PascalCaseSplitter.cs           pure utility (display-name fallback formatting)
+  Data/                           baked catalog / lookup data assets
+  ModManifest.json                mod manifest (displayName, requiredOn, etc.)
+  ItemChecklist.asmdef            runtime assembly definition
   ui/
     ItemChecklistWindow.cs        IModUI implementation (UIelement subclass)
     ItemRow.cs                    row MonoBehaviour (Bind API)
-    ItemChecklistContent.cs       IScrollable implementation
+    ItemChecklistContent.cs       IScrollable implementation (viewport recycler)
     FilterAndSearchModel.cs       filter/search state (deferred Iter-6)
+    UnityInputFieldAdapter.cs     input-field adapter for search (deferred Iter-6)
   Prefabs/
     ItemChecklistWindow.prefab    window hierarchy
     ItemRow.prefab                row template (recycled by scroll list)
   Art/Bridge/                     placeholder sprites (gitignored; replace before publish)
   Editor/
-    ItemChecklistMod.Editor.asmdef  editor-only assembly for CLIBuildHelper
+    ItemChecklist.Editor.asmdef   editor-only assembly for CLIBuildHelper
     CLIBuildHelper.cs             -executeMethod entry point for build.sh
     CLIPublishHelper.cs           -executeMethod entry point for upload.sh
 ```

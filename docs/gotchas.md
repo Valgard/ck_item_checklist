@@ -17,6 +17,25 @@ for top-of-list. Never pass `0f` unless you specifically want the bottom.
 See `docs/architecture.md § SetScrollValue Semantics` for the lerp math
 explanation.
 
+### Window-open guards must check `root.activeSelf`, not `gameObject.activeSelf`
+
+In a CoreLib `IModUI` window, the `Window`/`UIelement` component sits on the
+**parent** GameObject, which CoreLib keeps permanently active. Visibility is
+carried by the `root` **child** — `HideUI` toggles `root.SetActive(false)`,
+not the parent.
+
+Therefore any guard that means "only do this while the window is open" must
+check `root.activeSelf`, **not** `gameObject.activeSelf`:
+
+```csharp
+if (!root.activeSelf) return;   // correct — root carries visibility
+// if (!gameObject.activeSelf)  // WRONG — parent is always active, never gates
+```
+
+Gating on `gameObject.activeSelf` silently never fires (the parent is
+always-true), so the guarded code runs even while the window is hidden. This
+bit a per-frame recycle guard in Iter-3.8.
+
 ### UiController / VirtualScrollList are deleted — do not recreate
 
 `VirtualScrollList.cs`, `UiController.cs`, and `ItemRowView.cs` were
@@ -24,9 +43,17 @@ permanently deleted in Iter-2. They were replaced by CK's native
 `UIScrollWindow` + `IModUI` pattern + `ItemRow.cs`.
 
 Do not recreate — the old uGUI-based recycler is structurally incompatible
-with CK's `Physics.Raycast`-based `UIMouse`. Any Canvas-derived component
-is invisible to CK's input system. See `CLAUDE.md § Mod-Specific Gotchas`
-(uGUI structural failure) for the full explanation.
+with CK's `Physics.Raycast`-based `UIMouse`. Any Canvas-derived component is
+invisible to CK's input system. See § uGUI structurally fails in CK below.
+
+### uGUI (Canvas/Image) structurally fails in CK
+
+CK's `UIMouse` does a `Physics.Raycast` in the UI layer. `Canvas`/`Image`
+components have no `Collider` and are invisible to that raycast: input passes
+straight through and the cursor stays under the window regardless of Canvas
+Render Mode. This is not a configuration problem — it is a structural
+incompatibility. All 10 surveyed CK UI mods use `SpriteRenderer` + Layer 5 +
+`UIelement`; **0** use uGUI. Do not attempt Canvas-based UI.
 
 ## Mod Loading
 
@@ -54,7 +81,37 @@ open the menu, let the change land, then rebuild each fake-ID mod.
 See the parent `CLAUDE.md § Fake-ID dev install` for the full fake-ID
 mechanism.
 
-## SpriteMask Clipping (Iter-3.5b Aborted-Iter Lessons)
+## SpriteMask Clipping
+
+Clipping in CK `SpriteRenderer` UI uses a `SpriteMask` with a **Custom
+Sorting-Layer Range**. This section gives the working recipe (Iter-3.5c) first,
+then the aborted Iter-3.5b lessons that led to it.
+
+### The working recipe (Iter-3.5c)
+
+- **Sorting layer:** `"GUI"` (uniqueID `1241602095` — verify against
+  `CoreKeeperModSDK/ProjectSettings/TagManager.asset` before hardcoding).
+- **Custom Range:** `FrontOrder = 55`, `BackOrder = 40`. All row renderers
+  must have their `sortingOrder` within this range.
+- **IB reference orders:** Background=45, Icon=48, Label=49, Placeholder=49,
+  Checkmark=50. Row renderers sit between Background and the mask front-order.
+- **`mask_sprite.png`:** 1×1 white PNG. **Must** set `spritePixelsToUnits: 1`
+  in the `.meta` (NOT the SDK default of 16 — at PPU=16 the sprite is 0.0625
+  units and Transform scale produces a tiny mask instead of full window
+  coverage).
+- **Mask geometry:** place the SpriteMask as a child of RowsContainer. If
+  RowsContainer has a Y offset (e.g. `localPosition.y = 1.5`), the mask needs
+  the inverse Y offset (`-1.5`) to stay centered on the background.
+- **PugText clipping:** `PugText` has no public `SetSortingLayer` setter. Write
+  `style.sortingLayer = 1241602095` directly (`PugText.style` is a public
+  field). Prefab YAML keys for PugText are `sortingLayer:` / `orderInLayer:`
+  (NOT `m_SortingLayer` / `m_SortingOrder` — those are SpriteRenderer YAML keys).
+- **Layer pre-condition:** a mask with Custom Range `40..55` only clips
+  renderers already in the `"GUI"` sorting layer. If any SpriteRenderer is
+  still in `"Default"`, the mask clips nothing for that renderer. Prefab-edit
+  ALL renderers to `"GUI"` before installing the mask.
+
+### Aborted Iter-3.5b lessons
 
 The Iter-3.5b iteration was aborted after pre-flight discovered the
 following structural blockers. Documenting them prevents re-attempts.

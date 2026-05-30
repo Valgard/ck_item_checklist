@@ -8,7 +8,7 @@ permutations are tracked per ingredient pair. Requires CoreLib.
 
 ## Requirements
 
-- Core Keeper game (verified on 1.2.1.4-7f74)
+- Core Keeper game (verified on 1.2.1.4)
 - CoreLib mod (declared as dependency in ModBuilderSettings)
 
 ## Building
@@ -25,13 +25,24 @@ macOS places the freshly built mod into the fake-ID loader locations so Core
 Keeper picks it up on next launch. See the parent `CLAUDE.md` for the full
 build/install system and CrossOver/macOS specifics.
 
+**Building from a git worktree:** `../utils/build.sh` is correct from the mod
+root, but from inside a worktree (`.worktrees/<branch>/`) the same relative
+path resolves to `.worktrees/utils/`, which does not exist. From a worktree,
+use an absolute path to the shared `utils/` directory, or the worktree-relative
+`../../../utils/build.sh`.
+
 ## Art / Publishing
 
 Before publishing to mod.io, replace all sprites in
 `unity/ItemChecklist/Art/Bridge/` with original or commissioned art. The
 current Bridge sprites are derived from Item Browser (MIT-licensed) and must
-not ship in the published mod. See `docs/sprite-spec.md` for the full sprite
-inventory and size/style requirements.
+not ship in the published mod.
+
+## Known Limitations
+
+- **No visible scrollbar yet.** The window prefab has no wired scrollbar
+  (`scrollBar: {fileID: 0}`), so the scroll track does not render. Scrolling
+  works via the mouse wheel; a visible scrollbar is deferred to Iter-7.
 
 ## Documentation
 
