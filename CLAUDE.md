@@ -131,7 +131,19 @@ with `handleSpriteRenderer`, `handleCollider` BoxCollider, `handleSpritesToResiz
 `ScrollBar.Update()` self-shows on `ScrollHeight > 0`, drag maps mouse-Y →
 `SetScrollValue`, handle size ∝ `VisibleRatio` (min 0.625). Wire
 `UIScrollWindow.scrollBar` to it (prefab fields `scrollBar`/`arrowUp`/`arrowDown`
-are currently `fileID: 0`; scroll arrows stay optional/unused). Iter-5
+are currently `fileID: 0`; scroll arrows stay optional/unused).
+**Iter-4.6 — item rarity colouring (planned after the scrollbar)**: surface
+each item's CK rarity by colour for **all** items (not just food), the way CK
+itself does. De-risked (ILSpy): `enum Rarity` (Pug.Base.dll) =
+`Poor=-1, Common, Uncommon, Rare, Epic, Legendary`; each item carries it in
+`ObjectInfo.rarity`; colours come from `Manager.ui.slotBorderRarityColors`
+(`List<Color>`, index `(int)(rarity+1)`) via
+`Manager.ui.GetSlotBorderRarityColor(rarity, …)`. A placeholder
+`Art/Bridge/ui_rarity_border.png` already exists. **Distinct axis** from the
+Iter-3.7 cooked-food tiers (`CookedFoodCD.rareVersion`/`epicVersion`) — do not
+conflate the food Base/Rare/Epic ladder with general `ObjectInfo.rarity`.
+Likely surfaces as a tinted name or a rarity border on each row; pairs well
+with a rarity sort-order in Iter-5. Iter-5
 (Listen-Sortierung); Iter-6 (Filter+Suche — a discovered-only filter was
 prototyped as a throwaway test scaffold in Iter-3.8 and removed; it can
 seed Iter-6); Iter-7 (Window-/Style-Polish inkl. Footer-Move + perfectly
