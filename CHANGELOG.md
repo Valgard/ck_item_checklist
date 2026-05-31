@@ -47,6 +47,17 @@ describe what shipped per release, not every commit.
   ~905 ms to ~0–7 ms. Rows persist across close (`HideUI` only deactivates
   the window root) instead of being destroyed and re-spawned.
 
+### Fixed
+
+- **F1 now toggles the window.** Pressing F1 while the checklist is open
+  closes it (just like Escape or E); previously F1 only ever opened it, and
+  re-pressing it also reset the scroll position.
+- **No more overlap with the inventory/crafting UI.** The checklist and
+  Core Keeper's own inventory/crafting menus are now mutually exclusive:
+  opening a Vanilla menu (inventory, chest, crafting station, vendor…)
+  auto-hides the checklist, and F1 no longer opens the checklist on top of
+  an already-open Vanilla menu.
+
 ### Notes
 
 - **Tier-3 (Rare/Epic) tracking is included but empirically unverified

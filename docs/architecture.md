@@ -27,11 +27,18 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
 
 **Open path (F1 → visible window):**
 
-4. F1 opens the window (wired since Iter-1, via the CoreLib
-   `ControlMappingModule` keybind polled in `IMod.Update`) and calls
-   `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`. Note F1 only
-   *opens* — it does not close (`UserInterfaceModule.OpenModUI` is not
-   toggle-capable); ESC closes. A real F1 toggle remains Iter-4.
+4. F1 is a toggle (Iter-4). The keybind (wired since Iter-1 via the CoreLib
+   `ControlMappingModule`, polled in `IMod.Update`) drives a 3-way branch
+   keyed off *real visibility* (`ItemChecklistWindow.Instance.Root.activeSelf`,
+   **not** CoreLib's `currentInterface`, which the auto-hide patch can leave
+   transiently stale):
+   - window visible → close via
+     `Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false)` (the same
+     path Escape/E use — see Close path);
+   - else a Vanilla menu/inventory is open
+     (`Manager.ui.isPlayerInventoryShowing`) → ignore, so F1 never opens on
+     top of one;
+   - else → `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`.
 5. CoreLib calls `ItemChecklistWindow.ShowUI()`.
 6. `ShowUI` delegates to `ItemChecklistContent.PopulateContent` (Iter-3.8):
    it lazily grows the fixed row pool (`EnsurePool`), sets the catalog count
@@ -41,19 +48,37 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
    system. See § Viewport Virtualization and the UIScrollWindow Reference
    below.
 
-**Close path (Escape → hidden window):**
+**Close path (Escape / E / F1 → hidden window):**
 
-7. Player presses Escape → `HideAllInventoryAndCraftingUI` is called.
+7. Player presses Escape or E, **or** F1 while the window is open →
+   `HideAllInventoryAndCraftingUI` is called (F1 via the Iter-4 toggle,
+   with `forceClose: false` to mirror `PlayerController.CloseAnyOpenInventory`).
 8. CoreLib's postfix on `HideAllInventoryAndCraftingUI` calls
-   `IModUI.HideUI()` for every registered mod UI.
+   `IModUI.HideUI()` for every registered mod UI **and** clears
+   `UserInterfaceModule.currentInterface` (via `ClearModUIData`). Clearing
+   it releases the player from menu-state — a bare `HideUI()` on the F1-close
+   path would leave `currentInterface` dangling and freeze movement.
 9. `ItemChecklistWindow.HideUI()` calls `root.SetActive(false)` only
    (Iter-3.8) — the persistent row pool is **not** destroyed on close. The
    `PugText.Clear()` pool-teardown (the old per-destroy leak fix) moved to
    `ItemChecklistContent.OnDestroy`, which runs only on full pool teardown.
 
-**Auto-hide/cursor/WASD-block/Escape handling:** all handled by CoreLib
-and CK's `isAnyInventoryShowing` postfix chain. Zero additional Harmony
-patches needed for any of these.
+**Mutual exclusion with Vanilla menus (Iter-4):** `InventoryOpenAutoHidePatch`
+postfixes `UIManager.OnPlayerInventoryOpen` — the single funnel every Vanilla
+inventory/crafting/vendor open routes through (plain TAB via
+`PlayerController.OpenPlayerInventory`; chests/stations/vendors via wrappers
+that all delegate to it). If the checklist is visible when a Vanilla menu
+opens, it calls a **bare** `HideUI()` (not `HideAllInventoryAndCraftingUI`,
+which would re-close the just-opening menu). The briefly-dangling
+`currentInterface` is harmless: the Vanilla menu covers it and its close
+clears it, and the F1 toggle reads `Root.activeSelf`, not `currentInterface`.
+This coherence holds **only** while `ShowWithPlayerInventory == false` — that
+early-returns `OpenModUI` before `OnPlayerInventoryOpen`, so opening the
+checklist does not trip its own postfix.
+
+**Cursor/WASD-block/Escape handling:** all handled by CoreLib and CK's
+`isAnyInventoryShowing` postfix chain — zero patches for those. Iter-4 adds
+exactly one Harmony postfix (the mutual-exclusion patch above).
 
 ### Pattern Matrix (10 surveyed CK UI mods)
 
