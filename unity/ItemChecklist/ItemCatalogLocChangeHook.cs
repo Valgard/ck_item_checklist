@@ -39,6 +39,7 @@ namespace ItemChecklist
             try
             {
                 ItemChecklistMod.Catalog.Bake();
+                ItemChecklistMod.ListView = new ItemChecklist.UI.ItemListViewModel(ItemChecklistMod.Catalog, DiscoveredState.Instance);
                 ItemChecklistWindow.Instance?.RebindRows();
             }
             catch (NullReferenceException ex)

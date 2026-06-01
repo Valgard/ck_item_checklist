@@ -27,6 +27,7 @@ namespace ItemChecklist
     public sealed class ItemChecklistMod : IMod
     {
         public static ItemCatalog Catalog { get; private set; }
+        public static ItemChecklist.UI.ItemListViewModel ListView { get; internal set; }
 
         // AssetBundle reference — set in EarlyInit. UI code loads sprites
         // (window background, placeholder icon, etc.) via
