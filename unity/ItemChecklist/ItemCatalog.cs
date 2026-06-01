@@ -47,14 +47,16 @@ namespace ItemChecklist
             public readonly string DisplayName;
             public readonly Sprite Icon;
             public readonly string ModOrigin;   // empty string = vanilla
+            public readonly Rarity Rarity;      // CK ObjectInfo.rarity (Poor..Legendary)
 
-            public Entry(int objectId, int variation, string displayName, Sprite icon, string modOrigin)
+            public Entry(int objectId, int variation, string displayName, Sprite icon, string modOrigin, Rarity rarity)
             {
                 ObjectId = objectId;
                 Variation = variation;
                 DisplayName = displayName;
                 Icon = icon;
                 ModOrigin = modOrigin ?? string.Empty;
+                Rarity = rarity;
             }
         }
 
@@ -114,6 +116,7 @@ namespace ItemChecklist
                 var unlocalizedNames = new Dictionary<long, string>();
                 var accepted         = new List<ObjectDataCD>();
                 var iconCache        = new Dictionary<long, Sprite>();
+                var rarityCache      = new Dictionary<long, Rarity>();
 
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
@@ -166,6 +169,7 @@ namespace ItemChecklist
                     unlocalizedNames[key] = rawText;
                     accepted.Add(od);
                     iconCache[key] = info.smallIcon != null ? info.smallIcon : info.icon;
+                    rarityCache[key] = info.rarity;
                 }
 
                 // ─── Loop 2: α-enumeration for Cooked-Food permutations ─────────
@@ -207,17 +211,17 @@ namespace ItemChecklist
                     // 3 tier-variants per pair, same variation, different objectIDs.
                     AddCookedEntry(
                         new ObjectDataCD { objectID = baseFamily, variation = variation },
-                        localizedNames, unlocalizedNames, iconCache, accepted);
+                        localizedNames, unlocalizedNames, iconCache, rarityCache, accepted);
                     if (tierMap.TryGetValue(baseFamily, out var tiers))
                     {
                         if (tiers.rare != ObjectID.None)
                             AddCookedEntry(
                                 new ObjectDataCD { objectID = tiers.rare, variation = variation },
-                                localizedNames, unlocalizedNames, iconCache, accepted);
+                                localizedNames, unlocalizedNames, iconCache, rarityCache, accepted);
                         if (tiers.epic != ObjectID.None)
                             AddCookedEntry(
                                 new ObjectDataCD { objectID = tiers.epic, variation = variation },
-                                localizedNames, unlocalizedNames, iconCache, accepted);
+                                localizedNames, unlocalizedNames, iconCache, rarityCache, accepted);
                     }
                 }
 
@@ -239,7 +243,7 @@ namespace ItemChecklist
                             finalName = $"{finalName} ({rawName})";
                     }
                     string modOrigin = ResolveModOrigin(od, modIdToName);
-                    list.Add(new Entry((int)od.objectID, od.variation, finalName, iconCache[key], modOrigin));
+                    list.Add(new Entry((int)od.objectID, od.variation, finalName, iconCache[key], modOrigin, rarityCache[key]));
                 }
 
                 entries = list
@@ -370,6 +374,7 @@ namespace ItemChecklist
             Dictionary<long, string> localizedNames,
             Dictionary<long, string> unlocalizedNames,
             Dictionary<long, Sprite> iconCache,
+            Dictionary<long, Rarity> rarityCache,
             List<ObjectDataCD> accepted)
         {
             var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
@@ -389,6 +394,7 @@ namespace ItemChecklist
             unlocalizedNames[key] = rawText;
             accepted.Add(od);
             iconCache[key] = info.smallIcon != null ? info.smallIcon : info.icon;
+            rarityCache[key] = info.rarity;
         }
     }
 }
