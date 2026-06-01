@@ -150,7 +150,11 @@ namespace ItemChecklist.UI
             // parent GameObject, which stays active even when hidden.
             if (root == null || !root.activeSelf) return;
             if (title != null) title.Render(FormatTitle());
-            Content?.RefreshVisible();
+            var model = ItemChecklistMod.ListView;
+            if (model != null && model.Mode == SortMode.Found)
+                model.Recompute();          // Found order depends on discovery → re-sort (OnViewResultsChanged rebinds)
+            else
+                Content?.RefreshVisible();   // other modes: order unchanged, just repaint the affected row
         }
 
         /// <summary>
