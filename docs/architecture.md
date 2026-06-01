@@ -487,3 +487,156 @@ rarity ≥ Uncommon). The sprite is the placeholder `ui_rarity_border` (a white
 stays a thin fixed-pixel frame at any `m_Size` instead of thickening with the
 sprite. Real pixel-art (a designed border in place of the tinted white ring)
 remains Iter-9 polish.
+
+---
+
+## List View-Model & Sorting (Iter-7)
+
+### ItemListViewModel
+
+`ItemListViewModel` (revived from the orphaned `FilterAndSearchModel.cs`,
+renamed) owns the **display-order indirection**: an `int[] Order` array where
+`Order[displayIndex]` gives the catalog index for that display position. It
+decouples row rendering from catalog order.
+
+**`Recompute()`** rebuilds `Order` from scratch:
+
+1. Collects the set of *visible* catalog indices. Iter-7: all indices. The
+   filter/search seam — `DiscoveryFilter` and `SearchText` — is present but
+   at no-op defaults; Iter-8 will activate them without changing the recompute
+   contract.
+2. Sorts by the active `SortMode` comparator (ascending):
+   - **Name** — `DisplayName` (OrdinalIgnoreCase)
+   - **Rarity** — `(int)Rarity` ascending (Poor → Legendary)
+   - **Found** — discovered entries first (`db.CompareTo(da)` — true sorts before false)
+   - **Category** — `ObjectType.ToString()` (Ordinal)
+3. Tiebreak: `DisplayName` (OrdinalIgnoreCase) then catalog index — total
+   order, stable under reversal.
+4. **Descending** = reverse the sorted list.
+
+**Static per-session state:** `s_mode` (`SortMode`) and `s_ascending` (`bool`)
+are static fields. They survive window close/reopen and a catalog re-bake;
+reset on game restart.
+
+**Three recompute triggers:**
+
+- Mode or direction change via the dropdown / toggle callbacks.
+- `DiscoveredState.Changed` — **only** when `Mode == Found` (other modes are
+  discovery-independent, so firing on every pickup would be wasteful).
+- Re-bake: `ItemChecklistMod.ListView` is reassigned (static, `internal set`)
+  after each bake, which constructs a fresh `ItemListViewModel` and calls
+  `Recompute()`.
+
+**`ItemChecklistContent` reads through `Order`:** `Rebind` at display index
+`displayIdx` resolves `catalog.GetByIndex(model.Order[displayIdx])` instead
+of `catalog.GetByIndex(displayIdx)`. `_count` comes from `model.Count`.
+
+**`ItemCatalog.Entry.ObjectType`:** a new `ObjectType ObjectType` field,
+resolved at bake via an `objectTypeCache` built in both bake loops (mirroring
+`rarityCache`). Used by the Category comparator.
+
+---
+
+### Sort UI Components
+
+All sort controls live in the header strip of the checklist window, authored
+on the `…040`–`…060` fileID band in the prefab. Every clickable uses a **3D
+`BoxCollider`** (`!u!65`) and every `SpriteRenderer` uses `m_MaskInteraction: 0`
+(None) + the `"GUI"` sorting layer, matching the scrollbar rules.
+
+#### DropdownWidget
+
+`DropdownWidget : UIelement` is a reusable, self-contained dropdown. It is
+**not** CK-native — it is mod-authored.
+
+**API:**
+```csharp
+Configure(IReadOnlyList<string> labels, int selectedIndex, Action<int> onSelected)
+```
+Subsequent calls to `Configure` (e.g. after a sort mode change) re-initialise
+the header and pool without reinstantiation.
+
+**Header:** the selected option label shown at all times. A
+`DropdownToggleButton` on the Display GO (plus a separate caret button) opens
+and closes the popup on click.
+
+**Popup:** lists only the *non-selected* options, flush under the header at
+`-(pos + 1) * rowSpacing`. `EnsurePool` clones a `rowTemplate` to fill the
+non-selected slots; `RebuildList` lays them out. Selecting an option (via
+`DropdownOptionButton.OnLeftClicked → SelectOption`) updates the header,
+closes the popup, fires `onSelected`, and re-`Configure`s to shift the new
+selection. The popup closes via `TogglePopup` (header/caret click or
+`SelectOption`).
+
+**Click-outside-to-close (`LateUpdate`):** an `_armed` guard skips the
+opening frame so the click that opens the popup does not immediately close it
+(`LateUpdate` runs after CK's `UIMouse`; option clicks and the toggle already
+call `SelectOption`/`TogglePopup` before this check runs, so they are not
+double-fired). When `_open && !_armed && !ClickedInsidePopup()` → close.
+
+**Iter-8 reuse:** `DropdownWidget` is the intended host for the
+discovery-filter dropdown; `ui_icon_filter` / `ui_icon_clear_search` /
+`ui_text_background` sprites already ship in the IB atlases.
+
+#### DropdownToggleButton / DropdownOptionButton
+
+Each lives in its **own `.cs` file** (`DropdownToggleButton.cs`,
+`DropdownOptionButton.cs`). Both subclass `ButtonUIElement` and override
+`OnLeftClicked`. See `gotchas.md § Multiple MonoBehaviours in one file` for
+why splitting is mandatory.
+
+#### AscDescToggle
+
+`AscDescToggle : ButtonUIElement` — flips `ItemListViewModel.s_ascending`,
+swaps the asc/desc glyph (`ui_icon_sort_order_asc` / `_desc` sub-sprites),
+and triggers `Recompute()` + `RefreshVisible()`.
+
+---
+
+### ButtonUIElement Click Pattern
+
+`ButtonUIElement` (in `Pug.Other.dll`) is CK's standard clickable base class.
+Pattern verified from ItemBrowser `ItemBrowserButton.cs`, `FilterButton.cs`,
+and `OptionsEntry.cs`:
+
+```csharp
+public override void OnLeftClicked(bool mod1, bool mod2)
+{
+    base.OnLeftClicked(mod1, mod2);
+    if (!canBeClicked) return;
+    // … custom logic …
+}
+```
+
+**Required prefab rules (same as ScrollBarHandle):**
+
+- **3D `BoxCollider`** (`!u!65`): CK `UIMouse` raycasts in 3D. A
+  `BoxCollider2D` (`!u!61`) is never hit.
+- **`m_MaskInteraction: 0`** on every `SpriteRenderer`: keeps the button
+  visible inside a SpriteMask range (orders within 40..55).
+- **`"GUI"` sorting layer**: matches the window's sorting layer so the mask
+  range applies.
+- **Leave `spritesShownUnpressed` / `spritesShownPressed` empty**: if any GO
+  is listed in both, `ButtonUIElement.LateUpdate` toggles it off at idle →
+  the sprite disappears. Empty lists let the button's own `SpriteRenderer`
+  stay always-visible (same rule as `handleSpriteRenderer` on `ScrollBarHandle`).
+
+---
+
+### Sprites — Sheet Atlases (Iter-7)
+
+ItemBrowser's `ui_icon.png` and `ui_group.png` are **multiple-mode sheet
+atlases** (`textureType: 8`, `spriteMode: 2`) carrying named sub-sprites:
+`ui_icon_sort`, `ui_icon_sort_order_asc`, `ui_icon_sort_order_desc`,
+`ui_icon_filter`, `ui_icon_clear_search`, `ui_group_expand`,
+`ui_group_collapse`, and others.
+
+Reference sub-sprites in prefab YAML by `{fileID: <internalID>, guid: <atlas
+guid>, type: 3}`. Bundle inclusion is by **dependency-pull**: a bundled prefab
+referencing the atlas GUID pulls the whole atlas in; set `assetBundleName`
+to empty on the atlas asset itself (same as `ui_classic`). Do NOT copy
+individual PNGs from the atlas — extracted singles lose their sheet-atlas meta
+(see `gotchas.md § Bridge sprite trap`).
+
+Button backgrounds use `ui_scrollbar_handle` (raised look; `~{1,1}` `m_Size`
+for correct 9-slice reading). Slot/list backgrounds use `ui_slot_background`.

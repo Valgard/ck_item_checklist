@@ -60,6 +60,7 @@ DLLs are in CK's installation: `…/Core Keeper/CoreKeeper_Data/Managed/`.
 | `ScrollBar` / `ScrollBarHandle` | `Pug.Other.dll` | Native scrollbar (Iter-5, prefab-wired). `ScrollBar` fields: `scrollWindow`, `root` (a **child** GO it toggles — not the component's own GO, else it can self-deactivate before `ScrollHeight` is set), `background` (track `SpriteRenderer`), `handle` (`ScrollBarHandle`). `ScrollBarHandle : ButtonUIElement` fields: `handleSpriteRenderer`, `handleCollider` (**3D `BoxCollider`** `!u!65`, not `!u!61` — CK `UIMouse` raycasts in 3D), `handleSpritesToResize`. **No mod C#:** `UIScrollWindow.LateUpdate → UpdateScrollbar → ScrollBar.UpdateScrollBarPosition` does sizing + position + mouse-wheel sync once `UIScrollWindow.scrollBar` is wired (verified against Item Browser, which ships no scrollbar C#). Handle drag = `ScrollBarHandle.onLeftClick` UnityEvent → `ScrollBar.OnHandleLeftClick` (`m_TargetAssemblyTypeName: ScrollBar, Pug.Other`, `m_Mode: 1`). Handle size ∝ `VisibleRatio`, min 0.625. **`ButtonUIElement.LateUpdate` toggles GO activity** of `spritesShownUnpressed` (active when `!leftClickIsHeldDown`) and `spritesShownPressed` (active when held) — a GO in **both** lists ends up visible only while held; with one handle sprite keep both lists empty and let `handleSpriteRenderer` be the always-on handle, with the selected-border as `optionalSelectedMarker`. Renderers need `maskInteraction: None`. See `docs/architecture.md § Scrollbar (Iter-5)` and the `project-corekeeper-script-fileid-derivation` memory. |
 | `CoreLib UserInterfaceModule` | `CoreLib.UserInterface.dll` | Version 4.0.4 (stable Feb–May 2026). `LoadSubmodule` in `EarlyInit`; `RegisterModUI(GameObject)` in `ModObjectLoaded`. UI class must extend `UIelement` AND implement `IModUI`. Mount: auto into `UIManager.chestInventoryUI.transform.parent`. Open: `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`. Auto-hide on vanilla `HideAllInventoryAndCraftingUI`; zero patches needed for cursor/WASD-block/Escape. `Awake()` must call `HideUI()`. **Iter-4 F1 toggle + menu-exclusion:** `OpenModUI` is not toggle-capable, so the mod toggles itself — close via `Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false)` (mirrors `PlayerController.CloseAnyOpenInventory`; CoreLib's postfix clears `currentInterface`), open-state read from `Instance.Root.activeSelf` not `currentInterface`. Guard with `Manager.ui.isPlayerInventoryShowing` (per-UI `isShowing` getters on `UIManager` in `Pug.Other.dll` are **unpatched** — CoreLib only patches the aggregate `isAnyInventoryShowing`). `InventoryOpenAutoHidePatch` postfixes `UIManager.OnPlayerInventoryOpen` — the single funnel every Vanilla menu open routes through — with a **bare** `HideUI()` to enforce no-overlap; coherent only while `ShowWithPlayerInventory == false`. Background: `Manager.ui.GetCraftingUITheme(UIManager.CraftingUIThemeType.Wood).background` (enum param, not string → 9-slice wood frame, zero custom art). `BoxCollider2D` required on root. Production refs: limoka/BookMod (~145 IMod LoC + ~162 UI LoC), limoka/DummyMod (~87+84). |
 | `UIManager.GetSlotBorderRarityColor` / `ObjectInfo.rarity` / `enum Rarity` | `Pug.Other.dll` / `Pug.Base.dll` | Iter-6 rarity colouring. `enum Rarity { Poor=-1, Common, Uncommon, Rare, Epic, Legendary }`; `ObjectInfo.rarity` is a plain `public Rarity rarity` field. `Color GetSlotBorderRarityColor(Rarity rarity, bool useDefaultColorForCommon, Color defaultColor)` returns `defaultColor` when `useDefaultColorForCommon && (rarity == Common \|\| rarity == Poor)`, else `Manager.ui.slotBorderRarityColors[(int)(rarity + 1)]` (a `List<Color>`). `Manager.ui.*` is sandbox-safe (already used in this mod). `PugText.color` setter = `SetTempColor(value)` (paints the glyph SpriteRenderers `Render()` rebuilds → set after Render; pass `keepColorOnStart: true` to survive `renderOnStart`). See `docs/architecture.md § Rarity Colouring (Iter-6)` + `docs/gotchas.md § PugText tint`. |
+| `ButtonUIElement` | `Pug.Other.dll` | Iter-7 dropdown/toggle buttons. Clickable widget base class. Override `public override void OnLeftClicked(bool mod1, bool mod2)` — call `base.OnLeftClicked(mod1, mod2)` first, then guard with `if (!canBeClicked) return;`. Requires a **3D `BoxCollider`** (`!u!65`) — CK `UIMouse` raycasts in 3D. Leave `spritesShownUnpressed` and `spritesShownPressed` empty so `ButtonUIElement.LateUpdate` doesn't toggle GO activity and hide the button's SpriteRenderer (same rule as `ScrollBarHandle`). Pattern verified from ItemBrowser `ItemBrowserButton.cs` / `FilterButton.cs` / `OptionsEntry.cs`. |
 
 Iter-3.7's α-algorithm derives directly from `InventoryUtility.cs:~1626`:
 for any ingredient pair `(i1, i2)`, the resulting family is
@@ -160,14 +161,33 @@ first open (PugText `renderOnStart`), and the shipped `ui_rarity_border.png`
 placeholder was fully transparent (fixed to a white hollow frame, rendered as a
 9-slice via `spriteBorder {1,1,1,1}` so the ring stays thin; real pixel-art
 border remains **Iter-9** polish).
-Full mechanism in `docs/architecture.md § Rarity Colouring (Iter-6)`. Pending:
-Iter-7
-(Listen-Sortierung); Iter-8 (Filter+Suche — a discovered-only filter was
-prototyped as a throwaway test scaffold in Iter-3.8 and removed; it can
-seed Iter-8); Iter-9 (Window-/Style-Polish inkl. Footer-Move + perfectly
-flush window needs a panel/mask resize to an integer row multiple + scrollbar
-*visual* polish/real sprites). See `git log` for canonical per-iter merge
-points and `docs/superpowers/specs/` for design docs.
+Full mechanism in `docs/architecture.md § Rarity Colouring (Iter-6)`. **Iter-7
+(DONE):** runtime-switchable list sorting — four modes (Name, Rarity, Found,
+Category/ObjectType), each with ascending/descending direction. A reusable
+`DropdownWidget : UIelement` shows the active sort mode in a header and lists
+the remaining modes in a popup; an `AscDescToggle : ButtonUIElement` flips
+direction. Sort state is static per session (resets on game restart). The view
+model `ItemListViewModel` owns the `int[] Order` indirection (display position →
+catalog index), runs `Recompute()` on three triggers (mode/direction change,
+`DiscoveredState.Changed` only when Mode=Found, and re-bake), and keeps the
+filter/search seam (`DiscoveryFilter`, `SearchText`) at no-op defaults for
+Iter-8. `ItemCatalog.Entry` gained `ObjectType ObjectType` (via a new
+`objectTypeCache`) for the Category comparator. `ItemChecklistMod.ListView` is
+(re-)constructed after each bake. Full mechanism in `docs/architecture.md §
+List View-Model & Sorting (Iter-7)`. Pending: **Iter-8
+(Filter+Suche)** — the filter/search seam is already in `ItemListViewModel`
+(`DiscoveryFilter`/`SearchText` at no-op defaults); `DropdownWidget` is
+reusable for the discovery-filter dropdown (`ui_icon_filter`,
+`ui_icon_clear_search`, and `ui_text_background` sprites already ship in the IB
+atlases. **Iter-9 (Polish)** — dropdown content-fit auto-width via runtime
+`PugText` text measurement (also needed for Iter-8's longer "Undiscovered"
+label), exact spacing, real pixel-art sprites, caret/header refinement, and a
+header-strip layout (the sort controls currently overlap list row 0); real
+pixel-art rarity border; perfectly flush window; scrollbar visual polish + real
+sprites. **Iter-10 (tentative)** — code optimisations + extracting
+`DropdownWidget` into a standalone/nested prefab for true reuse, after Iter-9.
+See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
+for design docs.
 
 ## Conventions
 

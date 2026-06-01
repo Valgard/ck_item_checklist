@@ -8,6 +8,15 @@ describe what shipped per release, not every commit.
 
 ### Added
 
+- **Runtime-switchable list sorting.** The checklist can now be sorted by
+  four modes — **Name** (display name), **Rarity** (Poor → Legendary),
+  **Found** (discovered entries first), or **Category** (`ObjectType`) — each
+  with an **ascending/descending** direction. The UI is a dropdown next to the
+  scroll controls: the header shows the active sort mode; opening it lists only
+  the remaining three modes; selecting one re-sorts and promotes it to the
+  header. A separate asc/desc toggle button flips the direction. Sort state is
+  in-memory per session (static fields) — survives window close/reopen and a
+  catalog re-bake, resets on game restart.
 - **Item rarity colouring.** Each row now surfaces its Core Keeper rarity
   (`ObjectInfo.rarity`): the item name is tinted by rarity for **all** items
   (Common/Poor keep the default text colour; Uncommon and above get their
@@ -44,6 +53,14 @@ describe what shipped per release, not every commit.
 
 ### Changed
 
+- **`ItemChecklistContent` now indexes through `ItemListViewModel.Order`.**
+  Row binding reads `model.Order[displayIdx]` (catalog index for that display
+  position) instead of accessing the catalog directly by display index.
+  `_count` is taken from `model.Count`. No user-visible change — prerequisite
+  for sorting and future filtering.
+- **`ItemCatalog.Entry` gained an `ObjectType ObjectType` field**, resolved at
+  bake from a new `objectTypeCache` (parallel to `rarityCache`). Used by the
+  Category sort comparator.
 - **`DiscoveredState` key schema:** `HashSet<int>` → `HashSet<long>` with
   packed `(objectId, variation)` keys via new `PackKey(int, int)` helper.
 - **`ItemCatalog.Bake()` two-loop architecture:** standard items (Loop 1

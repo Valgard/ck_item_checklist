@@ -214,3 +214,74 @@ The visible placeholder is a white 1-px hollow frame (tinted at runtime by the
 rarity colour); `ui_slot_border.png` has the right hollow-frame shape but its
 `.meta` is `textureType: 0` (the sprite-meta trap) so it is not usable as a
 `Sprite` reference without re-importing.
+
+## Sorting / Dropdown (Iter-7)
+
+### Multiple MonoBehaviours in one `.cs` file break prefab wiring
+
+Only the class whose name matches the **filename** gets the Unity-standard
+`m_Script.fileID: 11500000`. Any other `MonoBehaviour` class in the same file
+gets an MD4-hash fileID — a computed value that is painful to look up and
+error-prone to hand-write in prefab YAML.
+
+`DropdownToggleButton` and `DropdownOptionButton` were originally draft-coded
+inside `DropdownWidget.cs`. Prefab wiring failed silently (the component was
+never bound) until each class was split into its own file:
+`DropdownToggleButton.cs`, `DropdownOptionButton.cs`.
+
+**Rule:** one `MonoBehaviour` per `.cs` file. Always.
+
+### Bridge sprite trap: use IB's sheet atlases, not extracted singles
+
+`Art/Bridge/` at one point held individually-extracted PNGs (`ui_icon_sort.png`,
+etc.) copied from ItemBrowser with a broken `.meta` (`textureType: 0` →
+imported as `Texture2D`). `LoadAsset<Sprite>` returns `null` for a `Texture2D`
+asset; the SpriteRenderer silently shows nothing.
+
+ItemBrowser's canonical sources `ui_icon.png` and `ui_group.png` are proper
+**multiple-mode sheet atlases** (`textureType: 8`, `spriteMode: 2`) with named
+sub-sprites. Copy those atlas files (with their `.meta`) and reference
+sub-sprites by `{fileID: <internalID>, guid: <atlas guid>, type: 3}`. Never
+extract individual PNGs from an atlas — they lose the sheet-atlas meta.
+
+### `using System;` in a UI file → `Object.Instantiate` is CS0104-ambiguous
+
+`System.Object` and `UnityEngine.Object` both become `Object` when both
+namespaces are in scope. The compiler error is:
+
+```
+error CS0104: 'Object' is an ambiguous reference between
+'UnityEngine.Object' and 'System.Object'
+```
+
+**Fix:** qualify the call: `UnityEngine.Object.Instantiate(...)`. Alternatively,
+remove `using System;` and replace any `System.*` usage with fully-qualified
+names. Files without `using System;` (e.g. `ItemChecklistContent`) are
+unaffected.
+
+### Generated `.meta` trails its `.cs` by one build
+
+Unity writes a new script's `.meta` file (the GUID carrier) only on the next
+Editor import/build — it is not present until the Editor has seen the file.
+A `.cs` committed before a build leaves its `.cs.meta` untracked.
+
+**Rule:** always build once after adding a new `.cs`, then `git add` both the
+`.cs` **and** its generated `.cs.meta` together before committing.
+
+### Editor batchmode build ≠ sandbox pass (new APIs)
+
+The Editor compile gate cannot see a RoslynCSharp-sandbox `CompileFailed` —
+that surfaces only at game launch. New BCL or Unity API usage added in Iter-7
+(e.g. `UnityEngine.Input.GetMouseButtonDown` for click-outside detection) must
+be confirmed by actually launching the game and watching `Player.log`, not
+just by a green Editor build.
+
+See `CLAUDE.md § Build-verify` for the canonical `Player.log` grep pattern.
+
+### `ui_scrollbar_handle` button background needs `~{1,1}` m_Size to read as raised
+
+9-slicing the narrow 4×8 `ui_scrollbar_handle` sprite with a small or
+squished `m_Size` (e.g. `{0.8, 0.7}`) flattens the raised look into a smear.
+The raised button effect reads correctly only at approximately `m_Size {1,1}`.
+Match the working asc/desc button's transform size when adapting this sprite
+for other clickables.
