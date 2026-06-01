@@ -106,8 +106,9 @@ namespace ItemChecklist.UI
 
         /// <summary>
         /// Ascending comparison for the active mode. Tiebreak is always
-        /// DisplayName (OrdinalIgnoreCase). Descending is applied by reversing
-        /// the sorted list in Recompute, so this stays a pure ascending compare.
+        /// DisplayName (InvariantCultureIgnoreCase — locale-aware, so "Ü" sorts
+        /// under U, not after Z). Descending is applied by reversing the sorted
+        /// list in Recompute, so this stays a pure ascending compare.
         /// </summary>
         private int Compare(int ia, int ib)
         {
@@ -135,7 +136,11 @@ namespace ItemChecklist.UI
                     break;
             }
             if (c != 0) return c;
-            c = string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
+            // Locale-aware: InvariantCulture weights "Ü" as a U-variant (diacritic =
+            // secondary weight) so it sorts under U, not after Z (which Ordinal,
+            // comparing raw codepoints, would do). Invariant matches the
+            // corekeeper-patch-forced UI culture (no de-DE satellite lookup).
+            c = string.Compare(a.DisplayName, b.DisplayName, StringComparison.InvariantCultureIgnoreCase);
             if (c != 0) return c;
             return ia.CompareTo(ib);   // final tiebreak: total order, stable under Reverse()
         }
