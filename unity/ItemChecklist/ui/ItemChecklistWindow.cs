@@ -91,6 +91,13 @@ namespace ItemChecklist.UI
             content.Init(rowPrefab);
             content.EnsurePool();
             var model = ItemChecklistMod.ListView;
+            // Recompute the sort order on every open. Discoveries happen while the
+            // window is CLOSED (the player can't pick items up with the UI open), so
+            // OnDiscoveryChanged's active-window guard skips them — without this, a
+            // reopen would show a stale order (e.g. a freshly-picked-up item not yet
+            // moved into the Found-mode discovered block). Cheap (~one sort of the
+            // catalog) and makes every open reflect the current discovered state.
+            model?.Recompute();
             content.SetCount(model != null ? model.Count : catalog.Count);
 
             // Wire IScrollable + refresh scroll range, then snap to top. Uses
