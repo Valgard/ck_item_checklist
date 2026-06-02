@@ -186,6 +186,18 @@ header-strip layout (the sort controls currently overlap list row 0); real
 pixel-art rarity border; perfectly flush window; scrollbar visual polish + real
 sprites. **Iter-10 (tentative)** — code optimisations + extracting
 `DropdownWidget` into a standalone/nested prefab for true reuse, after Iter-9.
+**Iter-11 (tentative) — per-variation/skin tracking.** The bake collapses
+every item family to its `variation == 0` primary entry (`ItemCatalog.cs:130`,
+"Phase-1 scope" comment), so colour/skin/state variants (dyed armour, torch
+on/off, crop growth stages, …) never get their own checklist row. CK itself
+tracks discovery per `(objectID, variation)` (`DiscoveredState.PackKey`), and
+IB exposes the choice via an `ignoreVariation` group key
+(`ObjectUtility.cs:422`) — so the data supports it; we deliberately hardwired
+"always ignore variation" to keep the list a *one-tick-per-item* checklist
+rather than a per-skin completion tracker. Revisit only if per-skin tracking
+becomes desirable; it would need a UI story for grouping/expanding variants so
+the list doesn't balloon with near-duplicates. *(Backlog item, distinct from
+the Iter-7.1 NonUsable-materials catalog fix — see `docs/gotchas.md`.)*
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
 
