@@ -222,6 +222,20 @@ or `CraftingCD`(&& !`CattleCD`), still dropping wild mobs.
 (used for `CookedFoodCD`), so the component checks are viable; the harder part
 is deciding *which* creatures belong in a player-facing "items found" list.
 *(Backlog item, sibling to Iter-7.1.)*
+**Iter-13 (tentative) — F1 guard misses loading screen & cutscenes.** The F1
+toggle in `ItemChecklistMod.Update` only blocks opening when a Vanilla
+menu/inventory/text-field/chat is active (`Manager.menu.IsAnyMenuActive()`,
+`Manager.ui.isPlayerInventoryShowing`, `Manager.input.textInputIsActive`,
+chat-window check). It does **not** block during the **world loading screen**
+or **in-game cutscenes**, so F1 pops the checklist over both. Completeness gap
+in the Iter-4 exclusion logic. Fix = add the missing state guards to the
+open-branch. Candidate signals (all need ILSpy + sandbox verification before
+use — do not assume the API names): for loading, gate on world/player
+readiness (the same `ClientWorldStateSystem.HasRunAtLeastOnce` /
+`Manager.main.player != null` signal the bake already waits on, or a
+screen-fade flag); for cutscenes, a cutscene-active flag on `Manager` (e.g. a
+`Manager.cutscene`/`Manager.menu` cutscene state or an input-locked flag).
+*(Backlog item — bugfix follow-up to Iter-4's toggle guard.)*
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
 
