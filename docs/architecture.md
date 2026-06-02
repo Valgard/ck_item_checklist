@@ -596,17 +596,22 @@ and triggers `Recompute()` + `RefreshVisible()`.
 ### ButtonUIElement Click Pattern
 
 `ButtonUIElement` (in `Pug.Other.dll`) is CK's standard clickable base class.
-Pattern verified from ItemBrowser `ItemBrowserButton.cs`, `FilterButton.cs`,
-and `OptionsEntry.cs`:
+**ItemChecklist convention — guard FIRST, then base** (verified consistent
+across `DropdownOptionButton`, `DropdownToggleButton`, `AscDescToggle`, and the
+Iter-8 `ClearSearchButton`):
 
 ```csharp
 public override void OnLeftClicked(bool mod1, bool mod2)
 {
-    base.OnLeftClicked(mod1, mod2);
-    if (!canBeClicked) return;
+    if (!canBeClicked) return;       // guard first: when not clickable, base is NOT run
+    base.OnLeftClicked(mod1, mod2);  // (no selection effect / sound on a dead click)
     // … custom logic …
 }
 ```
+
+> Order matters and the repo is uniform on guard-first. (An earlier draft of
+> this note showed base-first, copied from IB; the actual ItemChecklist code —
+> and every button in it — guards first. Match the repo, not the old snippet.)
 
 **Required prefab rules (same as ScrollBarHandle):**
 
@@ -640,3 +645,103 @@ individual PNGs from the atlas — extracted singles lose their sheet-atlas meta
 
 Button backgrounds use `ui_scrollbar_handle` (raised look; `~{1,1}` `m_Size`
 for correct 9-slice reading). Slot/list backgrounds use `ui_slot_background`.
+
+---
+
+## Filter & Search (Iter-8)
+
+Activates the `ItemListViewModel` filter/search seam left in place by Iter-7.
+The data layer needed only a one-line change; Iter-8 is UI wiring + prefab
+authoring.
+
+### ViewModel change (Option A semantics)
+
+`Recompute()`'s search block dropped its `if (!isDisc) continue;` guard, so the
+name search now matches the **real** `DisplayName` of *every* entry (discovered
+and undiscovered alike); undiscovered matches still render `???` in `ItemRow`.
+This is the deliberate **Option A** choice — a checklist's "have I found X?"
+question is answered unambiguously (the item appears; readable if found, `???`
+if not), consistent with the mod already showing `???` rows openly. A runtime
+toggle to switch Option A ↔ discovered-only is deferred to **Iter-8.1**.
+
+`ItemListViewModel.IsFiltered` (`filter != All || searchText.Trim().Length > 0`)
+drives the title's `· N shown` suffix — semantically correct, unlike
+`Count != catalog.Count` which is only accidentally equivalent (a 100%-complete
+`Discovered` filter has `Count == catalog.Count` yet is filtered).
+
+### SearchBar : TextInputField
+
+The search field is **CK-native**, not uGUI. `SearchBar` subclasses
+`TextInputField` (`Pug.Other.dll`): PugText rendering, the blinking caret
+(`CharacterMarkBlinker`), click-to-focus, and WASD-suppression are all
+inherited. `OnLeftClicked` (base) calls `Manager.input.SetActiveInputField(this)`.
+Our subclass only:
+- polls `GetInputText()` in `LateUpdate`, pushing changes to `model.SearchText`
+  (with a `_lastPushed` change-cache so unchanged frames don't re-`Recompute`);
+- exposes `SyncFrom(text)` — sets the field text **and** `_lastPushed` so the
+  window can sync the field to the model on open / after a re-bake without the
+  next frame pushing the synced value back.
+
+The orphaned `UnityInputFieldAdapter` (a uGUI `InputField` wrapper) was the
+wrong abstraction and is **deleted**. IB's `SearchBar : TextInputField` is the
+proven precedent; its controller-deselect / double-click-highlight / snap-point
+extras are intentionally omitted (single-player M&K).
+
+### Focus model — staying focused while typing
+
+CK's UI selection is **hover-based**: `currentSelectedUIElement` follows the
+mouse, and leaving an element's collider fires `OnDeselected`, which by default
+calls `Deactivate`. So with the stock setting, typing stopped the moment the
+mouse left the field. Fix: set **`dontDeactivateOnDeselect = true`** on the
+field (stays active off-hover). The trade-off is it then never self-deactivates,
+so `ItemChecklistWindow.HideUI()` calls `searchBar.Deactivate(false)` (guarded
+by `inputIsActive`) — every close path funnels through `HideUI`, so closing the
+window always frees gameplay input (WASD). Net behaviour: click → focus → type
+freely → close (F1/Esc) frees the field.
+
+### ClearSearchButton
+
+`ClearSearchButton : ButtonUIElement` (guard-first click pattern). Its
+`searchBar` ref is prefab-wired; on click it `ResetText()`s the field and clears
+`model.SearchText`. Glyph `ui_icon_clear_search`.
+
+### Filter dropdown — DropdownWidget reuse
+
+A second `DropdownWidget` instance (`FilterDropdown`), authored by **duplicating
+the `SortDropdown` subtree** via a deterministic fileID slot-remap (slots 50–60
+→ 70–80; the prefab's hand-authored `<classId><zeros><slot>` scheme makes the
+copy a pure `+20` on every in-subtree fileID). Glyph swapped to `ui_icon_filter`.
+`WireControls()` configures it with `FilterLabels = {All, Discovered,
+Undiscovered}` (index 1:1 with the `DiscoveryFilter` enum). No new widget code.
+
+### Control re-wire on re-bake
+
+`RebindRows()` now re-calls `WireControls()` after `PopulateContent()` so the
+dropdown/search callbacks re-capture the fresh `ItemListViewModel` instance
+after a re-bake (loc change / world reload while the window is open).
+`WireControls` tracks the previously-wired model (`_wiredModel`) and
+unsubscribes its `OnResultsChanged` before subscribing the new one, so the
+discarded model isn't retained by a dangling delegate.
+
+### Search-field prefab structure (the "Display" container)
+
+Mirrors the dropdown's slot look:
+```
+SearchField   (SearchBar + 3D BoxCollider = click/focus target; no SpriteRenderer)
+├─ Display    (SpriteRenderer: ui_classic 9-slice slot, Sprites-Default mat, GUI/order 52)
+│  ├─ Text    (PugText, pugText)
+│  └─ Hint    (PugText, hintText, "Search…")
+├─ SelectedMarker
+├─ Caret      (CharacterMarkBlinker + white_pixel SpriteRenderer)
+└─ ClearButton (ClearSearchButton + ui_icon_clear_search + 3D BoxCollider)
+```
+The `Display` was produced by duplicating the dropdown's `Display` (to inherit
+its correct sprite/material/sorting/9-slice) and **stripping** its
+`DropdownToggleButton` + `BoxCollider` (else the leftover button hijacks clicks
+and fires the *original* dropdown's popup — its `owner` still points there).
+Text/Hint are children of `Display`; SearchBar's `pugText`/`hintText` refs are
+fileID-based, so re-parenting doesn't break wiring.
+
+Pixel-exact spacing, a real pixel-art caret, and overlap-free header geometry
+are **Iter-9** polish; this iteration places controls in the approved L→R order
+(Search · Sort+AscDesc · Filter) and confirms they're clickable.

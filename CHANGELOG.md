@@ -8,6 +8,13 @@ describe what shipped per release, not every commit.
 
 ### Added
 
+- **Discovery filter and name search.** A filter dropdown narrows the
+  checklist to **All**, **Discovered**, or **Undiscovered** items. A search box
+  filters the list by item name as you type — matched against the localized
+  name in your game's language, so a search in German finds German names;
+  undiscovered matches still appear as `???`. A clear (✕) button empties the
+  search. The window title shows a `· N shown` count while the list is narrowed.
+
 - **Runtime-switchable list sorting.** The checklist can now be sorted by
   four modes — **Name** (display name), **Rarity** (Poor → Legendary),
   **Found** (discovered entries first), or **Category** (`ObjectType`) — each

@@ -4,7 +4,9 @@ ItemChecklist is a Core Keeper mod that tracks which items the player has
 discovered. A scrollable in-game checklist (open with F1) lists all
 discoverable items — vanilla and mod-added alike — showing
 discovered/undiscovered state with item icons and localized names. Cooked-food
-permutations are tracked per ingredient pair. Requires CoreLib.
+permutations are tracked per ingredient pair. The list can be **sorted**
+(name / rarity / found / category), **filtered** by discovery state, and
+**searched** by name. Requires CoreLib.
 
 ## Requirements
 

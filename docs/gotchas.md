@@ -311,3 +311,73 @@ needs ECS/registry APIs the RoslynCSharp sandbox blocks.
 per-entry `nameNoIcon` name logging) in Loop 1, read from `Player.log` after a
 world-load, is how the 117-vs-9 split and the 9 names were confirmed before
 choosing the icon guard. Stripped before merge.
+
+## Search Field / Header (Iter-8)
+
+### The search input is `TextInputField` (CK-native), NOT uGUI
+
+CK ships `TextInputField` (`Pug.Other.dll`) — a `UIelement,
+InputManager.TextInputInterface` that renders through `PugText`, carries a
+`CharacterMarkBlinker` caret, and self-activates in
+`OnLeftClicked → Manager.input.SetActiveInputField(this)`. Subclass it
+(`SearchBar : TextInputField`). The committed-but-orphaned
+`UnityInputFieldAdapter` (a `UnityEngine.UI.InputField` wrapper) was the wrong
+abstraction — uGUI structurally fails in CK — and was deleted in Iter-8. IB's
+`SearchBar : TextInputField` is the canonical reference; its prefab lives in
+`ItemBrowserUI.prefab`.
+
+### Freshly-added SpriteRenderers default to a DEAD material → render nothing
+
+Adding a `SpriteRenderer` via "Add Component" in this project assigns material
+`guid 274d4544…` — which **does not exist as an asset** (dangling reference). A
+SpriteRenderer with a missing material draws nothing, even with a valid sprite,
+correct sorting, and opaque colour. Every working window renderer instead uses
+Unity's built-in **Sprites-Default** (`fileID: 10754, guid:
+0000000000000000f000000000000000, type: 0`). Symptom: object exists, selection
+box shows, but nothing renders — in the Editor *and* in-game. Fix: set Material
+→ Sprites-Default on every hand-added SpriteRenderer (or duplicate a working
+element to inherit it).
+
+### Freshly-added SpriteRenderers default to Sorting Layer "Default", not "GUI"
+
+A new SpriteRenderer lands on sorting layer `0` ("Default"); the whole window is
+on **"GUI"** (`m_SortingLayer: 5`, ID `1241602095`). Wrong layer → sorted behind
+the panel → invisible. Set Sorting Layer = GUI + an appropriate Order (header
+controls ~50–54). Distinct from the material trap above — they often co-occur on
+hand-authored renderers and must both be fixed.
+
+### Caret scale: white_pixel is 1×1 px @ PPU 16 → scale UP, not down
+
+`white_pixel.png` is 1×1 px at `spritePixelsToUnits: 16` → base size 0.0625
+units. A caret built from it needs **up**-scaling to be visible — e.g. Transform
+scale `~{0.8, 6, 1}` for a ~0.05 × 0.38-unit bar. A naive `{0.06, 0.4}` yields a
+sub-pixel sliver (the caret blinks correctly via `CharacterMarkBlinker.sr`, just
+invisibly small). `CharacterMarkBlinker` has one serialized field, `sr` (the
+SpriteRenderer it toggles); wire it to the caret's renderer.
+
+### CK text-input deselects on mouse-leave → set `dontDeactivateOnDeselect`
+
+CK's selection is hover-based; leaving the field's collider fires
+`OnDeselected → Deactivate`, so typing stops the instant the mouse moves off.
+Set **`dontDeactivateOnDeselect = true`** to stay focused off-hover. It then
+won't self-deactivate, so deactivate explicitly on window close
+(`HideUI → searchBar.Deactivate(false)`, guarded by `inputIsActive`) or a
+closed window leaves the input active and **WASD blocked**.
+
+### Duplicate-and-strip a CK widget: remove the leftover button + collider
+
+Duplicating a working widget subtree (e.g. the dropdown's `Display`) to inherit
+its correct sprite/material/sorting/9-slice is the safest authoring path — but
+you inherit its **function** too. A copied `ButtonUIElement` (here
+`DropdownToggleButton`) keeps its `owner` pointing at the *original* widget, so
+its leftover 3D collider hijacks clicks and fires the original's action. When
+repurposing, remove the `ButtonUIElement` component **and** its `BoxCollider`.
+
+### PugText doesn't render in the Editor (runtime `Render()` only)
+
+`PugText` builds its glyph SpriteRenderers at runtime via `Render()`; in the
+Prefab/Scene view it shows nothing. So the Editor is unreliable for previewing
+text-bearing UI — verify text in the Game view (build + run). For overlap/click
+checks, the **BoxCollider gizmos** are reliable (that *is* what CK's 3D raycast
+sees). SpriteRenderer pieces (backgrounds, glyphs) *do* render in the Editor
+once their material + sorting layer are correct (see the two traps above).
