@@ -88,6 +88,14 @@ namespace ItemChecklist.UI
 
         public void HideUI()
         {
+            // Defocus the search field before hiding. With dontDeactivateOnDeselect
+            // = true the field stays active when the mouse leaves it (so the player
+            // can type while moving the cursor); the trade-off is it no longer
+            // self-deactivates, so a window close would otherwise leave the text
+            // input active and gameplay input (WASD) blocked. Deactivate here closes
+            // that gap — every close path funnels through HideUI.
+            if (searchBar != null && searchBar.inputIsActive)
+                searchBar.Deactivate(false);
             // Rows persist in the pool across hide/show; no per-entry Destroy.
             root.SetActive(false);
         }
