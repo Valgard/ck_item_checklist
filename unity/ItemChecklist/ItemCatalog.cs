@@ -139,17 +139,31 @@ namespace ItemChecklist
 
                     // ObjectType has no single "Item" value — it discriminates the
                     // kind of thing (Helm, MiningPick, Ring, …). Items are
-                    // everything that *isn't* a categorically-non-item type. The
-                    // exclusion list mirrors the start of ItemBrowser's
-                    // ObjectUtility.IsNonObtainable.
-                    // NonUsable=0 is the default value of any DB entry registered
-                    // without an explicit type — test fixtures, prefab stubs, etc.
-                    // Almost always garbage from a player-facing checklist's POV.
-                    if (info.objectType == ObjectType.NonUsable)    continue;
+                    // everything that *isn't* a categorically-non-item type. This
+                    // exclusion list mirrors ItemBrowser's ObjectUtility.IsNonObtainable
+                    // (ObjectUtility.cs:393), which excludes NonObtainable / Creature /
+                    // Critter / PlayerType — but **not** NonUsable.
                     if (info.objectType == ObjectType.NonObtainable) continue;
                     if (info.objectType == ObjectType.Creature)      continue;
                     if (info.objectType == ObjectType.Critter)       continue;
                     if (info.objectType == ObjectType.PlayerType)    continue;
+
+                    // Iter-7.1 catalog-completeness fix: ObjectType.NonUsable is NOT
+                    // "garbage". CK assigns it to raw materials — ores, bars, raw wood,
+                    // scrap, plain Wood, etc. The old blanket `NonUsable continue`
+                    // silently dropped every ore/bar/raw-wood from the checklist. IB
+                    // doesn't exclude NonUsable at all; we can't replicate its full
+                    // IsNonObtainable here (it needs ECS/registry APIs the RoslynCSharp
+                    // sandbox blocks), so instead we keep NonUsable items and drop only
+                    // the handful of internal engine entities CK also files under
+                    // NonUsable — territory spawners, TheCore, the DroppedItem entity,
+                    // and boss-statue prefab stubs. Those are exactly the NonUsable
+                    // entries with no icon (the 117 real materials all carry one; the 9
+                    // internal entities have neither an icon nor a localized name) —
+                    // verified in-game on game version 1.2.1.4.
+                    if (info.objectType == ObjectType.NonUsable
+                        && info.smallIcon == null && info.icon == null)
+                        continue;
 
                     // Two-pass name resolution (ItemBrowser ObjectUtility.cs pattern).
                     // localize=true  → I2.Loc resolved display name (e.g. "Large Water Can")

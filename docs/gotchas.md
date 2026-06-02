@@ -285,3 +285,29 @@ squished `m_Size` (e.g. `{0.8, 0.7}`) flattens the raised look into a smear.
 The raised button effect reads correctly only at approximately `m_Size {1,1}`.
 Match the working asc/desc button's transform size when adapting this sprite
 for other clickables.
+
+## Catalog / Bake (Iter-7.1)
+
+### `ObjectType.NonUsable` is raw materials, not garbage
+
+`ItemCatalog.Bake` Loop 1 used to `continue` on `ObjectType.NonUsable`, with a
+comment calling it "garbage / test fixtures / prefab stubs". **That is wrong.**
+Core Keeper assigns `NonUsable` to **raw materials** — ores, bars, raw wood,
+scrap, plain Wood, etc. The blanket exclude silently dropped every one of them
+from the checklist (user noticed Holz/Kupfererz/Schrott missing). ItemBrowser's
+`ObjectUtility.IsNonObtainable` does **not** exclude `NonUsable` at all.
+
+The fix keeps `NonUsable` items and instead drops only the internal engine
+entities CK also files under that type. Empirically on game version 1.2.1.4
+there are 126 `NonUsable` items: 117 real materials (all carry an icon) and 9
+internal entities with **no icon and no localized name** — 4 territory
+spawners, the world `TheCore`, the `DroppedItem` entity, and 3 boss-statue
+prefab stubs. The guard is therefore `objectType == NonUsable && smallIcon ==
+null && icon == null → continue`: icon presence cleanly separates the two
+populations, and IB's full `IsNonObtainable` can't be reused here because it
+needs ECS/registry APIs the RoslynCSharp sandbox blocks.
+
+**Diagnosing the population:** a throwaway DIAG census (`total/kept/dropped` +
+per-entry `nameNoIcon` name logging) in Loop 1, read from `Player.log` after a
+world-load, is how the 117-vs-9 split and the 9 names were confirmed before
+choosing the icon guard. Stripped before merge.

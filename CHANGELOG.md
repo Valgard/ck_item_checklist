@@ -82,6 +82,14 @@ describe what shipped per release, not every commit.
 
 ### Fixed
 
+- **Raw materials now appear in the checklist.** Ores, bars, raw wood, scrap
+  and similar were silently missing because the catalog bake wrongly excluded
+  every `ObjectType.NonUsable` item as "garbage". Core Keeper actually files
+  raw materials under that type, so they are now included (catalog grows by
+  ~126 entries). The handful of internal engine entities also typed
+  `NonUsable` (territory spawners, the world Core, the dropped-item entity,
+  boss-statue prefab stubs) are still excluded — they have no icon and no
+  localized name, so they are not player-facing items.
 - **F1 now toggles the window.** Pressing F1 while the checklist is open
   closes it (just like Escape or E); previously F1 only ever opened it, and
   re-pressing it also reset the scroll position.
