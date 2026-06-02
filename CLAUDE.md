@@ -174,7 +174,17 @@ filter/search seam (`DiscoveryFilter`, `SearchText`) at no-op defaults for
 Iter-8. `ItemCatalog.Entry` gained `ObjectType ObjectType` (via a new
 `objectTypeCache`) for the Category comparator. `ItemChecklistMod.ListView` is
 (re-)constructed after each bake. Full mechanism in `docs/architecture.md §
-List View-Model & Sorting (Iter-7)`. Pending: **Iter-8
+List View-Model & Sorting (Iter-7)`. **Iter-7.1 (DONE):** catalog-completeness
+fix — `ItemCatalog.Bake` Loop 1 blanket-excluded `ObjectType.NonUsable` as
+"garbage", but CK files raw materials (ores, bars, raw wood, scrap) under that
+type, so they were silently missing. Replaced with a narrow guard that drops a
+`NonUsable` item only when it has no icon (`smallIcon` and `icon` both null);
+verified in-game (1.2.1.4) that the 126 `NonUsable` items are 117 real
+materials (all have an icon) + 9 internal engine entities with no icon and no
+localized name (territory spawners, `TheCore`, the `DroppedItem` entity,
+boss-statue stubs). Catalog 10844 → 10835. IB's full `IsNonObtainable` can't be
+reused (needs ECS/registry APIs the sandbox blocks). Full reasoning in
+`docs/gotchas.md § Catalog / Bake (Iter-7.1)`. Pending: **Iter-8
 (Filter+Suche)** — the filter/search seam is already in `ItemListViewModel`
 (`DiscoveryFilter`/`SearchText` at no-op defaults); `DropdownWidget` is
 reusable for the discovery-filter dropdown (`ui_icon_filter`,
