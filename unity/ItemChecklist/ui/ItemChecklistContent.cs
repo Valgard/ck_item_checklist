@@ -29,6 +29,12 @@ namespace ItemChecklist.UI
         // Used only if UIScrollWindow.windowHeight is unavailable/zero.
         private const float FallbackWindowHeight = 9.25f;
 
+        // Content-local y of the visible window (mask) top. Row 0's TOP edge is
+        // pinned here so the list start/end stay flush for ANY RowHeight (Rebind
+        // offsets each row centre by RowHeight/2). Fixed window-layout constant
+        // from the Iter-3.8/window-size tuning (was implicitly RowHeight/2 at 2.5).
+        private const float MaskTopLocalY = 1.25f;
+
         private static readonly MemberInfo MiScrollable =
             typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
 
@@ -155,7 +161,9 @@ namespace ItemChecklist.UI
                     continue;
                 }
                 if (!row.gameObject.activeSelf) row.gameObject.SetActive(true);
-                row.transform.localPosition = new Vector3(0f, -(displayIdx * RowHeight), 0f);
+                // Pin row 0's TOP to MaskTopLocalY (flush) regardless of RowHeight:
+                // centre = top - RowHeight/2, each row RowHeight below the previous.
+                row.transform.localPosition = new Vector3(0f, MaskTopLocalY - RowHeight * (displayIdx + 0.5f), 0f);
                 int catalogIdx = model.Order[displayIdx];
                 var entry = catalog.GetByIndex(catalogIdx);
                 // CK-authoritative rarity colour. useDefaultColorForCommon: true →
