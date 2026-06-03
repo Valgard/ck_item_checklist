@@ -122,6 +122,7 @@
     "PugProperties.dll",
     "PugProperties.Editor.dll",
     "PugRP.dll",
+    "PugSprite.dll",
     "Pugstorm.WorldGen.dll",
     "PugText.Editor.dll",
     "PugWorldGen.Authoring.dll",
