@@ -114,7 +114,7 @@ Iter-3.5b lessons: `docs/gotchas.md § SpriteMask Clipping`.
 
 ## Iter-Roadmap (live)
 
-As of 2026-06-04: Iter-3.5 through 8 (incl. the 3.x/7.1 point-iters) are DONE on main; Iter-9 is DONE on branch `iter-9` (pending ff-merge). Iter-3.8
+As of 2026-06-04: Iter-3.5 through 8 (incl. the 3.x/7.1 point-iters) are DONE on main; Iter-9 (UI layout/behaviour polish) is DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
