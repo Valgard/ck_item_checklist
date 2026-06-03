@@ -22,6 +22,8 @@ namespace ItemChecklist.UI
     [DefaultExecutionOrder(-100)]
     public sealed class ItemChecklistContent : UIelement, IScrollable
     {
+        // Runtime value is read from the row prefab's background SpriteRenderer in
+        // Init() (single source of truth); this compile-time default is the fallback.
         public float RowHeight = ItemRow.RowHeight;
 
         // Used only if UIScrollWindow.windowHeight is unavailable/zero.
@@ -52,10 +54,20 @@ namespace ItemChecklist.UI
                 API.Reflection.SetValue(MiScrollable, _scrollWindow, this);
         }
 
-        /// <summary>Idempotent: stores the row prefab used to build the pool.</summary>
+        /// <summary>Idempotent: stores the row prefab and derives RowHeight from its
+        /// background sprite (single source of truth — see the RowHeight field).</summary>
         public void Init(GameObject rowPrefab)
         {
             _rowPrefab = rowPrefab;
+            // Read the row height straight from the prefab's background SpriteRenderer
+            // so changing the row bg height in the prefab alone re-spaces the whole
+            // list. size.y is authoritative only in Sliced/Tiled draw mode (in Simple
+            // it returns the sprite's native size), so guard on that; otherwise keep
+            // the compile-time ItemRow.RowHeight fallback.
+            var proto = rowPrefab != null ? rowPrefab.GetComponent<ItemRow>() : null;
+            if (proto != null && proto.background != null
+                && proto.background.drawMode != SpriteDrawMode.Simple)
+                RowHeight = proto.background.size.y;
             if (_scrollWindow == null)
                 _scrollWindow = GetComponentInParent<UIScrollWindow>(true);
         }
