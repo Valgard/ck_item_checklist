@@ -100,7 +100,7 @@ namespace ItemChecklist.UI
             float wh = (_scrollWindow != null && _scrollWindow.windowHeight > 0f)
                 ? _scrollWindow.windowHeight
                 : FallbackWindowHeight;
-            return Mathf.CeilToInt(wh / RowHeight) + 2;   // +2 buffer: partial row top + bottom
+            return Mathf.CeilToInt(wh / RowHeight) + 4;   // +4 buffer: 2 partial/spare rows top + bottom (denser rows since RowHeight 1.5)
         }
 
         /// <summary>Set the total entry count; drives reported height + scrollbar.</summary>
