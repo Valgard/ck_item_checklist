@@ -62,6 +62,9 @@ namespace ItemChecklist.UI
         public void ShowUI()
         {
             root.SetActive(true);
+            // Hide the game HUD (health/food/hotbar/buffs) while the checklist is up —
+            // CK's own non-persisting menu-open mechanism (mirrors RadicalMenuController).
+            Manager.ui.TemporarilyDisableGameplayUI();
             ApplyTheme();
             PopulateContent();
             WireControls();
@@ -96,6 +99,11 @@ namespace ItemChecklist.UI
             // that gap — every close path funnels through HideUI.
             if (searchBar != null && searchBar.inputIsActive)
                 searchBar.Deactivate(false);
+            // Restore the game HUD that ShowUI hid. Guarded: Awake() calls HideUI()
+            // before Manager is ready, and re-enabling is a harmless no-op when nothing
+            // was disabled.
+            if (Manager.main != null && Manager.ui != null)
+                Manager.ui.EnableTemporarilyDisabledGameplayUI();
             // Rows persist in the pool across hide/show; no per-entry Destroy.
             root.SetActive(false);
         }
