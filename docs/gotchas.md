@@ -405,3 +405,28 @@ once their material + sorting layer are correct (see the two traps above).
   CoreLib set `currentInterface` -- which left `isAnyInventoryShowing` false, so
   CK never blocked world input (clicks + WASD leaked through the open window).
   Use ASCII "..." in the hint string.
+- **Do NOT force CK's input latches to fix the first-open input leak.** The real
+  root cause of the leak is CoreLib setting `currentInterface` *after* `ShowUI`
+  (see the ellipsis crash above) -- let `ShowUI` complete cleanly. Forcing the
+  latches (`AnyInventoryOrMapWasActiveThisFrame` / `PlayerInputBlockedThisFrame`)
+  over-blocks the ESC / E close path, so the window can't be closed. A
+  `WorldInputSuppressWhileChecklistOpenPatch.cs` was built for this and deleted.
+- **`TextInputField` re-asserts the caret position every frame.** It sets
+  `characterMarkBlinker.transform.position = pugText.position` in its update, so a
+  static prefab `localPosition` on the caret GameObject is ignored. To offset the
+  caret, move the `white_pixel` into a child GameObject (with the +Y offset) and
+  rewire `CharacterMarkBlinker.sr` to it. Deferred to Iter-14.
+- **CK pixel fonts blur when Transform-scaled below 1.** To render text smaller,
+  use a smaller native font (`thinTiny`, `fontFace` `16777344`) instead of
+  scaling a larger font down -- a sub-1 Transform scale produces uneven, blurry
+  pixels.
+- **`PugSprite.dll` must be in the asmdef `precompiledReferences`.** The
+  `CursorScaleRestorePatch` touches `SpriteObject`, which lives in `PugSprite.dll`;
+  without the reference the patch fails to compile with `CS0012`.
+- **The scrollbar can be reparented in the prefab without breaking wiring.**
+  `UIScrollWindow.scrollBar` is a fileID reference, so it survives reparenting
+  (e.g. moving the `ScrollBar` into `RowsContainer`). Recompute the scrollbar's
+  `localPosition` for the new parent and fix **both** `m_Children` lists (remove
+  from the old parent, add to the new one).
+- **`PugTextStyle.HorizontalAlignment` enum:** serialized `horizontalAlignment`
+  is `left = 0`, `center = 1`, `right = 2`.

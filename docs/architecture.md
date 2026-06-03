@@ -210,7 +210,7 @@ recycles rows by index, so ItemChecklist implements its own on top of the
 `scrollingContent`) owns a fixed pool of
 
 ```
-N = ceil(windowHeight / RowHeight) + 2     // ~5–6 rows (RowHeight = 2.5)
+N = ceil(windowHeight / RowHeight) + 4     // RowHeight = 1.5 since Iter-9 (read from the prefab background at Init); see § Item-Row Layout (Iter-9)
 ```
 
 row GameObjects. The pool only ever *grows* — `EnsurePool` grows toward
@@ -297,18 +297,20 @@ mask `scale.y = 6.5`, mask `localPos.y = -2.0`.
 
 **Iter-9 enlargement.** The window was sized to near-fullscreen with a thin
 **uniform border matching CK's inventory margin** (0.25 world-units). Final
-values: background + root collider `29.5 × 16.375`, `windowHeight = 13`, mask
-`scale.y = 13` / `localPos.y = -5.25`, `RowsContainer.y = 3.75`, row width
-`27.5`. The window is centered in the camera's **30 × 16.875-unit viewport**
+values (committed): background + root collider `29.5 × 16.375` (mask width 28.5), `windowHeight =
+13.75`, mask `scale.y = 13.75` / `localPos.y = -5.625` (`windowHeight` ==
+mask `scale.y`, preserving the flush invariant), `RowsContainer.y = 3.75`, row
+width `27.5`. The window is centered in the camera's **30 × 16.875-unit viewport**
 (measured once via a temporary log of `Manager.camera.uiCamera.orthographicSize`
 = `8.4375`, aspect 16:9; `world_height = 2·orthoSize`, `world_width = height·aspect`).
 **No runtime sizing logic:** CK's orthographic UI camera shows a constant world
 area regardless of resolution, and CK has no UI-scale option, so a fixed prefab
 size is "fullscreen with border" on every resolution (empirically confirmed).
-`RowHeight` stays `2.5` (native), so the recycled pool auto-grew via
-`ComputePoolSize` (`pool = 7` at `windowHeight 13`). The bottom shows a
-deliberately clipped partial row as a "more below" affordance (whole-row flush is
-a separate later Iter-9 slice).
+A later Iter-9 slice changed `RowHeight` from the pre-Iter-9 `2.5` to **`1.5`**
+(now read from the row prefab background at `Init` — see § Item-Row Layout
+(Iter-9)), so the recycled pool auto-grows via `ComputePoolSize` to fit the
+denser rows. Whole-row flush (row 0's top pinned to the mask top) was settled in
+the § Item-Row Layout slice.
 
 ### Scrollbar (Iter-5)
 
@@ -353,7 +355,7 @@ height) + `ScrollBarHandle` (`ScrollBarHandle` + 3D `BoxCollider` =
 For hand-wiring the CK component `m_Script` refs (portable fileID, install-local
 guid), see the `project-corekeeper-script-fileid-derivation` memory. Scroll
 arrows stay unwired (`arrowUp`/`arrowDown` = `{fileID: 0}`); track-position
-fine-tuning + real sprites are deferred to Iter-9.
+fine-tuning + real sprites are deferred to Iter-12 (pixel-art).
 
 ---
 
@@ -501,7 +503,7 @@ rarity ≥ Uncommon). The sprite is the placeholder `ui_rarity_border` (a white
 (`spriteBorder {1,1,1,1}` in its `.meta`, `m_DrawMode: 1`) so the 1-px ring
 stays a thin fixed-pixel frame at any `m_Size` instead of thickening with the
 sprite. Real pixel-art (a designed border in place of the tinted white ring)
-remains Iter-9 polish.
+remains Iter-12 (pixel-art) polish.
 
 ---
 
@@ -757,9 +759,10 @@ and fires the *original* dropdown's popup — its `owner` still points there).
 Text/Hint are children of `Display`; SearchBar's `pugText`/`hintText` refs are
 fileID-based, so re-parenting doesn't break wiring.
 
-Pixel-exact spacing, a real pixel-art caret, and overlap-free header geometry
-are **Iter-9** polish; this iteration places controls in the approved L→R order
-(Search · Sort+AscDesc · Filter) and confirms they're clickable.
+This iteration placed controls in the approved L→R order
+(Search · Sort+AscDesc · Filter) and confirmed they're clickable; pixel-exact
+spacing and overlap-free header geometry were settled in **Iter-9** (DONE).
+Search-caret vertical alignment is deferred to **Iter-14**.
 
 ---
 

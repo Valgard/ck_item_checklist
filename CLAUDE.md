@@ -292,3 +292,12 @@ for design docs.
 - Spec lives in `docs/superpowers/specs/`, plan in
   `docs/superpowers/plans/`, exploratory research in `docs/research/`.
   Every iter has a 1:1:1 spec/plan/(optional)research mapping.
+- **Write superpowers specs/plans to the *main* tree, not the worktree.**
+  `docs/superpowers/` is gitignored, and `git worktree add` only checks out
+  *tracked* files, so a spec authored inside the worktree is lost on
+  `git worktree remove`. Author/edit specs and plans in the main checkout.
+- **The visual-calibration loop runs inline, not via subagents.** Judging
+  margins / flush / spacing from screenshots requires observing the live
+  CrossOver game window; a Unity batchmode build also locks the project. A
+  subagent can neither see the window nor share the lock, so do this work in
+  the main session.

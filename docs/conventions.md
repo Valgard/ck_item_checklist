@@ -105,6 +105,17 @@ seed the real Iter-8 discovered-only filter.)
 Rule: scaffolds never get committed onto a story commit. Add them to the
 working tree, use them, then `git restore` before the iter's ff-merge.
 
+### Temp-`Debug.Log` measurement technique
+
+To get exact in-game numbers that cannot be read from the prefab (camera
+`orthographicSize` / aspect for the viewport size, dropdown / text width via
+`PugText.localCharacterEndPositions`), drop a one-shot throwaway `Debug.Log`
+that prints the value, read it from `Player.log`, then remove the log. Same
+discipline as the throwaway scaffold above — it never reaches a story commit.
+**ILSpy-verify the accessor first** (field vs. property, exact name): a
+sandbox-banned member would `CompileFailed` the whole mod, so confirm the
+member is sandbox-safe in the decompiled DLL before adding the log.
+
 **Recovery:** if Core Keeper hangs on the loading screen (quit-deadlock in
 `ModManager` — symptom: `Exit blocked by ModManager` in Player.log), use:
 
@@ -130,15 +141,27 @@ unity/ItemChecklist/
   SaveManagerActiveSelectHook.cs  Harmony patch for active-character resolution
   CharacterDataDiscoverySnapshot.cs  initial-state reader on OnAfterDeserialize
   PascalCaseSplitter.cs           pure utility (display-name fallback formatting)
-  Data/                           baked catalog / lookup data assets
+  InventoryOpenAutoHidePatch.cs   Harmony patch — auto-hide on Vanilla menu open (Iter-4)
+  CursorScaleRestorePatch.cs      Harmony patch — restore cursor scale while open (Iter-9)
+  InGameButtonHintsSuppressPatch.cs       Harmony patch — hide button-hint prompts (Iter-9)
+  InventoryShortCutsButtonSuppressPatch.cs  Harmony patch — hide inventory shortcuts button (Iter-9)
+  ShortCutsWindowSuppressPatch.cs Harmony patch — suppress help panel (Iter-9)
+  PauseSuppressWhileChecklistOpenPatch.cs  Harmony patch — block ESC->pause race (Iter-9)
+  Data/                           (empty; catalog baked at runtime)
   ModManifest.json                mod manifest (displayName, requiredOn, etc.)
   ItemChecklist.asmdef            runtime assembly definition
   ui/
     ItemChecklistWindow.cs        IModUI implementation (UIelement subclass)
     ItemRow.cs                    row MonoBehaviour (Bind API)
     ItemChecklistContent.cs       IScrollable implementation (viewport recycler)
-    FilterAndSearchModel.cs       filter/search state (deferred Iter-8)
-    UnityInputFieldAdapter.cs     input-field adapter for search (deferred Iter-8)
+    ItemListViewModel.cs          order/filter/search view model (Iter-7/8)
+    SortMode.cs                   sort-mode enum + comparators (Iter-7)
+    DropdownWidget.cs             reusable dropdown (sort/filter) (Iter-7/8)
+    DropdownToggleButton.cs       dropdown header toggle button (Iter-7)
+    DropdownOptionButton.cs       dropdown popup option button (Iter-7)
+    AscDescToggle.cs              ascending/descending direction toggle (Iter-7)
+    SearchBar.cs                  TextInputField subclass — name search (Iter-8)
+    ClearSearchButton.cs          clears the search field (Iter-8)
   Prefabs/
     ItemChecklistWindow.prefab    window hierarchy
     ItemRow.prefab                row template (recycled by scroll list)
@@ -147,11 +170,13 @@ unity/ItemChecklist/
     ItemChecklist.Editor.asmdef   editor-only assembly for CLIBuildHelper
     CLIBuildHelper.cs             -executeMethod entry point for build.sh
     CLIPublishHelper.cs           -executeMethod entry point for upload.sh
+    SDK_SETUP.md                  SDK setup boilerplate (in-tree doc)
 ```
 
 **Naming patterns:**
 
 - `*Hook.cs` — top-level Harmony patches
+- `*Patch.cs` — top-level Harmony patches (toggle/suppression behaviour)
 - `*Snapshot.cs` — top-level initial-state readers
 - `ui/*.cs` — IModUI, IScrollable, and row logic
 - `Editor/*.cs` — editor-only build/publish helpers (in separate `.asmdef`)

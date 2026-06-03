@@ -42,9 +42,12 @@ not ship in the published mod.
 
 ## Known Limitations
 
-- **No visible scrollbar yet.** The window prefab has no wired scrollbar
-  (`scrollBar: {fileID: 0}`), so the scroll track does not render. Scrolling
-  works via the mouse wheel; a visible scrollbar is deferred to Iter-9.
+- **Placeholder art.** The rarity border and scrollbar track/handle use
+  placeholder sprites (a tinted white 9-slice frame, Item-Browser-derived
+  scrollbar art). Real pixel-art is deferred to Iter-12.
+- **No per-variation tracking.** Each item family is tracked once; colour /
+  skin / state variants do not get their own row (deferred — see Iter-17 in
+  `CLAUDE.md`).
 
 ## Documentation
 
