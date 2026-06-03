@@ -12,7 +12,7 @@ namespace ItemChecklist.UI
         public SpriteRenderer checkmark;
         public SpriteRenderer rarityBorder;   // Iter-6: rarity frame, shown for Uncommon+
 
-        public const float RowHeight = 2.5f; // world units (~40px at 16 PPU)
+        public const float RowHeight = 1.5f; // world units (~24px at 16 PPU)
 
         public void Bind(int objectId, Sprite iconSprite, string name, bool isDiscovered,
             Color rarityColor, Rarity rarity)
