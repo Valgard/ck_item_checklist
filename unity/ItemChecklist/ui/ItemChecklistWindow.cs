@@ -10,7 +10,8 @@ namespace ItemChecklist.UI
         // Editor-wired serialized fields
         public GameObject root;
         public SpriteRenderer background;
-        public PugText title;
+        public PugText title;          // footer status line — right-aligned discovered/total counter
+        public PugText shownLabel;     // footer status line — left-aligned "N shown" (filtered only)
         public Transform rowsContent;     // assigned to RowsContainer/Content in Editor
         public GameObject rowPrefab;      // assigned to ItemRow.prefab in Editor
         public UIScrollWindow scrollWindow;
@@ -165,8 +166,7 @@ namespace ItemChecklist.UI
                     background.sprite = ItemChecklistMod.AssetBundle.LoadAsset<Sprite>("ui_panel");
             }
 
-            if (title != null)
-                title.Render(FormatTitle());
+            RenderStatus();
         }
 
         private string FormatTitle()
@@ -174,13 +174,23 @@ namespace ItemChecklist.UI
             var catalog = ItemChecklistMod.Catalog;
             var state = DiscoveredState.Instance;
             if (catalog == null || catalog.Count == 0)
-                return "Item Checklist";
+                return "0 / 0";
             float percent = 100f * state.Count / catalog.Count;
-            string headline = $"Item Checklist — {state.Count} / {catalog.Count} ({percent:F1}%)";
+            // Iter-9 footer: right-aligned discovered/total counter only. The "N shown"
+            // filtered-count is a separate left-aligned label (FormatShown / shownLabel).
+            return $"{state.Count} / {catalog.Count} ({percent:F1}%)";
+        }
+
+        private string FormatShown()
+        {
             var model = ItemChecklistMod.ListView;
-            if (model != null && model.IsFiltered)
-                headline += $" · {model.Count} shown";
-            return headline;
+            return (model != null && model.IsFiltered) ? $"{model.Count} shown" : "";
+        }
+
+        private void RenderStatus()
+        {
+            if (title != null) title.Render(FormatTitle());
+            if (shownLabel != null) shownLabel.Render(FormatShown());
         }
 
         private void OnDiscoveryChanged()
@@ -188,7 +198,7 @@ namespace ItemChecklist.UI
             // root (a child) carries visibility; the Window component sits on the
             // parent GameObject, which stays active even when hidden.
             if (root == null || !root.activeSelf) return;
-            if (title != null) title.Render(FormatTitle());
+            RenderStatus();
             var model = ItemChecklistMod.ListView;
             if (model != null && model.Mode == SortMode.Found)
                 model.Recompute();          // Found order depends on discovery → re-sort (OnViewResultsChanged rebinds)
@@ -221,7 +231,7 @@ namespace ItemChecklist.UI
         private void OnViewResultsChanged()
         {
             if (root == null || !root.activeSelf) return;
-            if (title != null) title.Render(FormatTitle());
+            RenderStatus();
             var content = Content;
             if (content == null) return;
             var model = ItemChecklistMod.ListView;
