@@ -34,7 +34,7 @@ namespace ItemChecklist.UI
             }
         }
 
-        private static readonly string[] SortLabels = { "Name", "Rarity", "Found", "Category" };
+        private static readonly string[] SortLabels = { "Name", "Rarity", "Level", "Value" };
         private static readonly string[] FilterLabels = { "All", "Discovered", "Undiscovered" };
 
         private static readonly MemberInfo MiScrollable = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
@@ -195,15 +195,9 @@ namespace ItemChecklist.UI
 
         private void OnDiscoveryChanged()
         {
-            // root (a child) carries visibility; the Window component sits on the
-            // parent GameObject, which stays active even when hidden.
             if (root == null || !root.activeSelf) return;
             RenderStatus();
-            var model = ItemChecklistMod.ListView;
-            if (model != null && model.Mode == SortMode.Found)
-                model.Recompute();          // Found order depends on discovery → re-sort (OnViewResultsChanged rebinds)
-            else
-                Content?.RefreshVisible();   // other modes: order unchanged, just repaint the affected row
+            Content?.RefreshVisible();   // no sort depends on discovery now; just repaint
         }
 
         /// <summary>

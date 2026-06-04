@@ -128,16 +128,13 @@ namespace ItemChecklist.UI
                 case SortMode.Rarity:
                     c = ((int)a.Rarity).CompareTo((int)b.Rarity);
                     break;
-                case SortMode.Found:
-                    // ascending = discovered first (user choice). true sorts
-                    // before false, so invert the bool compare.
-                    bool da = state.IsDiscovered(a.ObjectId, a.Variation);
-                    bool db = state.IsDiscovered(b.ObjectId, b.Variation);
-                    c = db.CompareTo(da);   // discovered (true) -> earlier
+                case SortMode.Level:
+                    c = a.Level.CompareTo(b.Level);
                     break;
-                case SortMode.Category:
-                    c = string.Compare(a.ObjectType.ToString(), b.ObjectType.ToString(),
-                        StringComparison.Ordinal);
+                case SortMode.Value:
+                    // -1 (unsellable) coerced to 0 so unsellable items cluster at the
+                    // bottom in descending / top in ascending, consistently.
+                    c = ValueKey(a).CompareTo(ValueKey(b));
                     break;
                 default: // SortMode.Name
                     c = 0;
@@ -152,5 +149,7 @@ namespace ItemChecklist.UI
             if (c != 0) return c;
             return ia.CompareTo(ib);   // final tiebreak: total order, stable under Reverse()
         }
+
+        private static int ValueKey(ItemCatalog.Entry e) => e.SellValue < 0 ? 0 : e.SellValue;
     }
 }
