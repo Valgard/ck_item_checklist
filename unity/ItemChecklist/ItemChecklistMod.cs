@@ -110,6 +110,10 @@ namespace ItemChecklist
 
         public void Update()
         {
+            // Deferred language-change re-bake (set by ItemCatalogLocChangeHook;
+            // run here, post-DoLocalizeAll, to avoid the mid-localize GetObjectName NRE).
+            ItemCatalogLocChangeHook.ProcessPending();
+
             string activeGuid = SaveManagerActiveSelectHook.ActiveGuid;
 
             // No active character (main menu) — clear "applied for"
