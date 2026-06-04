@@ -17,7 +17,7 @@ namespace ItemChecklist.UI
         public UIScrollWindow scrollWindow;
         public AscDescToggle ascDescToggle;
         public DropdownWidget sortDropdown;
-        public DropdownWidget filterDropdown;
+        public FacetedFilterWidget facetedFilter;
         public SearchBar searchBar;
         public ClearSearchButton clearSearchButton;   // declared here; wired to its SearchBar in the window prefab (later task)
 
@@ -35,7 +35,6 @@ namespace ItemChecklist.UI
         }
 
         private static readonly string[] SortLabels = { "Name", "Rarity", "Level", "Value" };
-        private static readonly string[] DiscoveryLabels = { "All", "Discovered", "Undiscovered" };
 
         private static readonly MemberInfo MiScrollable = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
         private static readonly MemberInfo MiUpdateScrollHeight = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "UpdateScrollHeight");
@@ -84,18 +83,24 @@ namespace ItemChecklist.UI
                 ascDescToggle.Configure(model.Ascending, asc => { model.Ascending = asc; });
             if (sortDropdown != null)
                 sortDropdown.Configure(SortLabels, (int)model.Mode, i => { model.Mode = (SortMode)i; });
-            if (filterDropdown != null)
+            if (facetedFilter != null)
             {
-                int sel = model.DiscoverySelected(true) && !model.DiscoverySelected(false) ? 1
-                        : model.DiscoverySelected(false) && !model.DiscoverySelected(true) ? 2 : 0;
-                filterDropdown.Configure(DiscoveryLabels, sel, i =>
+                var members = new System.Collections.Generic.List<(string, string, System.Func<bool>, System.Action)>
                 {
-                    // rebuild the discovery set from the 3-state choice
-                    if (model.DiscoverySelected(true))  model.ToggleDiscovery(true);
-                    if (model.DiscoverySelected(false)) model.ToggleDiscovery(false);
-                    if (i == 1) model.ToggleDiscovery(true);
-                    else if (i == 2) model.ToggleDiscovery(false);
-                });
+                    // Clear-all pseudo-row (empty section → no header rendered).
+                    ("", "Clear all", () => false, () => facetedFilter.ClearAll()),
+
+                    ("Discovery", "Discovered",   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
+                    ("Discovery", "Undiscovered", () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
+                };
+                foreach (var r in RarityFilterTiers())
+                    members.Add(("Rarity", RarityLabel(r), () => model.RaritySelected(r), () => model.ToggleRarity(r)));
+                foreach (var c in ItemCategories.All)
+                    members.Add(("Category", CategoryLabel(c), () => model.CategorySelected(c), () => model.ToggleCategory(c)));
+                members.Add(("Craftable", "Craftable",     () => model.CraftSelected(true),  () => model.ToggleCraft(true)));
+                members.Add(("Craftable", "Not craftable", () => model.CraftSelected(false), () => model.ToggleCraft(false)));
+
+                facetedFilter.Configure(members, () => model.ActiveFilterCount, () => model.ClearAllFilters());
             }
             if (searchBar != null)
                 searchBar.SyncFrom(model.SearchText);
@@ -252,6 +257,21 @@ namespace ItemChecklist.UI
                 scrollWindow.ResetScroll();
             }
             content.RefreshVisible();
+        }
+
+        private static Rarity[] RarityFilterTiers() => new[]
+            { Rarity.Common, Rarity.Uncommon, Rarity.Rare, Rarity.Epic, Rarity.Legendary };
+
+        private static string RarityLabel(Rarity r) => r.ToString();   // Iter-11 localises
+
+        private static string CategoryLabel(ItemCategory c)
+        {
+            switch (c)
+            {
+                case ItemCategory.ArmorAccessories: return "Armor & Accessories";
+                case ItemCategory.KeyItems:         return "Key Items";
+                default:                            return c.ToString();
+            }
         }
     }
 }

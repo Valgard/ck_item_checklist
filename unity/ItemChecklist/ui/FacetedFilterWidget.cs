@@ -103,7 +103,7 @@ namespace ItemChecklist.UI
                 if (_members[m].section != lastSection)
                 {
                     lastSection = _members[m].section;
-                    if (headerIdx < _headerPool.Count && _headerPool[headerIdx] != null)
+                    if (!string.IsNullOrEmpty(lastSection) && headerIdx < _headerPool.Count && _headerPool[headerIdx] != null)
                     {
                         var ht = _headerPool[headerIdx];
                         ht.transform.parent.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
