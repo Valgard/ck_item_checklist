@@ -108,7 +108,8 @@ namespace ItemChecklist.UI
                         var ht = _headerPool[headerIdx];
                         ht.transform.parent.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
                         if (!ht.transform.parent.gameObject.activeSelf) ht.transform.parent.gameObject.SetActive(true);
-                        ht.Render($"— {lastSection} —");
+                        ht.Render(lastSection);
+                        ht.SetTempColor(new Color(0.6f, 0.6f, 0.6f), keepColorOnStart: true);   // gray section header
                         headerIdx++; pos++;
                     }
                 }
@@ -118,7 +119,8 @@ namespace ItemChecklist.UI
                 btn.memberId = m;
                 btn.transform.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
                 var label = btn.transform.Find("Label")?.GetComponent<PugText>();
-                if (label != null) label.Render(_members[m].label);
+                if (label != null)
+                    label.Render((string.IsNullOrEmpty(_members[m].section) ? "" : "  ") + _members[m].label);
                 btn.SetChecked(_members[m].isOn());
                 rowIdx++; pos++;
             }
