@@ -261,10 +261,35 @@ value ≤ 0, and undiscovered rows (spoiler guard). Labels are placeholder-Engli
 structured for Iter-11 (localisation) routing. Three new `ItemCatalog.Entry` fields
 baked: `Level`, `SellValue`, `IsCraftable`.
 
+**Iter-11 (DONE):** native localisation via CK's `TextDataBlock` / `ScriptableData`
+mechanism. Term strings live in
+`unity/ItemChecklist/Localization/localization.yaml`; the shared Editor helper
+`utils/LocalizationGenerator.cs` (namespace `CoreKeeperModUtils`, symlinked by
+`link.sh`, gated behind `.envrc:USE_SHARED_EDITOR_HELPERS=1`) reads that YAML and
+templates raw `.asset` YAML for each language — **Option II: raw asset templating**
+— keyed by `utils/ck-language-addresses.json` (13 runtime languages, address→ISO,
+runtime-dumped because `LanguageDataBlock`s are runtime-only and the SDK editor API
+cannot enumerate them at build time). At runtime, terms are resolved via
+`API.Localization.GetLocalizedTerm` through the `Loc.T` / `Loc.F` helpers, with
+the raw term key as fallback. EN + DE shipped; adding a language later = add a YAML
+language key and rebuild. The F1 keybind display name uses CK's own
+`ControlMapper/ItemChecklist-ToggleChecklistPC` term. Language changes re-bake the
+catalog (deferred to the next `Update` tick, guarded on `Manager.main.player !=
+null`). This mod is the **pilot** for the shared `utils/` editor helpers
+(`CLIBuildHelper`, `CLIPublishHelper`, `LocalizationGenerator`); `disable-durability`
+and `faster-talents` still use per-mod helpers and migrate later. Hard-won findings:
+`LanguageDataBlock` is runtime-only (no SDK API at build time → Option II), the
+`m_Script.guid` for `ScriptableData.dll` is per-SDK-clone-local and must be resolved
+via `AssetDatabase.AssetPathToGUID` at generation time (not copied from IB), and
+`PugFont` crashes on labels exceeding `maxWidth > 0f` with longer translations →
+set `PugText.maxWidth = 0f` on all localised single-line labels. Full details in
+`docs/gotchas.md § Localisation (Iter-11)`.
+
 ### Future roadmap (frozen 2026-06-04)
 - **Iter-10 — DONE** (see above).
-- **Iter-11 -- localisation.** Translatable "N shown", keybind display name, search
-  hint + sort/filter labels via CoreLib `LocalizationModule`.
+- **Iter-11 — DONE** (see above). Note: implemented via native TextDataBlock
+  generation + `LocalizationGenerator.cs`, **not** CoreLib `LocalizationModule`
+  (which is deprecated).
 - **Iter-12 -- real pixel-art sprites.** Replace the placeholder rarity border
   (white 9-slice hollow frame) + scrollbar track/handle sprites.
 - **Iter-13 -- `DropdownWidget` prefab extraction.** Extract the widget into a

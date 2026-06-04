@@ -512,3 +512,69 @@ thing to clear.
   from the old parent, add to the new one).
 - **`PugTextStyle.HorizontalAlignment` enum:** serialized `horizontalAlignment`
   is `left = 0`, `center = 1`, `right = 2`.
+
+## Localisation (Iter-11)
+
+### `LanguageDataBlock`s are runtime-only — the SDK editor cannot enumerate them
+
+`ScriptableDataEditorUtility.GetCachedDataBlocks<LanguageDataBlock>()` and
+`AssetDatabase.FindAssets("t:LanguageDataBlock")` both return 0 results — in
+`-batchmode` **and** in a fully-loaded interactive Editor (verified across 600
+`Update` ticks after project import). `LanguageDataBlock` carries
+`[RuntimeInitializeOnScriptableDataLoad]`; the blocks are instantiated only at
+game runtime, not at edit time.
+
+Consequence: a TextDataBlock generator cannot use the real CK-SDK localisation
+API at build time — there are no `LanguageDataBlock` instances to iterate. The
+address→ISO mapping was captured once via a runtime dump
+(`ScriptableData.GetDataBlocks<LanguageDataBlock>()` logged from the running
+game) and committed to `core_keeper/utils/ck-language-addresses.json` (13
+runtime languages; primary = `en`). This is why the generator templates raw
+`.asset` YAML (Option II) instead of calling `LanguageDataBlock` methods at
+build time.
+
+### `m_Script.guid` for game-DLL MonoBehaviours is per-SDK-clone-local — resolve it dynamically
+
+Generated TextDataBlock `.asset` files must reference `ScriptableData.dll`
+via its `.meta` GUID. Copying a foreign value (e.g. Item Browser's
+`e853a5af…`) makes the asset fail to bind to the class at build time — it
+bundles broken, and at runtime the loader emits `couldn't load
+Assets/…/X.asset from asset bundle`, the block is never imported,
+`GetLocalizedTerm` returns null, and the UI shows the raw term key instead of
+a translated string.
+
+Fix: resolve the GUID dynamically at generation time:
+
+```csharp
+string guid = AssetDatabase.AssetPathToGUID(
+    "Assets/Plugins/CoreKeeperModSDK/ScriptableData.dll");
+```
+
+The `fileID` (`2108018792`) is the portable MD4 class-name hash and is safe to
+hardcode. Cross-ref the `project-corekeeper-script-fileid-derivation` memory
+for the general rule.
+
+### `PugFont.Render` crashes on labels exceeding `maxWidth` — set `maxWidth = 0f` on all localised single-line labels
+
+`PugFont.Render` calls the internal `AddNewLinesToLinesExceedingMaxWidth` only
+when `maxWidth > 0f`. That method throws `IndexOutOfRangeException` on labels
+whose text length exceeds the configured `maxWidth` — which English text may
+not, but longer translations (e.g. German) routinely do.
+
+Critically, the throw occurs inside `ShowUI()` (via
+`FacetedFilterWidget.RebuildList` / `DropdownWidget` label renders), which
+aborts before CoreLib sets `currentInterface`. The result: the window opens
+but cannot be closed with ESC or E — only the mod's own F1 toggle works.
+
+Fix: set `PugText.maxWidth = 0f` on every localised single-line label (filter
+rows, section headers, dropdown labels). With `maxWidth == 0f` the wrap path is
+never entered and no crash is possible.
+
+This is the same crash class as the thinTiny ellipsis (U+2026) note in
+`§ Item Rows & Header (Iter-9)` — the throw site is identical; the triggers
+differ (ellipsis glyph vs. line-length overflow). Both are fixed by keeping
+single-line labels away from the `AddNewLinesToLinesExceedingMaxWidth` code path.
+
+**Also:** never use U+2026 (ellipsis `…`) or U+2014 (em-dash `—`) in term
+values — the `LocalizationGenerator` validates term strings and **fails the
+build** on either character. Use ASCII `...` and `-` instead.

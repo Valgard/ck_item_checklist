@@ -8,6 +8,15 @@ describe what shipped per release, not every commit.
 
 ### Added
 
+- **Localisation (English + German).** All checklist UI text — search hint,
+  sort modes, the faceted filter (section headers, rarity, category, discovery
+  and craftable options, "Clear all"), the footer "N shown" counter, the per-row
+  level column, and the F1 keybind name in the game's Controls menu — now follows
+  the game language and ships in English and German. Switching the game language
+  updates the checklist live. More languages can be added later as data. Built on
+  Core Keeper's native localisation: terms are authored in a single
+  `localization.yaml` and generated into native `TextDataBlock` assets at build
+  time.
 - **Level and Value columns per row.** Each checklist row now shows a
   right-aligned **Level** column (`Lv N`) and a **Value** column (sell
   value in Ancient Coins, shown with the coin glyph). Both display `—` for
