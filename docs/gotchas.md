@@ -383,6 +383,88 @@ sees). SpriteRenderer pieces (backgrounds, glyphs) *do* render in the Editor
 once their material + sorting layer are correct (see the two traps above).
 
 
+## Catalog / Bake (Iter-10)
+
+### `ObjectInfo.level` is dead — use `LevelCD` (Iter-10)
+
+`ObjectInfo` has a `level` field, but it is **not** set by the game and reads
+as 0 for every item (legacy field, dead code, not populated by any live system).
+**Use `PugDatabase.TryGetComponent<LevelCD>(od, out var lvl) ? lvl.level : 0`**
+to get the actual item level. This is the same path ItemBrowser's
+`ObjectUtility.GetBaseLevel` takes (confirmed via ILSpy decompile).
+
+Symptom of using `ObjectInfo.level` directly: every item shows level 0 and
+the Level sort produces identical values for the whole catalog.
+
+### `sellValue == -1` is "auto-compute", not unsellable (Iter-10)
+
+`ObjectInfo.sellValue == -1` is CK's sentinel for **"compute the sell value
+from rarity + crafting ingredients"**. It does **not** mean unsellable. Items
+with `sellValue == -1` have a real sell price — it just needs to be derived.
+
+Truly unsellable items are identified by the presence of the
+`CantBeSoldAuthoring` component OR by `rarity == Legendary`; their computed
+value is 0.
+
+The correct logic (ported from ItemBrowser `ObjectUtility.GetValue`, sell
+mode):
+1. `HasComponent<CantBeSoldAuthoring>` OR `rarity == Legendary` → 0.
+2. `sellValue >= 0` → use directly.
+3. `sellValue < 0` → auto-compute: rarity base (`GetRaritySellValue`) + crafting
+   ingredients + cooked-food ingredient recursion + objectID-seeded ±10 % jitter.
+
+Symptom of treating `sellValue == -1` as unsellable: the majority of items
+show `—` for value and sort as if worth 0.
+
+## Prefab / Editor (Iter-10)
+
+### Prefab opened in Editor isolation renders blank when all SpriteRenderers use `maskInteraction: VisibleInsideMask` and there is no SpriteMask in the prefab
+
+An `ItemRow` prefab open in the Editor (isolated mode) shows all
+`SpriteRenderer`s as invisible because they all use `m_MaskInteraction: 1`
+(Visible Inside Mask). Outside a parent that owns a `SpriteMask`, the renderers
+are always outside any mask's range and therefore invisible.
+
+This is **expected and not a bug.** The rows only render correctly in the
+context of the window prefab, which supplies the SpriteMask. Do not change the
+`maskInteraction` to `None` to "fix" the Editor preview — that would break the
+row clipping at runtime.
+
+Verify row visuals only by building and running the game, not by inspecting the
+row prefab in isolation in the Editor.
+
+### grep-by-GUID is unreliable for verifying which sprite a SpriteRenderer uses
+
+A Unity atlas / sprite-sheet asset has one GUID for the whole texture file but
+many internal fileIDs — one per named sub-sprite. Grepping a prefab YAML for
+a known GUID only tells you the atlas is referenced; it does NOT tell you which
+sub-sprite is referenced. Two SpriteRenderers pointing at the same atlas GUID
+but different fileIDs show completely different glyphs.
+
+**Use `utils/prefab_query.py`** (a YAML parser) to resolve `{fileID, guid}`
+pairs to their named sub-sprite, or compare fileIDs explicitly against the
+atlas `.meta` sub-sprite table. Never use `grep <guid>` as a substitute for
+verifying the exact sub-sprite selected.
+
+### Unity ILPP "Initial Asset Database Refresh" hang after a batchmode build
+
+Symptom: the next batchmode build after a successful one stalls indefinitely at
+`"Initial Asset Database Refresh"` in the Editor log and never proceeds.
+
+Cause: the Unity IL post-processor (ILPP) left a lock or stale cache file in
+`Library/Bee/` from the previous build run.
+
+Recovery:
+1. Kill the hung Unity Editor process (`pkill -f "Unity"` or via Activity
+   Monitor).
+2. Delete `<SDK_PATH>/Library/Bee/` (the build cache — safe to delete; Unity
+   regenerates it on next build; only deletes build-cache, not project assets).
+3. Restart the Unity Hub and re-open the project.
+
+This hang is intermittent and not caused by source changes. If a build that
+previously succeeded stops progressing at ILPP, the Bee cache is the first
+thing to clear.
+
 ## Item Rows & Header (Iter-9)
 
 - **Small point-filtered sprites distort on the 1/16 grid.** A small

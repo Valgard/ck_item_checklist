@@ -234,11 +234,35 @@ layout/behaviour pass:
   height; row background ends at the scrollbar's left edge (no overlap). Mechanism
   in `docs/architecture.md` / `docs/gotchas.md`.
 
+**Iter-10 (DONE):** sort & filter redesign — supersedes the Iter-7/8 option set.
+Four sort modes: **Name**, **Rarity**, **Level**, **Value** (dropped Found + Category
+sorts from Iter-7 — both are now filter dimensions, not sort axes). Level is read
+from `LevelCD.level` via `PugDatabase.TryGetComponent<LevelCD>` (else 0) — NOT
+`ObjectInfo.level`, which is dead/legacy and read nowhere in the game (confirmed via
+decompile + IB `ObjectUtility.GetBaseLevel`). Value is a faithful port of IB's
+`ObjectUtility.GetValue` (sell mode) in `ItemCatalog.ComputeSellValue`: `sellValue
+== -1` is CK's "auto-compute from rarity + ingredients" marker, NOT "unsellable";
+truly unsellable = `CantBeSoldAuthoring` OR rarity Legendary → 0 → rendered `—`.
+Filter dimension replaced by `FacetedFilterWidget`: a single "Filter (N)" header
+dropdown opening a sectioned popup with four OR-within / AND-across dimensions —
+**Discovery** (Discovered/Undiscovered), **Category** (10-bucket taxonomy from
+`ObjectType` ranges in `ItemCategory`/`ItemCategories.Of`: Weapons/ArmorAccessories/
+Tools/Food/Placeables/Materials/Valuables/KeyItems/Instruments/Other), **Rarity**
+(Poor…Epic), **Craftable** (Craftable/Not craftable). `ItemListViewModel` holds four
+static `HashSet` dimensions; `Recompute` applies each as a `continue` predicate. A
+dedicated "Clear all" action row (drawn from `actionTemplate` — its own pool, no
+checkbox) resets all dimensions. Three pools in `FacetedFilterWidget`: checkbox rows,
+action rows, section-header PugTexts; `RebuildList` re-syncs all checkbox visuals on
+every click. Companion files: `FacetCheckboxButton`, `FacetToggleButton`.
+Each row now shows right-aligned **Level** (`Lv N`) and **Value** (sell value)
+columns + an **Ancient Coin** glyph (`ObjectID.AncientCoin` icon, loaded once via
+`PugDatabase.GetObjectInfo` and shared across all rows). Em-dash `—` for level ≤ 0,
+value ≤ 0, and undiscovered rows (spoiler guard). Labels are placeholder-English,
+structured for Iter-11 (localisation) routing. Three new `ItemCatalog.Entry` fields
+baked: `Level`, `SellValue`, `IsCraftable`.
+
 ### Future roadmap (frozen 2026-06-04)
-- **Iter-10 -- re-evaluate Sort & Filter settings.** Are the current sort modes
-  (Name/Rarity/Found/Category) and filters (All/Discovered/Undiscovered) sensible,
-  and should other options be added? Finalise the option set *before* Iter-11
-  (localisation) so the labels are stable.
+- **Iter-10 — DONE** (see above).
 - **Iter-11 -- localisation.** Translatable "N shown", keybind display name, search
   hint + sort/filter labels via CoreLib `LocalizationModule`.
 - **Iter-12 -- real pixel-art sprites.** Replace the placeholder rarity border

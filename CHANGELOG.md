@@ -8,6 +8,30 @@ describe what shipped per release, not every commit.
 
 ### Added
 
+- **Level and Value columns per row.** Each checklist row now shows a
+  right-aligned **Level** column (`Lv N`) and a **Value** column (sell
+  value in Ancient Coins, shown with the coin glyph). Both display `—` for
+  undiscovered rows (no spoilers) and for items that have no level or no
+  sell value. Level is read from CK's `LevelCD.level` component. Value is
+  computed via the same logic ItemBrowser uses (`GetValue` sell mode):
+  `sellValue == -1` means "auto-compute from rarity + ingredients", not
+  "unsellable"; truly unsellable items (carrying `CantBeSoldAuthoring` or
+  rarity Legendary) show `—`.
+- **Faceted multi-select filter.** Replaces the previous single-dimension
+  Discovery dropdown with a combined **"Filter (N)"** popup covering four
+  dimensions: **Discovery** (Discovered / Undiscovered), **Category**
+  (Weapons / Armor & Accessories / Tools / Food / Placeables / Materials /
+  Valuables / Key Items / Instruments / Other), **Rarity** (Poor … Epic),
+  and **Craftable** (Craftable / Not craftable). Semantics: OR within a
+  dimension, AND across dimensions; an empty dimension is no constraint. A
+  **Clear all** action row at the top of the popup resets all dimensions at
+  once. The header counts active selections (`Filter (N)`); clearing returns
+  it to `Filter`.
+- **Level and Value sort modes.** Alongside Name and Rarity, the sort
+  dropdown now offers **Level** and **Value** (both ascending/descending).
+  The old Found and Category sort modes are removed — discovery state is now
+  a filter dimension, and category is likewise a filter dimension.
+
 - **Bigger, near-fullscreen window.** The checklist window is now much larger —
   wider entries and more rows visible — sized to a thin, uniform border that
   matches Core Keeper's own inventory margin. Because Core Keeper's UI camera
@@ -71,6 +95,14 @@ describe what shipped per release, not every commit.
   exact positioning — is planned for a later iteration.)
 
 ### Changed
+
+- **`SortMode` enum updated.** The enum is now `{ Name, Rarity, Level,
+  Value }`. Sessions that had a saved `Found` or `Category` sort mode reset
+  to Name on game restart (static state, no persistence).
+- **`ItemCatalog.Entry` gained `Level`, `SellValue`, and `IsCraftable`
+  fields**, baked from `LevelCD`, `ComputeSellValue` (IB port), and
+  `requiredObjectsToCraft` respectively. Used by the new sort modes and
+  faceted filter.
 
 - **`ItemChecklistContent` now indexes through `ItemListViewModel.Order`.**
   Row binding reads `model.Order[displayIdx]` (catalog index for that display
