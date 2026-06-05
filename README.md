@@ -1,26 +1,68 @@
-# ItemChecklist
+# Item Checklist
 
-ItemChecklist is a Core Keeper mod that tracks which items the player has
-discovered. A scrollable in-game checklist (open with F1) lists all
-discoverable items — vanilla and mod-added alike — showing
-discovered/undiscovered state with item icons and localized names. Cooked-food
-permutations are tracked per ingredient pair. The list can be **sorted**
-(name / rarity / level / value, each ascending or descending), **filtered**
-by discovery, category, rarity and craftability (faceted multi-select), and
-**searched** by name. Requires CoreLib.
+A Core Keeper mod that tracks which items you have discovered in a world. Press
+**F1** for a scrollable checklist of every discoverable item — vanilla and
+mod-added alike — that auto-checks items on pickup, hides undiscovered items to
+avoid spoilers, and keeps a live discovery counter on the HUD.
+
+Discovery is tracked **per world × per player**.
+
+## Features
+
+- **Discovery checklist (F1)** — every discoverable item with its icon, localized
+  name and discovered/undiscovered state; undiscovered items show as `???`.
+- **Always-on HUD counter** — `N / M (p.p%)` discovered, top-right above the
+  minimap, updating live.
+- **Sort** by name, rarity, level or value (ascending/descending).
+- **Faceted filter** — discovery, category, rarity and craftability
+  (multi-select; OR within a dimension, AND across dimensions).
+- **Name search** — matches the localized name in your game's language;
+  undiscovered matches stay `???`.
+- **Per-row Level and Value** columns (sell value in Ancient Coins).
+- **Rarity colouring** of item names and icon borders (undiscovered rows too).
+- **Per-permutation cooked-food tracking** (~10,800 catalog entries; Mushroom
+  Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
+- **English and German**, following the in-game language; switches live.
 
 ## Requirements
 
-- Core Keeper game (verified on 1.2.1.4)
-- CoreLib mod (declared as dependency in ModBuilderSettings)
+- Core Keeper (verified on 1.2.1.4)
+- [CoreLib](https://mod.io/g/corekeeper/m/corelib) — required dependency
+
+## Installation
+
+Subscribe in-game through the **Mods** menu (or on the mod.io website) and
+restart. [CoreLib](https://mod.io/g/corekeeper/m/corelib) must be installed
+alongside it.
+
+## Known Limitations
+
+- **Placeholder art.** The rarity border and the scrollbar track/handle use
+  placeholder sprites (see [Credits](#credits)). Real pixel-art is planned for a
+  later version.
+- **No per-variation tracking.** Each item family is tracked once; colour / skin
+  / state variants do not get their own row.
+- **Cooked-food Rare/Epic tiers** are included but not yet verified against live
+  cooking events — unreachable tiers, if any, simply stay greyed out.
 
 ## Localisation
 
 The mod UI is localised in **English and German** and follows the in-game
-language. Additional languages can be added as data (one entry per language in
-`unity/ItemChecklist/Localization/localization.yaml`, then rebuild).
+language. Additional languages can be added as data — add one entry per language
+in `unity/ItemChecklist/Localization/localization.yaml` and rebuild.
 
-## Building
+## Credits
+
+Some UI bridge sprites (the rarity border and the scrollbar track/handle) are
+derived from [Item Browser](https://github.com/moorowl/ItemBrowser) by **moorowl**,
+used under the MIT License (© 2026 moorowl). These are placeholders pending the
+mod's own pixel-art (see [Known Limitations](#known-limitations)).
+
+---
+
+## Development
+
+### Building
 
 ```bash
 cd item-checklist
@@ -35,30 +77,23 @@ Keeper picks it up on next launch. See the parent `CLAUDE.md` for the full
 build/install system and CrossOver/macOS specifics.
 
 **Building from a git worktree:** `../utils/build.sh` is correct from the mod
-root, but from inside a worktree (`.worktrees/<branch>/`) the same relative
-path resolves to `.worktrees/utils/`, which does not exist. From a worktree,
-use an absolute path to the shared `utils/` directory, or the worktree-relative
+root, but from inside a worktree (`.worktrees/<branch>/`) the same relative path
+resolves to `.worktrees/utils/`, which does not exist. From a worktree, use an
+absolute path to the shared `utils/` directory, or the worktree-relative
 `../../../utils/build.sh`.
 
-## Art / Publishing
+### Publishing
 
-Before publishing to mod.io, replace all sprites in
-`unity/ItemChecklist/Art/Bridge/` with original or commissioned art. The
-current Bridge sprites are derived from Item Browser (MIT-licensed) and must
-not ship in the published mod.
+Publishing runs through the SDK's mod.io plugin via `../utils/upload.sh`, which
+reads the published version and changelog from the topmost `## [x.y.z]` entry in
+`CHANGELOG.md`. See the parent `CLAUDE.md` (sections "mod.io publishing" and
+"The three mod IDs") for the full flow.
 
-## Known Limitations
-
-- **Placeholder art.** The rarity border and scrollbar track/handle use
-  placeholder sprites (a tinted white 9-slice frame, Item-Browser-derived
-  scrollbar art). Real pixel-art is deferred to Iter-12 (see `docs/roadmap.md`).
-- **No per-variation tracking.** Each item family is tracked once; colour /
-  skin / state variants do not get their own row (deferred — see Iter-17 in
-  `docs/roadmap.md`).
-
-## Documentation
+### Documentation
 
 - [Architecture overview](docs/architecture.md)
 - [Code conventions](docs/conventions.md)
 - [Known gotchas](docs/gotchas.md)
+- [Iteration history](docs/iteration-history.md)
+- [Future roadmap](docs/roadmap.md)
 - [Mod-internal CLAUDE.md](CLAUDE.md) (for AI assistants working in this repo)
