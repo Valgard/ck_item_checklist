@@ -1,0 +1,87 @@
+# Item Checklist — environment variables (TEMPLATE)
+#
+# Copy this file to `.envrc` and adjust the machine-specific paths below
+# (marked "ADJUST"). The real `.envrc` is gitignored; this `.envrc.example`
+# is committed as the documented template. Source it before invoking the
+# shared build scripts:
+#
+#   cp .envrc.example .envrc   # then edit the ADJUST lines
+#   source .envrc && ../utils/build.sh
+
+# --- Machine paths (ADJUST per machine) -------------------------------------
+
+# Path to the Unity Editor binary. MUST be Unity 6000.0.59f2 (the exact patch
+# version pinned in the SDK's ProjectVersion.txt). This is the canonical macOS
+# Unity Hub install location; adjust if yours differs.
+export UNITY_BIN="/Applications/Unity/Hub/Editor/6000.0.59f2/Unity.app/Contents/MacOS/Unity"
+
+# Path to the cloned Pugstorm CoreKeeperModSDK (the shared SDK clone, a sibling
+# of this mod repo under core_keeper/). ADJUST to your absolute path — the SDK
+# symlinks (utils/link.sh) encode absolute paths.
+export SDK_PATH="/path/to/core_keeper/CoreKeeperModSDK"
+
+# Directory where Pugstorm's ModBuilder writes its output. The builder always
+# appends an `ItemChecklist/` subfolder, so the final layout is
+# `$MOD_INSTALL_PATH/ItemChecklist/{ModManifest.json,Scripts,Bundles}`.
+#
+# macOS / CrossOver: kept at a neutral staging path. `../utils/build.sh`
+# auto-runs `../utils/install-macos.sh`, which copies from this staging dir
+# into the mod.io load path. The default below is machine-portable ($HOME).
+export MOD_INSTALL_PATH="$HOME/Library/Caches/item-checklist-build/"
+
+# Space-separated list of one or more Core Keeper game versions, each written
+# as a mod.io compatibility tag in the fake mod.io install
+# (utils/install-macos.sh) and on publish. Add more to support multiple builds
+# (e.g. "1.2.1.2 1.2.1.4"). Match this to your installed game version
+# (Player.log "Game version: X").
+export CK_GAME_VERSION="1.2.1.4"
+
+# --- Mod identity (consumed by the shared utils/ scripts) -------------------
+# These are project-inherent — leave as-is for ItemChecklist.
+
+# The mod's PascalCase name. Drives SDK symlink paths and the build entry
+# point (utils/build.sh runs <MOD_NAME>.Editor.CLIBuildHelper.Build, or the
+# shared CoreKeeperModUtils.CLIBuildHelper.Build when USE_SHARED_EDITOR_HELPERS=1).
+export MOD_NAME="ItemChecklist"
+
+# The mod's kebab-case id, written as `name_id` in the fake mod.io state.json.
+export MOD_NAME_ID="item-checklist"
+
+# One-line mod summary, written into state.json by utils/install-macos.sh.
+export MOD_SUMMARY="Track which items you've found in this world — auto-checked on pickup, manually correctable, with spoiler-hidden undiscovered items."
+
+# A numeric mod.io ID not present in mod.io's catalog. Must be DISTINCT per mod,
+# or sibling mods' mods/<id>_1/ folders collide.
+# 9999999 = disable-durability, 9999998 = faster-talents, 9999997 = item-checklist.
+export FAKE_MOD_ID="9999997"
+
+# --- Project-local PATH additions -------------------------------------------
+
+# ilspycmd is a .NET global tool, installed under ~/.dotnet/tools. macOS does
+# not put that on PATH by default. Sourced project-locally so it does not bleed
+# into other sessions. (Only needed for decompiling game DLLs; harmless otherwise.)
+export PATH="$HOME/.dotnet/tools:$PATH"
+
+# --- Iter-11 localisation + shared editor-helper pilot ----------------------
+
+# Opt into the shared utils/ editor helpers (link.sh symlinks them; build.sh /
+# upload.sh use the constant -executeMethod). Only ItemChecklist sets this for now.
+# REQUIRED: the per-mod CLIBuildHelper/CLIPublishHelper are gone (shared in utils/).
+export USE_SHARED_EDITOR_HELPERS=1
+
+# Localisation source (committed) + generated-asset output (gitignored) +
+# the committed CK language-address table the generator templates with.
+# LOC_YAML lives OUTSIDE unity/<Mod>/ on purpose: the ModBuilder packs every
+# importable file under the mod folder into the AssetBundle, so a yaml in
+# Assets would ship redundantly. The generator reads it via file path, not
+# AssetDatabase, so it can live anywhere. Generated/ stays under the mod
+# folder (those .asset are the runtime data and are meant to be packed).
+export LOC_YAML="$PWD/localization/localization.yaml"
+export LOC_OUT="$PWD/unity/$MOD_NAME/Localization/Generated"
+# LOC_TABLE lives in the shared core_keeper/utils/ dir (sibling of this repo).
+# The relative form below resolves from the mod repo root; adjust if your
+# layout differs.
+export LOC_TABLE="$PWD/../utils/ck-language-addresses.json"
+
+# Publish helper needs the repo root for CHANGELOG parsing.
+export MOD_REPO_ROOT="$PWD"
