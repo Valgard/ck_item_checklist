@@ -41,9 +41,17 @@ namespace ItemChecklist.UI
         {
             if (hudRoot != null)
             {
-                hudRoot.transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
-                bool inGame = Manager.sceneHandler != null && Manager.sceneHandler.isInGame;
-                if (hudRoot.activeSelf != inGame) hudRoot.SetActive(inGame);
+                // Good-HUD-citizen visibility via explicit, proven signals (the
+                // CalcGameplayUITargetScaleMultiplier idiom returns (0,0,0) here —
+                // it is not a drop-in scale source for a mod HUD). Hidden when the
+                // player inventory / crafting / the checklist window (a CoreLib mod
+                // UI, covered by the aggregate isAnyInventoryShowing) or any menu is
+                // open; shown only while actually in a world.
+                bool show = Manager.sceneHandler != null && Manager.sceneHandler.isInGame
+                            && Manager.main != null && Manager.main.player != null   // not during the world load screen (isInGame is already true there)
+                            && !Manager.ui.isAnyInventoryShowing
+                            && !Manager.menu.IsAnyMenuActive();
+                if (hudRoot.activeSelf != show) hudRoot.SetActive(show);
             }
             base.LateUpdate();
         }
