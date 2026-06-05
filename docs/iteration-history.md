@@ -167,7 +167,9 @@ language key and rebuild. The F1 keybind display name uses CK's own
 catalog (deferred to the next `Update` tick, guarded on `Manager.main.player !=
 null`). This mod is the **pilot** for the shared `utils/` editor helpers
 (`CLIBuildHelper`, `CLIPublishHelper`, `LocalizationGenerator`); `disable-durability`
-and `faster-talents` still use per-mod helpers and migrate later. Hard-won findings:
+and `faster-talents` still used per-mod helpers at the time of Iter-11 (both have
+since migrated, and the opt-in flag `USE_SHARED_EDITOR_HELPERS` was then removed —
+the shared helpers are now unconditional). Hard-won findings:
 `LanguageDataBlock` is runtime-only (no SDK API at build time → Option II), the
 `m_Script.guid` for `ScriptableData.dll` is per-SDK-clone-local and must be resolved
 via `AssetDatabase.AssetPathToGUID` at generation time (not copied from IB), and

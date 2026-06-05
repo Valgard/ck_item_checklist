@@ -186,11 +186,11 @@ unity/ItemChecklist/
 ```
 
 The three Editor helpers (`CLIBuildHelper.cs`, `CLIPublishHelper.cs`,
-`LocalizationGenerator.cs`) are **not** committed in this repo. ItemChecklist is
-the pilot for the shared-helper pattern: the real files live in
-`core_keeper/utils/` (namespace `CoreKeeperModUtils`) and are symlinked into
-`Editor/` by `link.sh`, gated on `.envrc:USE_SHARED_EDITOR_HELPERS=1`. The
-symlinks (and `Localization/Generated/`) are therefore gitignored.
+`LocalizationGenerator.cs`) are **not** committed in this repo. ItemChecklist was
+the pilot for the shared-helper pattern (now adopted by every mod): the real
+files live in `core_keeper/utils/` (namespace `CoreKeeperModUtils`) and are
+symlinked into `Editor/` by `link.sh`. The symlinks (and
+`Localization/Generated/`) are therefore gitignored.
 
 **Naming patterns:**
 

@@ -40,8 +40,7 @@ export CK_GAME_VERSION="1.2.1.4"
 # These are project-inherent — leave as-is for ItemChecklist.
 
 # The mod's PascalCase name. Drives SDK symlink paths and the build entry
-# point (utils/build.sh runs <MOD_NAME>.Editor.CLIBuildHelper.Build, or the
-# shared CoreKeeperModUtils.CLIBuildHelper.Build when USE_SHARED_EDITOR_HELPERS=1).
+# point (utils/build.sh runs the shared CoreKeeperModUtils.CLIBuildHelper.Build).
 export MOD_NAME="ItemChecklist"
 
 # The mod's kebab-case id, written as `name_id` in the fake mod.io state.json.
@@ -62,12 +61,7 @@ export FAKE_MOD_ID="9999997"
 # into other sessions. (Only needed for decompiling game DLLs; harmless otherwise.)
 export PATH="$HOME/.dotnet/tools:$PATH"
 
-# --- Iter-11 localisation + shared editor-helper pilot ----------------------
-
-# Opt into the shared utils/ editor helpers (link.sh symlinks them; build.sh /
-# upload.sh use the constant -executeMethod). Only ItemChecklist sets this for now.
-# REQUIRED: the per-mod CLIBuildHelper/CLIPublishHelper are gone (shared in utils/).
-export USE_SHARED_EDITOR_HELPERS=1
+# --- Iter-11 localisation ----------------------------------------------------
 
 # Localisation source (committed) + generated-asset output (gitignored) +
 # the committed CK language-address table the generator templates with.
