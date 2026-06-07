@@ -6,6 +6,15 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [0.9.1] - 2026-06-07
+
+### Fixed
+
+- The always-on HUD counter no longer shows up on the world-loading screen
+  when you enter a world, and no longer lingers during the fade-out when you
+  leave to the main menu. Opening the checklist with F1 is likewise blocked
+  while either loading screen is up.
+
 ## [0.9.0] - 2026-06-05
 
 First public release — a deliberate pre-1.0 version. The feature set is
