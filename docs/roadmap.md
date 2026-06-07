@@ -8,6 +8,10 @@ Frozen 2026-06-04. The backlog of planned iterations (Iter-12 onward).
   `LocalizationModule` (which is deprecated).
 - **Iter-11.5 — DONE** (see `docs/iteration-history.md`). Always-on top-right HUD
   discovery counter (non-modal `UIelement`; HUD-layer + explicit visibility).
+- **Iter-11.6 — DONE** (see `docs/iteration-history.md`). Load-screen visibility fix:
+  shared `WorldState.IsInPlayableWorld` (`isInGame && isSceneHandlerReady &&
+  !Manager.load.IsLoading()`) replaces the unreliable `player != null` gate on both
+  the HUD and the F1 open-guard. Closes the **loading-screen** half of Iter-15 below.
 - **Iter-12 -- real pixel-art sprites.** Replace the placeholder rarity border
   (white 9-slice hollow frame) + scrollbar track/handle sprites.
 - **Iter-13 -- `DropdownWidget` prefab extraction.** Extract the widget into a
@@ -17,14 +21,12 @@ Frozen 2026-06-04. The backlog of planned iterations (Iter-12 onward).
   `TextInputField` forces `characterMarkBlinker.transform.position =
   pugText.position` every frame, so the fix is to move the white_pixel into a child
   GO with a +Y offset and rewire `CharacterMarkBlinker.sr`.
-- **Iter-15 (tentative) -- F1 guard misses loading screen & cutscenes.** The F1
-  toggle in `ItemChecklistMod.Update` only blocks opening when a Vanilla
-  menu/inventory/text-field/chat is active; it does **not** block during the world
-  loading screen or in-game cutscenes, so F1 pops the checklist over both. Fix =
-  add the missing state guards (loading: `ClientWorldStateSystem.HasRunAtLeastOnce`
-  / `Manager.main.player != null` or a screen-fade flag; cutscenes: a cutscene /
-  input-locked flag -- all need ILSpy + sandbox verification). Bugfix follow-up to
-  Iter-4's toggle guard.
+- **Iter-15 (tentative) -- F1 guard misses cutscenes.** *(Loading-screen half DONE
+  in Iter-11.6.)* The F1 toggle in `ItemChecklistMod.Update` now blocks opening
+  during both load screens via `WorldState.IsInPlayableWorld`, but it does **not**
+  yet block during in-game **cutscenes/intro**, so F1 can still pop the checklist
+  over those. Remaining fix = a cutscene / input-locked flag (needs ILSpy + sandbox
+  verification). Bugfix follow-up to Iter-4's toggle guard.
 - **Iter-16 (tentative) -- pet/creature discovery.** The bake blanket-excludes
   `ObjectType.Creature`/`Critter`, so tamed pets/critters never get a row -- same
   bug class as the Iter-7.1 NonUsable fix. IB keeps anything with `PetCD`

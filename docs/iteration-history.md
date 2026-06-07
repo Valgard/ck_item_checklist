@@ -204,3 +204,21 @@ world-load screen — the Iter-15 bug class) `&& !Manager.ui.isAnyInventoryShowi
 Bonus: HUD-layer membership means CK's own `CameraManager.ShowHUD(false)` culls the
 counter together with the rest of the gameplay HUD, for free. Full mechanism in
 `docs/architecture.md § HUD Counter (Iter-11.5)`.
+
+**Iter-11.6 (DONE):** load-screen visibility fix — the Iter-11.5 HUD showed on the
+world-load screen (entering) and lingered on the exit fade to the main menu, because
+both it and the Iter-15 F1 open-guard gated on `Manager.main.player != null`,
+wrongly believing that suppressed the load screen. It does not: the player object is
+instantiated at `PlayerController.OnOccupied` (the bake anchor) *while the load
+screen is still up* and survives the exit transition, so `player != null` is true
+across **both** load screens. Introduced a shared `WorldState.IsInPlayableWorld`
+predicate mirroring CK's own `PlayerController.PlayerInputBlocked` gate
+(`isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`); both the HUD
+visibility check and the F1 open-guard now use it. Chose `!Manager.load.IsLoading()`
+(`loadingQueue != null`) over CK's `IsLoadingAndScreenBlack()` — the latter is only
+true while the screen is fully black and would let the HUD flash during the exit
+fade-out. This closes the **loading-screen** half of roadmap Iter-15 (the F1-over-
+loading-screen bug); the **cutscene/intro** half still needs a separate input-locked
+signal and remains open. Verified in-game (1.2.1.4): clean sandbox compile (zero
+`CompileFailed`), no per-frame NRE from the HUD `LateUpdate`. Full reasoning in
+`docs/gotchas.md § HUD Counter`.

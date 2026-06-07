@@ -629,10 +629,35 @@ CK's own HUD elements set
 `localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier()` each frame, but for
 a mod HUD mounted as above it returns `(0,0,0)` — used as a scale source it makes
 the element invisible. Drive visibility explicitly instead (toggle the root active
-on `isInGame && Manager.main.player != null && !Manager.ui.isAnyInventoryShowing &&
-!Manager.menu.IsAnyMenuActive()`). The `player != null` term also keeps the HUD off
-the **world-load screen** (`isInGame` is already true there — the same gap as the
-Iter-15 F1 guard).
+on `WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing &&
+!Manager.menu.IsAnyMenuActive()`).
+
+### `Manager.main.player != null` does NOT suppress a load screen (Iter-11.6)
+Iter-11.5 originally gated the HUD on `isInGame && Manager.main.player != null`,
+believing `player != null` kept it off the world-load screen. **It does not** — and
+the same wrong assumption sat in the Iter-15 F1 guard. The player object is
+instantiated at `PlayerController.OnOccupied` (the very anchor that kicks our catalog
+bake — see `ItemCatalogWorldLoadHook`), which fires *while the load screen is still
+up*, and it survives into the exit-to-menu transition. So `player != null` is true
+across **both** load screens (entering and leaving) and suppresses neither: the HUD
+flashed on the entry load screen and lingered on the exit fade to the main menu.
+
+The fix (`WorldState.IsInPlayableWorld`) mirrors CK's own gameplay-active gate
+(`PlayerController.PlayerInputBlocked`, decompile `Pug.Other` ~line 130335):
+`Manager.sceneHandler.isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`.
+Two non-obvious choices:
+- **`!Manager.load.IsLoading()`** (`loadingQueue != null`), **not** CK's own
+  `IsLoadingAndScreenBlack()`. The latter is only true while the screen is *fully
+  black*, so during the **exit fade-out** (screen still partly visible, load already
+  queued) it returns false and the HUD would briefly flash. `IsLoading()` is true
+  from the moment the load is queued until it completes, covering both directions.
+- **`isSceneHandlerReady`** complements it for the few frames where the queue is
+  already cleared but the scene is not yet fully set up.
+
+Both signals are the same API category as the already-used `Manager.ui.*` /
+`Manager.menu.*` (not `Manager.saves`, not `System.IO`) → sandbox-safe (confirmed
+in-game: full `Init`/bake lifecycle ran, zero `CompileFailed`). Cutscenes/intro need
+a separate input-locked signal and remain out of scope (roadmap Iter-15).
 
 ### Diagnosing "active but invisible" CK UI — log `isVisible` + `z` + `layer`
 When a UI element is active, on-screen and full-alpha but nothing shows, log
