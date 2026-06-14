@@ -23,6 +23,9 @@ namespace ItemChecklist.UI
         public Sprite caretOpen;               // ui_group_collapse (expanded)
         public float rowSpacing = 0.7f;        // compact option spacing (NOT the big list RowHeight)
 
+        private SpriteRenderer _panel;              // cached popup bg, auto-sized to the option count
+        private float _topY;                        // authored popup top edge (prefab popup.y + size/2), captured once
+
         private readonly List<DropdownOptionButton> _rows = new List<DropdownOptionButton>();
         private readonly List<PugText> _rowLabels = new List<PugText>();
         private readonly List<SpriteRenderer> _rowSelectedMarks = new List<SpriteRenderer>();
@@ -35,6 +38,12 @@ namespace ItemChecklist.UI
         public void Configure(IReadOnlyList<string> labels, int selectedIndex, Action<int> onSelected)
         {
             _onSelected = onSelected;
+            if (_panel == null && popupPanel != null)
+            {
+                _panel = popupPanel.GetComponent<SpriteRenderer>();
+                // capture the authored top edge from the prefab (popup.y + half height) so it stays editable there
+                if (_panel != null) _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
+            }
             _labels = new string[labels.Count];
             for (int i = 0; i < labels.Count; i++) _labels[i] = labels[i];
             EnsurePool(Mathf.Max(0, _labels.Length - 1));
@@ -92,6 +101,23 @@ namespace ItemChecklist.UI
             }
             for (int i = pos; i < _rows.Count; i++)
                 if (_rows[i].gameObject.activeSelf) _rows[i].gameObject.SetActive(false);
+
+            // Auto-size the popup to the actual option count (robust to label changes):
+            // centre the options on the popup origin + fit the panel height to the stack.
+            // Options sit at -(pos+1)*rowSpacing, so their centre is at -(n+1)/2*rowSpacing.
+            int n = pos;
+            if (n > 0)
+            {
+                float h = n * rowSpacing;   // no extra padding — panel hugs the option stack
+                if (rowContainer != null)
+                    rowContainer.localPosition = new Vector3(
+                        rowContainer.localPosition.x, (n + 1) / 2f * rowSpacing, rowContainer.localPosition.z);
+                if (popupPanel != null)     // top-align: keep the authored top edge, panel grows downward
+                    popupPanel.transform.localPosition = new Vector3(
+                        popupPanel.transform.localPosition.x, _topY - h / 2f, popupPanel.transform.localPosition.z);
+                if (_panel != null)
+                    _panel.size = new Vector2(_panel.size.x, h);
+            }
         }
 
         public void SelectOption(int optionIndex)

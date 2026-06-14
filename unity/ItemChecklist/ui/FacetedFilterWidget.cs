@@ -33,6 +33,9 @@ namespace ItemChecklist.UI
         public Sprite caretOpen;
         public float rowSpacing = 0.7f;
 
+        private SpriteRenderer _panel;              // cached popup bg, auto-sized to the row count
+        private float _topY;                        // authored popup top edge (prefab popup.y + size/2), captured once
+
         // One row in the flat member table. An empty section marks an action row.
         private struct Member
         {
@@ -59,6 +62,12 @@ namespace ItemChecklist.UI
             Func<int> activeCount, Action clearAll)
         {
             _members.Clear();
+            if (_panel == null && popupPanel != null)
+            {
+                _panel = popupPanel.GetComponent<SpriteRenderer>();
+                // capture the authored top edge from the prefab (popup.y + half height) so it stays editable there
+                if (_panel != null) _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
+            }
             foreach (var m in members)
                 _members.Add(new Member { section = m.section, label = m.label, isOn = m.isOn, toggle = m.toggle });
             _onAnyChange = () => RenderHeader(activeCount);
@@ -172,6 +181,22 @@ namespace ItemChecklist.UI
             {
                 var p = _headerPool[i]?.transform.parent;
                 if (p != null && p.gameObject.activeSelf) p.gameObject.SetActive(false);
+            }
+
+            // Auto-size the popup to the actual row count (headers + checkbox/action rows):
+            // rows sit at -(pos)*rowSpacing, so their centre is at -(n-1)/2*rowSpacing.
+            int n = pos;
+            if (n > 0)
+            {
+                float h = n * rowSpacing;   // no extra padding — panel hugs the row stack
+                if (rowContainer != null)
+                    rowContainer.localPosition = new Vector3(
+                        rowContainer.localPosition.x, (n - 1) / 2f * rowSpacing, rowContainer.localPosition.z);
+                if (popupPanel != null)     // top-align: keep the authored top edge, panel grows downward
+                    popupPanel.transform.localPosition = new Vector3(
+                        popupPanel.transform.localPosition.x, _topY - h / 2f, popupPanel.transform.localPosition.z);
+                if (_panel != null)
+                    _panel.size = new Vector2(_panel.size.x, h);
             }
         }
 
