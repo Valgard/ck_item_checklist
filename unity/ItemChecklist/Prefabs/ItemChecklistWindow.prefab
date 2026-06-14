@@ -706,7 +706,7 @@ MonoBehaviour:
     outlineColor: {r: 0, g: 0, b: 0, a: 0}
     supportColorTags: 0
     sortingLayer: -2147483648
-    orderInLayer: 9999
+    orderInLayer: 50
     maskInteraction: 0
   styleOverrides: []
   usePooledResources: 1
@@ -795,7 +795,7 @@ MonoBehaviour:
     outlineColor: {r: 0, g: 0, b: 0, a: 0}
     supportColorTags: 0
     sortingLayer: -2147483648
-    orderInLayer: 9999
+    orderInLayer: 50
     maskInteraction: 0
   styleOverrides: []
   usePooledResources: 1
@@ -4206,7 +4206,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &4000000000000000090
 Transform:
   m_ObjectHideFlags: 0
