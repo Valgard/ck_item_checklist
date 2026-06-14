@@ -674,3 +674,56 @@ two builds instead of guessing.
 a public C# property — referencing it from mod code is a `CS1061` compile error.
 Set the text at runtime via `PugText.Render(string)` (as `ItemChecklistHud.Refresh`
 does), never by assigning `textString`.
+
+## Sprite Sheet & UI Sorting (Iter-12)
+
+### All PugText sits on the GUI sorting layer — `orderInLayer` separates it from SpriteRenderers
+Every `PugText` defaults to `style.sortingLayer = int.MinValue` and
+`style.orderInLayer = 9999`. `int.MinValue` is **not** a real layer — it is a
+sentinel: `PugText.Render` resolves it to the **GUI** layer
+(`SortingLayer.NameToID("GUI")`), then applies `orderInLayer` verbatim as the
+renderer's `sortingOrder` (no runtime reset). So PugText glyphs and
+SpriteRenderers live on the **same** GUI layer, and order alone decides who
+draws in front — with the default 9999, *every* PugText draws over *every*
+SpriteRenderer. Consequence: a dropdown popup (a SpriteRenderer BG at order 54)
+cannot cover a footer counter (a PugText at 9999) until the footer's
+`orderInLayer` is lowered below the popup BG. `orderInLayer` is freely editable
+(`SetOrderInLayer` or the serialized style value); the in-list `ItemRow` labels
+already use `49`. Fix applied: `StatusBar`/`ShownLabel` lowered to `50`
+(< popup BG 54, > window BG; the popup's own option labels stay at 9999 so they
+still draw over the panel). Only elements a popup spatially overlaps need this —
+header labels sit above the downward-opening popups and stay at 9999 (they must
+stay above their own header BG at 52).
+
+### 9-slice border must equal the sprite's actual corner size, not 1px
+A sprite drawn `Sliced` (`m_DrawMode: 1`) with `spriteBorder {1,1,1,1}` keeps
+only the outermost 1px ring sharp and **stretches** everything inside. If the
+pixel-art corner is thicker than 1px, its inner pixels fall in the stretched
+"center" zone and distort. The `Entry Selected` selection marker has **3px
+L-shaped corners** (transparent edge-midpoints), so it needs
+`spriteBorder {3,3,3,3}` — with `{1,1,1,1}` the corners stretched instead of
+9-slicing. Rule: read the sprite's alpha map, measure the corner, set the border
+to the corner size. (Verify with PIL: crop the sprite rect from the sheet and
+print an alpha map.)
+
+### A static checkbox box GO needs `m_IsActive: 1` — the code only toggles the fill
+In `FacetCheckboxButton`, the wired `checkMark` SpriteRenderer is the **fill**
+("Checkbox filled slash", shown only when checked via `SetChecked → .enabled`).
+The empty **box** itself (a separate child GO, "Checkbox empty") is never touched
+by code — it must be statically visible. If that box GO has `m_IsActive: 0`, the
+whole checkbox is invisible (an inactive parent also hides its fill child), even
+though sprite/material/layer/scale are all correct. Naming trap: the box GO is
+named `Checkmark`, not the tick.
+
+### "My fix doesn't show in-game" → compare mtimes before blaming caches
+When an external edit (YAML/meta written outside the Editor) doesn't appear in
+the build, the first check is **not** AssetDatabase cache or symlink theories —
+it is `mtime(edited file)` vs `mtime(CoreKeeperModSDK/Library/SourceAssetDB)`
+(a proxy for the last build's AssetDatabase pass). If the edit is newer, it
+simply wasn't rebuilt yet (and the loader only re-reads the mod on **game
+restart**, so a rebuilt mod still needs a fresh game launch). Editor-made
+changes get cached + built; external symlink-target edits are picked up on the
+next `build.sh` AssetDatabase refresh. A language switch is runtime, not a
+rebuild — identical-build screenshots can differ only in language. Only after
+the mtimes prove a real rebuild happened should you suspect the
+symlink/AssetDatabase cache.

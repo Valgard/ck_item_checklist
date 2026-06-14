@@ -222,3 +222,29 @@ loading-screen bug); the **cutscene/intro** half still needs a separate input-lo
 signal and remains open. Verified in-game (1.2.1.4): clean sandbox compile (zero
 `CompileFailed`), no per-frame NRE from the HUD `LateUpdate`. Full reasoning in
 `docs/gotchas.md § HUD Counter`.
+
+**Iter-12 (real pixel-art sprites) — DONE (2026-06-14, branch `iter-12`).**
+Replaced every Item Browser placeholder sprite with original pixel-art authored
+in Pixaki. A deterministic generator (`utils/pixaki_to_sheet.py`, TDD) packs the
+`.pixaki` layers into one `ui_checklist` sheet (25 sprites, stable internal IDs
+from name hashes) and templates the `.png.meta` (sprite rects + 9-slice borders);
+the prefabs were rewired off the IB `Art/Bridge/` GUIDs onto the sheet (verified
+**zero IB references** remain), and the dev-only `Art/Bridge/` folder was deleted.
+The `.pixaki` master is now versioned (`sources/`). After the user re-sliced /
+renamed sprites in Unity's Sprite Editor, the generator became **off-limits**
+(re-running would overwrite the manual `.meta` edits) — the committed sheet +
+prefab are the source of truth. Dropdown popups gained runtime auto-sizing
+(`DropdownWidget`/`FacetedFilterWidget` compute panel height/position from the row
+count, top edge read from the prefab), and the hardcoded `MaskTopLocalY` /
+`FallbackWindowHeight` were derived from the `ContentsMask` (fixing a latent
+fallback-height drift). In-game calibration fixed three hard-won issues (all in
+`docs/gotchas.md § Sprite Sheet & UI Sorting`): **(1)** the footer status-line
+drew over open dropdown popups because all PugText sits on the GUI layer at
+`orderInLayer 9999` — lowered the footer to 50 (< popup BG 54); **(2)** the filter
+checkbox boxes were invisible because the static box GO (`Checkmark`) had
+`m_IsActive: 0` (the code only toggles the fill); **(3)** the selection marker
+stretched instead of 9-slicing because its 3px corners needed
+`spriteBorder {3,3,3,3}`, not `{1,1,1,1}`. A "fix didn't show" red herring was
+traced via mtime (edit newer than the last build = simply not rebuilt), not the
+AssetDatabase/symlink cache. Real pixel-art for the remaining placeholder sprites
+(rarity border, scrollbar) continues as polish toward 1.0.0.

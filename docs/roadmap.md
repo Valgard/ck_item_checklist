@@ -12,8 +12,10 @@ Frozen 2026-06-04. The backlog of planned iterations (Iter-12 onward).
   shared `WorldState.IsInPlayableWorld` (`isInGame && isSceneHandlerReady &&
   !Manager.load.IsLoading()`) replaces the unreliable `player != null` gate on both
   the HUD and the F1 open-guard. Closes the **loading-screen** half of Iter-15 below.
-- **Iter-12 -- real pixel-art sprites.** Replace the placeholder rarity border
-  (white 9-slice hollow frame) + scrollbar track/handle sprites.
+- **Iter-12 -- real pixel-art sprites. DONE** (see `docs/iteration-history.md`).
+  Replaced every Item Browser placeholder sprite with own pixel-art authored in
+  Pixaki, generated into a single `ui_checklist` sheet; rewired all prefab refs
+  (zero IB references remain), deleted the dev-only `Art/Bridge/` folder.
 - **Iter-13 -- `DropdownWidget` prefab extraction.** Extract the widget into a
   standalone/nested prefab for true reuse.
 - **Iter-14 -- code refactor / optimisations + search caret vertical alignment.**
