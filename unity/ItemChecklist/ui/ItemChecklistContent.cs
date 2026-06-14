@@ -26,14 +26,18 @@ namespace ItemChecklist.UI
         // Init() (single source of truth); this compile-time default is the fallback.
         public float RowHeight = ItemRow.RowHeight;
 
-        // Used only if UIScrollWindow.windowHeight is unavailable/zero.
-        private const float FallbackWindowHeight = 9.25f;
+        // The next two are derived from the ContentsMask in Init() (single source of
+        // truth, like RowHeight from the row bg); these compile-time values are the
+        // fallback if the mask is not found. Derivation + invariant: see Init().
+
+        // Viewport (mask) height; used only if UIScrollWindow.windowHeight is
+        // unavailable/zero.
+        private float _fallbackWindowHeight = 13.75f;
 
         // Content-local y of the visible window (mask) top. Row 0's TOP edge is
         // pinned here so the list start/end stay flush for ANY RowHeight (Rebind
-        // offsets each row centre by RowHeight/2). Fixed window-layout constant
-        // from the Iter-3.8/window-size tuning (was implicitly RowHeight/2 at 2.5).
-        private const float MaskTopLocalY = 1.25f;
+        // offsets each row centre by RowHeight/2).
+        private float _maskTopLocalY = 1.25f;
 
         private static readonly MemberInfo MiScrollable =
             typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
@@ -76,6 +80,22 @@ namespace ItemChecklist.UI
                 RowHeight = proto.background.size.y;
             if (_scrollWindow == null)
                 _scrollWindow = GetComponentInParent<UIScrollWindow>(true);
+
+            // Derive the viewport top + height from the ContentsMask (single source
+            // of truth, like RowHeight from the row bg). The mask is a 1x1 sprite
+            // (PPU 1) scaled to viewport size, so its height = localScale.y and its
+            // top edge (content-local) = localPosition.y + localScale.y/2 — both hold
+            // because Content sits at the mask's shared-parent origin (localPosition
+            // 0, scale 1). Reading the mask (which never scrolls) keeps both values in
+            // sync when it is moved/resized in the prefab. The ContentsMask is a
+            // sibling; its name must match the prefab authoring (Find-by-name avoids a
+            // first-in-mod SpriteMask type reference the sandbox might reject).
+            var mask = transform.parent != null ? transform.parent.Find("ContentsMask") : null;
+            if (mask != null)
+            {
+                _maskTopLocalY = mask.localPosition.y + mask.localScale.y / 2f;
+                _fallbackWindowHeight = mask.localScale.y;
+            }
         }
 
         /// <summary>
@@ -105,7 +125,7 @@ namespace ItemChecklist.UI
         {
             float wh = (_scrollWindow != null && _scrollWindow.windowHeight > 0f)
                 ? _scrollWindow.windowHeight
-                : FallbackWindowHeight;
+                : _fallbackWindowHeight;
             return Mathf.CeilToInt(wh / RowHeight) + 4;   // +4 buffer: 2 partial/spare rows top + bottom (denser rows since RowHeight 1.5)
         }
 
@@ -161,9 +181,9 @@ namespace ItemChecklist.UI
                     continue;
                 }
                 if (!row.gameObject.activeSelf) row.gameObject.SetActive(true);
-                // Pin row 0's TOP to MaskTopLocalY (flush) regardless of RowHeight:
+                // Pin row 0's TOP to _maskTopLocalY (flush) regardless of RowHeight:
                 // centre = top - RowHeight/2, each row RowHeight below the previous.
-                row.transform.localPosition = new Vector3(0f, MaskTopLocalY - RowHeight * (displayIdx + 0.5f), 0f);
+                row.transform.localPosition = new Vector3(0f, _maskTopLocalY - RowHeight * (displayIdx + 0.5f), 0f);
                 int catalogIdx = model.Order[displayIdx];
                 var entry = catalog.GetByIndex(catalogIdx);
                 // CK-authoritative rarity colour. useDefaultColorForCommon: true →
