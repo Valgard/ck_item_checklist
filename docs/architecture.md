@@ -921,11 +921,18 @@ actually render (both proven only in-game — see `docs/gotchas.md`):
 ### Visibility — explicit, not the scale-multiplier idiom
 `Manager.ui.CalcGameplayUITargetScaleMultiplier()` returns `(0,0,0)` for this mod
 HUD (it is not a drop-in scale source — using it zeroes the element). `LateUpdate`
-instead toggles `hudRoot` active by explicit signals:
-`isInGame && Manager.main.player != null && !Manager.ui.isAnyInventoryShowing &&
+instead toggles `hudRoot` active by explicit signals (`ItemChecklistHud.cs:56`):
+`WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing &&
 !Manager.menu.IsAnyMenuActive()`. `isAnyInventoryShowing` (the CoreLib-patched
-aggregate) covers the player inventory, crafting, **and** the checklist window;
-the `player != null` term suppresses the world-load screen.
+aggregate) covers the player inventory, crafting, **and** the checklist window.
+The leading gate is the shared `WorldState.IsInPlayableWorld` predicate
+(`isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`), which Iter-11.6
+substituted for the original `Manager.main.player != null` term: contrary to the
+earlier assumption, `player != null` does **not** suppress the world-load screen
+(the player object is instantiated at `PlayerController.OnOccupied` *while the
+load screen is still up* and survives the exit-to-menu transition, so it is true
+across both load screens). See `docs/gotchas.md § Manager.main.player != null does
+NOT suppress a load screen (Iter-11.6)`.
 
 ### Content
 Icon = `ui_slot_toggled_border` box + `ui_icon_requirement` tick (0.7 scale, a

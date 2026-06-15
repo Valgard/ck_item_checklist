@@ -346,7 +346,13 @@ the panel → invisible. Set Sorting Layer = GUI + an appropriate Order (header
 controls ~50–54). Distinct from the material trap above — they often co-occur on
 hand-authored renderers and must both be fixed.
 
-### Caret scale: white_pixel is 1×1 px @ PPU 16 → scale UP, not down
+### Caret scale: white_pixel is 1×1 px @ PPU 16 → scale UP, not down (SUPERSEDED — historical lore)
+
+> **Superseded since Iter-12.** The caret no longer uses `white_pixel`: Iter-12
+> swapped it to the painted 2×8 `Caret` sheet sprite and **removed** the
+> `{0.8, 6, 1}` scale hack; Iter-14.1 then sliced it to 2×7 via a vertical
+> 9-slice. Kept below only as background on why the original sub-pixel approach
+> needed up-scaling.
 
 `white_pixel.png` is 1×1 px at `spritePixelsToUnits: 16` → base size 0.0625
 units. A caret built from it needs **up**-scaling to be visible — e.g. Transform
@@ -495,9 +501,17 @@ thing to clear.
   `WorldInputSuppressWhileChecklistOpenPatch.cs` was built for this and deleted.
 - **`TextInputField` re-asserts the caret position every frame.** It sets
   `characterMarkBlinker.transform.position = pugText.position` in its update, so a
-  static prefab `localPosition` on the caret GameObject is ignored. To offset the
-  caret, move the `white_pixel` into a child GameObject (with the +Y offset) and
-  rewire `CharacterMarkBlinker.sr` to it. Deferred to Iter-14.
+  static prefab `localPosition` on the caret GameObject is ignored — the per-frame
+  write clobbers it. Iter-14.1 fixed this (pure prefab, zero C#) by moving the caret
+  `SpriteRenderer` into a child GameObject `CaretSprite` carrying a constant
+  `localPosition` (+1px up to centre, +2px right for a gap): the child inherits the
+  parent's per-frame world position and adds the nudge on top. The `SpriteRenderer`
+  **kept its fileID** (only re-homed to the child), so `CharacterMarkBlinker.sr`
+  needed **no** rewire. (Iter-12 had already swapped the caret off `white_pixel`
+  onto the painted 2×8 `Caret` sheet sprite — see the superseded "Caret scale"
+  note above; 14.1 also sliced it 8px→7px via the sprite's vertical 9-slice.) The
+  intermittent worktree-AssetDatabase staleness that confounded the calibration is
+  documented in § Worktree builds.
 - **CK pixel fonts blur when Transform-scaled below 1.** To render text smaller,
   use a smaller native font (`thinTiny`, `fontFace` `16777344`) instead of
   scaling a larger font down -- a sub-1 Transform scale produces uneven, blurry
@@ -754,3 +768,27 @@ hits **existing** mods purely because the build runs from a worktree. The mtime
 check above is still the right *first* step; it just cannot clear the worktree
 case, because a stale-content rebuild is indistinguishable from a real one by
 mtime alone.
+
+### In-game visual calibration: screencapture → sips crop → image Read
+Pixel-level UI placement (margins, flush, caret offset, blink position) is judged
+by the assistant capturing the live game window directly — no Claude-specific
+feature involved, just Bash + a macOS OS tool + an image-capable `Read`:
+
+1. `screencapture -x /tmp/ck.png` grabs the full screen silently (`-x` = no
+   shutter sound). Requires the **game window foregrounded** and macOS
+   **screen-recording permission** granted to the terminal/host.
+2. `sips -c <h> <w> --cropOffset <top> <left> /tmp/ck.png --out /tmp/ck_crop.png`
+   crops to just the UI region of interest (smaller image = sharper pixel
+   judgement on `Read`).
+3. `Read /tmp/ck_crop.png` — the image-capable Read renders the PNG so placement
+   can be eyeballed.
+
+For a **blinking** element (the search caret), a single capture often lands on
+the blink-off phase and shows nothing. Take ~5 rapid captures ~180 ms apart to
+guarantee catching the blink-on phase — pause with
+`perl -e 'select(undef,undef,undef,0.18)'` between captures, **not** `sleep`
+(foreground `sleep` is blocked in this environment). Read whichever frame shows
+the caret lit.
+
+This loop must run **inline in the main session** (it needs the live CrossOver
+window and the build lock) — see `docs/conventions.md`.

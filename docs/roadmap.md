@@ -1,6 +1,8 @@
 # ItemChecklist — Future Roadmap
 
-Frozen 2026-06-04. The backlog of planned iterations (Iter-12 onward).
+A living done/planned ledger (started 2026-06-04). Tracks each iteration's
+status — DONE entries link to `docs/iteration-history.md`; the rest are the
+remaining backlog.
 
 - **Iter-10 — DONE** (see `docs/iteration-history.md`).
 - **Iter-11 — DONE** (see `docs/iteration-history.md`). Note: implemented via

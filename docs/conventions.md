@@ -29,18 +29,18 @@ as early, separate commits on each branch.
 
 ## Worktree Conventions
 
-**Setup:** every new worktree needs two gitignored files copied from the main
-checkout:
+**Setup:** every new worktree needs only the gitignored `.envrc` copied from
+the main checkout:
 
 ```bash
 cp .envrc .worktrees/<branch>/.envrc
-rsync -a unity/ItemChecklist/Art/ .worktrees/<branch>/unity/ItemChecklist/Art/
-# rsync with trailing slashes — cp -R creates a double-nested directory
 ```
 
 `.envrc` carries the machine-local build env (`UNITY_BIN`, `SDK_PATH`, etc.)
-and is never tracked in git. The Art directory carries the bridge sprites
-(also gitignored) needed to build.
+and is never tracked in git. `unity/ItemChecklist/Art/` no longer needs copying:
+since Iter-12 the pixel-art sheet under `Art/UI/` is **tracked**, so
+`git worktree add` checks it out automatically (the old gitignored `Art/Bridge/`
+placeholder sprites were deleted in Iter-12).
 
 **superpowers specs/plans live only in the worktree.** The
 `superpowers:brainstorming` / `writing-plans` skills default their spec and
@@ -149,8 +149,7 @@ unity/ItemChecklist/
   InventoryShortCutsButtonSuppressPatch.cs  Harmony patch — hide inventory shortcuts button (Iter-9)
   ShortCutsWindowSuppressPatch.cs Harmony patch — suppress help panel (Iter-9)
   PauseSuppressWhileChecklistOpenPatch.cs  Harmony patch — block ESC->pause race (Iter-9)
-  Data/                           (empty; catalog baked at runtime)
-  ModManifest.json                mod manifest (displayName, requiredOn, etc.)
+  WorldState.cs                   shared IsInPlayableWorld predicate (HUD + F1 guard) (Iter-11.6)
   ItemChecklist.asmdef            runtime assembly definition
   ui/
     ItemChecklistWindow.cs        IModUI implementation (UIelement subclass)
@@ -170,13 +169,12 @@ unity/ItemChecklist/
     FacetCheckboxButton.cs        filter checkbox row button (Iter-10)
     FacetToggleButton.cs          filter header toggle button (Iter-10)
   Localization/
-    localization.yaml             source terms (one entry per language) (Iter-11)
     Generated/                    build-generated .asset TextDataBlocks (gitignored)
   Prefabs/
     ItemChecklistWindow.prefab    window hierarchy
     ItemChecklistHUD.prefab       always-on HUD counter (checkbox icon + PugText) (Iter-11.5)
     ItemRow.prefab                row template (recycled by scroll list)
-  Art/Bridge/                     placeholder sprites (gitignored; replace before publish)
+  Art/UI/                         tracked pixel-art sheet ui_checklist.png + mask_sprite.png (Iter-12)
   Editor/
     ItemChecklist.Editor.asmdef   editor-only assembly for the CLI helpers
     CLIBuildHelper.cs             -> core_keeper/utils/ (shared symlink, gitignored)
@@ -192,6 +190,13 @@ files live in `core_keeper/utils/` (namespace `CoreKeeperModUtils`) and are
 symlinked into `Editor/` by `link.sh`. The symlinks (and
 `Localization/Generated/`) are therefore gitignored.
 
+The **source** localisation YAML is **not** under `unity/`: it lives at
+repo-root `localization/localization.yaml` (the `.envrc:LOC_YAML` path),
+deliberately outside the `unity/ItemChecklist/` tree so `ModBuilder` does not
+pack it into the AssetBundle. `LocalizationGenerator` reads it and writes the
+per-language `.asset` TextDataBlocks into `unity/ItemChecklist/Localization/
+Generated/` (the `.envrc:LOC_OUT` path) at build time.
+
 **Naming patterns:**
 
 - `*Hook.cs` — top-level Harmony patches
@@ -199,3 +204,15 @@ symlinked into `Editor/` by `link.sh`. The symlinks (and
 - `*Snapshot.cs` — top-level initial-state readers
 - `ui/*.cs` — IModUI, IScrollable, and row logic
 - `Editor/*.cs` — editor-only build/publish helpers (in separate `.asmdef`)
+
+## Prefab Authoring Conventions
+
+**Re-parent a prefab component without breaking references.** To move a
+component to a different GameObject while keeping every reference to it intact,
+**keep the component's `fileID`** and only repoint its `m_GameObject`: add the
+component's `fileID` to the new GO's `m_Component` list and remove it from the
+old GO's list. References elsewhere (other components' serialized fields) are by
+`fileID`, so they survive untouched. Iter-14.1 re-homed the caret
+`SpriteRenderer` onto a child `CaretSprite` GO this way, so
+`CharacterMarkBlinker.sr` needed no rewire (see the Iter-14.1 entry in
+`docs/iteration-history.md`).
