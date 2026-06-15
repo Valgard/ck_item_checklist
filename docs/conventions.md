@@ -27,6 +27,39 @@ as early, separate commits on each branch.
 **Force-push:** after a rebase of a pushed feature branch, force-push with
 `--force-with-lease`.
 
+### Committing around Unity prefab reserialization
+
+Unity rewrites a whole `.prefab` on every Editor save — GameObject blocks get
+reordered and trailing whitespace is normalised — so a functional one-line change
+arrives mixed with dozens of cosmetic diff hunks that belong to no feature. Four
+techniques keep the history clean (all used in the Iter-12 extension):
+
+- **Working-tree swap for hunk-level splitting.** `git apply --cached` is
+  unreliable here: the cosmetic reorder interleaves with functional hunks, and a
+  single `m_Children` hunk often mixes two features. Instead reconstruct the file
+  *content* per commit and let git recompute the diff — save the full version
+  aside (`cp file /tmp/full`), check out HEAD (`git show HEAD:file > file`),
+  re-apply only commit A's edits, commit; then restore the full version and
+  commit B. No hand-counted patch offsets, no risk of mangling the YAML.
+- **HEAD-rebuild to strip reserialization noise.** To commit *only* the
+  functional change with zero cosmetic churn, rebuild the target file **from
+  HEAD** applying only the functional edits — everything untouched stays
+  byte-identical to HEAD and never appears in the diff. This removes the
+  whitespace/reorder noise by construction (cleaner than reverting it back out of
+  the Editor-saved version).
+- **Prove functional equivalence with a sorted-value hash.** To confirm a
+  rebuilt/noise-stripped prefab is identical to the in-game-verified version,
+  `grep` the functional lines (`m_Sprite`/`m_Size`/`m_Father`/`m_Enabled`/
+  `m_SortingOrder`/sprite fileIDs), **sort**, and hash. Equal hashes prove the
+  functional multiset is unchanged — sorting drops GameObject-order noise and the
+  grep skips whitespace-only lines. Always check the match *count* against the
+  expected count: a `\S+:` grep silently misses names containing spaces.
+- **Separate the functional commit from the canonical-format commit.** Keep
+  feature commits noise-free (reviewable), then — if the repo should match Unity's
+  canonical serialization so the next Editor save yields no phantom diff — make a
+  dedicated `style(prefab): …` commit that re-applies the Editor's trailing
+  spaces / block order. Functional change and format reconciliation stay separate.
+
 ## Worktree Conventions
 
 **Setup:** every new worktree needs only the gitignored `.envrc` copied from
@@ -216,3 +249,12 @@ old GO's list. References elsewhere (other components' serialized fields) are by
 `SpriteRenderer` onto a child `CaretSprite` GO this way, so
 `CharacterMarkBlinker.sr` needed no rewire (see the Iter-14.1 entry in
 `docs/iteration-history.md`).
+
+## Documentation Conventions
+
+- **Derive reference tables from the artifact; don't hand-maintain them.** A doc
+  table that mirrors generated data (e.g. the sprite catalog in
+  `pixel-art-authoring.md`, mirroring `ui_checklist.png.meta`) goes stale the
+  moment the artifact changes. Mark such a table as generated and carry the
+  one-liner that regenerates it, so a reader refreshes it from the source of
+  truth instead of trusting a frozen copy.

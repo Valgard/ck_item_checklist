@@ -792,3 +792,43 @@ the caret lit.
 
 This loop must run **inline in the main session** (it needs the live CrossOver
 window and the build lock) — see `docs/conventions.md`.
+
+## Item Icons (Iter-12 extension)
+
+### CK doesn't scale item icons to fit — it enlarges the slot
+Detail icons (tools, weapons) overflow a tight icon slot, but scaling them *down*
+to fit makes them tiny: `Sprite.bounds.size` reports the **rect** size (e.g.
+40/16 = 2.5u for a 40×40 sprite), not the tight visible bbox, so a fit-to-bounds
+scale shrinks by the transparent padding and the visible content ends up far
+smaller than the slot. CK's own inventory slots don't scale icons either — the
+slot background + rarity border are **1.25u** (20px at PPU 16) and the icon
+renders at **native** scale inside. The Iter-12-extension `ItemRow` matches this:
+`IconSlot` background + `RarityBorder` `m_Size` are 1.25u, and `ItemRow.Bind`
+resets `icon.transform.localScale = Vector3.one` (the viewport pool recycles
+rows, so the reset must be per-bind).
+
+### `Sprite.bounds.size` is the rect, not the tight bbox
+`Sprite.bounds.size` / `Sprite.rect` always reflect the full sprite rect, never
+the tight visible mesh (the tight mesh affects rendering only). You therefore
+cannot measure an icon's visible extent from `bounds`; any "fit to visible
+content" math off `bounds` is wrong for padded sprites. (`Sprite.rect` /
+`bounds` / `pixelsPerUnit` access is sandbox-safe.)
+
+### `iconOffset` is slot-relative — Icon must be a child of IconSlot
+CK/IB position an item icon by `icon.transform.localPosition = objectInfo.iconOffset`
+(IB `UserInterfaceUtility.ApplyObjectIconTransform`). For that offset to land
+right, the icon transform must be a **child of the slot** so `localPosition` is
+relative to the slot centre. The Iter-12 extension re-parented `Icon` under
+`IconSlot` (base `localPosition = (0,0,0)`); `ItemRow.Bind` sets
+`icon.transform.localPosition = PugDatabase.GetObjectInfo((ObjectID)objectId, 0).iconOffset`
+for discovered rows and keeps the `?` sprite centred (`Vector3.zero`, no item
+offset) for undiscovered rows. As a sibling of the slot, setting
+`localPosition = iconOffset` would discard the slot position and snap the icon to
+the row origin.
+
+### IB's `ApplyObjectIconTransform` scale path is a dead end for padded sprites
+IB also applies `scaleMin = Min(1/iconSize.x, 1/iconSize.y)` (with `iconSize` the
+bounds when both dims > 1) — i.e. it *does* scale-to-fit. For ItemChecklist's
+40×40 padded sprites that shrinks the small visible tool to a dot (the bounds
+include the transparent margin). Rejected in favour of the native-size + 1.25u
+slot above; only `iconOffset` (not the scale) was kept.
