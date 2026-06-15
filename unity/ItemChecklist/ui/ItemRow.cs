@@ -9,7 +9,7 @@ namespace ItemChecklist.UI
         public SpriteRenderer background;
         public SpriteRenderer icon;
         public PugText label;
-        public PugText placeholder;
+        public Sprite unknownIcon;           // Iter-12: sprite shown in the icon slot for undiscovered items
         public SpriteRenderer checkmark;     // empty checkbox, shown on every row
         public SpriteRenderer checkFill;     // requirement icon inside the box, discovered only
         public SpriteRenderer rarityBorder;   // Iter-6: rarity frame, shown for Uncommon+
@@ -41,15 +41,16 @@ namespace ItemChecklist.UI
         {
             if (isDiscovered)
             {
-                if (icon != null) { icon.sprite = iconSprite; icon.enabled = true; }
+                // Real item icon: never tinted (reset, since the pool recycles rows).
+                if (icon != null) { icon.sprite = iconSprite; icon.enabled = true; icon.color = Color.white; }
                 if (label != null) label.Render(name);
-                if (placeholder != null) placeholder.gameObject.SetActive(false);
             }
             else
             {
-                if (icon != null) icon.enabled = false;
+                // Undiscovered: show the "unknown object" sprite in the icon slot (Iter-12),
+                // tinted by rarity to match the name tint + rarity border (Common/Poor = default).
+                if (icon != null) { icon.sprite = unknownIcon; icon.enabled = unknownIcon != null; icon.color = rarityColor; }
                 if (label != null) label.Render("???");
-                if (placeholder != null) placeholder.gameObject.SetActive(true);
             }
 
             // Checkbox: empty box on every row; the requirement icon fills it only

@@ -34,7 +34,6 @@ Transform:
   - {fileID: 4000000000000000011}
   - {fileID: 4000000000000000012}
   - {fileID: 4000000000000000013}
-  - {fileID: 4000000000000000014}
   - {fileID: 4000000000000000015}
   - {fileID: 4000000000000000020}
   - {fileID: 4000000000000000030}
@@ -71,7 +70,7 @@ MonoBehaviour:
   background: {fileID: 2120000000000000010}
   icon: {fileID: 2120000000000000011}
   label: {fileID: 1140000000000000011}
-  placeholder: {fileID: 1140000000000000012}
+  unknownIcon: {fileID: 60782178, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
   checkmark: {fileID: 2120000000000000012}
   rarityBorder: {fileID: 2120000000000000020}
   checkFill: {fileID: 2120000000000000016}
@@ -241,7 +240,7 @@ SpriteRenderer:
   m_SortingLayerID: 1241602095
   m_SortingLayer: 5
   m_SortingOrder: 48
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 60782178, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -249,7 +248,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_MaskInteraction: 1
   m_SpriteSortPoint: 0
 --- !u!1 &2000000000000000012
@@ -332,95 +331,6 @@ MonoBehaviour:
     rightToLeftXOffset: 0
     invertHorizontalAlignment: 0
     color: {r: 1, g: 1, b: 1, a: 1}
-    outline: 0
-    outlineColor: {r: 0, g: 0, b: 0, a: 0}
-    supportColorTags: 0
-    sortingLayer: 1241602095
-    orderInLayer: 49
-    maskInteraction: 1
-  styleOverrides: []
-  usePooledResources: 1
-  freeResourcesOnDisable: 0
---- !u!1 &2000000000000000013
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4000000000000000014}
-  - component: {fileID: 1140000000000000012}
-  m_Layer: 5
-  m_Name: Placeholder
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &4000000000000000014
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2000000000000000013}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13.2, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4000000000000000010}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1140000000000000012
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2000000000000000013}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 1873953792, guid: 3519ac58e5ff54941a4a69512016923c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  centerInParent: 0
-  activeInPlatforms: -1
-  activeInStoreFronts: -1
-  renderOnStart: 1
-  keepEnabledOnStart: 1
-  alwaysUpdateDynamicTextPixelPos: 0
-  isWrittenToByUser: 0
-  checkForProfanity: 0
-  isHidden: 0
-  trackDynamicTextCharacterEndPositions: 0
-  localize: 0
-  topAligned: 0
-  languagesToForceLatinFont: 
-  localizePlaceholders: 1
-  dontResetEffectsOnRender: 0
-  hideInStreamerMode: 0
-  maxWidth: 1
-  textString: '?'
-  textSuffix: 
-  formatFields: []
-  overrideMaterial: {fileID: 0}
-  offsetKey: 
-  style:
-    fontFace: 16777232
-    capitalization: 0
-    horizontalAlignment: 1
-    verticalAlignment: 1
-    extraCharSpacing: 0
-    extraSpaceWidth: 0
-    extraLineSpacing: 0
-    extraEmptyLineSpacing: 0
-    forceMonospace: 0
-    wrapAtComma: 0
-    rightToLeftXOffset: 0
-    invertHorizontalAlignment: 0
-    color: {r: 0.7058824, g: 0.7058824, b: 0.7058824, a: 1}
     outline: 0
     outlineColor: {r: 0, g: 0, b: 0, a: 0}
     supportColorTags: 0
