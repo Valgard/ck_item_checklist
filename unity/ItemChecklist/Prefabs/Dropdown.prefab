@@ -650,7 +650,7 @@ MonoBehaviour:
   playClickSoundEffect: 0
   clickSoundEffect: 0
   clickSoundPitch: 1
-  owner: {fileID: 3872615691725607934}
+  owner: {fileID: 0}
   index: 0
 --- !u!1 &4002831670443938807
 GameObject:
@@ -928,7 +928,6 @@ GameObject:
   - component: {fileID: 1003887442933748730}
   - component: {fileID: 2812388314241209338}
   - component: {fileID: 6942579261774533626}
-  - component: {fileID: 3872615691725607930}
   m_Layer: 5
   m_Name: ToggleButton
   m_TagString: Untagged
@@ -1028,72 +1027,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.7, y: 0.7, z: 4}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &3872615691725607930
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4002831670443938810}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 323f442dee2934f459cea21fec249abc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  topUIElements: []
-  bottomUIElements: []
-  leftUIElements: []
-  rightUIElements: []
-  childElements: []
-  selectFirstEnabledElementInList: 0
-  invokeSelectionEvents: 0
-  onElementSelectedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  onElementDeselectedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  canBeClicked: 1
-  disabledColor: {r: 1, g: 1, b: 1, a: 1}
-  onLeftClick:
-    m_PersistentCalls:
-      m_Calls: []
-  onRightClick:
-    m_PersistentCalls:
-      m_Calls: []
-  onSelected:
-    m_PersistentCalls:
-      m_Calls: []
-  onDeselected:
-    m_PersistentCalls:
-      m_Calls: []
-  optionalSelectedMarker: {fileID: 0}
-  optionToSelectOnHover: {fileID: 0}
-  spritesShownUnpressed: []
-  spritesShownPressed: []
-  skipUpdatingSpritesColor: 0
-  showHoverTitle: 0
-  optionalTitle:
-    mTerm: 
-    mRTL_IgnoreArabicFix: 0
-    mRTL_MaxLineLength: 0
-    mRTL_ConvertNumbers: 0
-    m_DontLocalizeParameters: 0
-  showHoverDesc: 0
-  optionalHoverDesc:
-    mTerm: 
-    mRTL_IgnoreArabicFix: 0
-    mRTL_MaxLineLength: 0
-    mRTL_ConvertNumbers: 0
-    m_DontLocalizeParameters: 0
-  optionalShortCut: 0
-  adjustSpritesToFitTextSize: 0
-  spritesSizePadding: {x: 0, y: 0}
-  text: {fileID: 0}
-  playClickSoundEffect: 0
-  clickSoundEffect: 0
-  clickSoundPitch: 1
-  owner: {fileID: 3872615691725607934}
 --- !u!1 &4002831670443938811
 GameObject:
   m_ObjectHideFlags: 0
@@ -1190,7 +1123,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1003887442933748734}
-  - component: {fileID: 3872615691725607934}
   m_Layer: 5
   m_Name: Dropdown
   m_TagString: Untagged
@@ -1215,40 +1147,6 @@ Transform:
   - {fileID: 1003887442933748724}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3872615691725607934
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4002831670443938814}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b5d01b40c403045faae3c9a4f16dbb5f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  topUIElements: []
-  bottomUIElements: []
-  leftUIElements: []
-  rightUIElements: []
-  childElements: []
-  selectFirstEnabledElementInList: 0
-  invokeSelectionEvents: 0
-  onElementSelectedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  onElementDeselectedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  selectedLabel: {fileID: 3872615691725607929}
-  toggle: {fileID: 3872615691725607930}
-  caret: {fileID: 2812388314241209339}
-  popupPanel: {fileID: 4002831670443938804}
-  rowContainer: {fileID: 1003887442933748725}
-  rowTemplate: {fileID: 4002831670443938806}
-  caretClosed: {fileID: 1907094303, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
-  caretOpen: {fileID: -1597693367, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
-  rowSpacing: 0.625
 --- !u!1 &4002831670443938815
 GameObject:
   m_ObjectHideFlags: 0
@@ -1426,7 +1324,7 @@ MonoBehaviour:
   playClickSoundEffect: 0
   clickSoundEffect: 0
   clickSoundPitch: 1
-  owner: {fileID: 3872615691725607934}
+  owner: {fileID: 0}
 --- !u!1 &7547268115541696573
 GameObject:
   m_ObjectHideFlags: 0

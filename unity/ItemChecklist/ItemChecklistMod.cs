@@ -109,13 +109,23 @@ namespace ItemChecklist
         {
             if (obj is GameObject go)
             {
-                // The HUD counter is non-modal — capture it for our own
-                // lazy instantiation in Update; everything else is a modal
-                // window registered with CoreLib as before.
-                if (go.name == "ItemChecklistHUD")
+                // Route loaded mod prefabs by name (whitelist, not else-register):
+                //  - the checklist window is the only modal UI registered with CoreLib;
+                //  - the HUD counter is non-modal, captured for our own lazy
+                //    instantiation in Update;
+                //  - everything else is a reusable building-block prefab
+                //    (Dropdown.prefab and its Sort/FacetedFilter variants), nested
+                //    into the window and never opened on its own — it must NOT be
+                //    registered as a modal UI.
+                if (go.name == "ItemChecklistWindow")
+                    UserInterfaceModule.RegisterModUI(go);
+                else if (go.name == "ItemChecklistHUD")
                     hudPrefab = go;
                 else
-                    UserInterfaceModule.RegisterModUI(go);
+                    // Building-block prefab (Dropdown.prefab + its variants):
+                    // nested into the window, never opened on its own. Logged
+                    // (not silently dropped) so the skip is traceable in Player.log.
+                    Debug.Log($"[ItemChecklist] Skipping RegisterModUI for building-block prefab '{go.name}'");
             }
         }
         public void Shutdown() { }
