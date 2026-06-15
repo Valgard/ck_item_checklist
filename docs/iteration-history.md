@@ -248,3 +248,26 @@ stretched instead of 9-slicing because its 3px corners needed
 traced via mtime (edit newer than the last build = simply not rebuilt), not the
 AssetDatabase/symlink cache. Real pixel-art for the remaining placeholder sprites
 (rarity border, scrollbar) continues as polish toward 1.0.0.
+
+**Iter-12 extension (2026-06-15, direct on `main`, no separate branch).** A
+follow-up pass that *reactivated* the generator and reworked the icon slot:
+- **Generator reactivated** (supersedes the "off-limits" note above):
+  `utils/pixaki_to_sheet.py` now reproduces the manually-edited sheet —
+  `RENAME` / `PAD` / `BORDER_OVERRIDE` tables fold the Sprite-Editor renames,
+  9-slice borders, and bottom-anchored padding back into the source, and a
+  `--guid` flag keeps the committed sheet GUID stable. The `.pixaki` master is
+  the single source of truth again; the sheet is regenerable (TDD, 7 tests green).
+- **Unknown Object icon:** the sheet grew 25 → 26 sprites with a dedicated
+  16×16 Unknown Object icon (`internalID 60782178`). Undiscovered rows now show
+  that sprite (rarity-tinted) in the icon slot instead of a PugText "?"; the
+  `Placeholder` GameObject + its PugText were removed (a sprite is cheaper).
+- **Native icon sizing + iconOffset:** item icons render at native scale (no
+  scale-to-fit) in an enlarged **1.25u** slot, positioned by the game's per-item
+  `iconOffset` like CK/IB. To make the offset slot-relative, `Icon` was
+  reparented under `IconSlot`; the `IconSlot` background and rarity border were
+  enlarged to 1.25u to match.
+- A latent inactive `ContentMask` GameObject (parked per-row-mask experiment)
+  was committed in isolation. Shipped as five clean logical commits across both
+  repos (generator + tests in `core_keeper`; sheet + window-prefab, parked
+  `ContentMask`, Unknown-Object feature, native-sizing feature, and a
+  canonical-serialization commit in `item-checklist`).
