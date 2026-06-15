@@ -154,9 +154,11 @@ baked: `Level`, `SellValue`, `IsCraftable`.
 
 **Iter-11 (DONE):** native localisation via CK's `TextDataBlock` / `ScriptableData`
 mechanism. Term strings live in
-`unity/ItemChecklist/Localization/localization.yaml`; the shared Editor helper
+`localization/localization.yaml` (mod-root, outside `unity/` so ModBuilder does
+not pack it into the AssetBundle); the shared Editor helper
 `utils/LocalizationGenerator.cs` (namespace `CoreKeeperModUtils`, symlinked by
-`link.sh`, gated behind `.envrc:USE_SHARED_EDITOR_HELPERS=1`) reads that YAML and
+`link.sh`; at the time gated behind `.envrc:USE_SHARED_EDITOR_HELPERS=1`, since
+removed — see below) reads that YAML and
 templates raw `.asset` YAML for each language — **Option II: raw asset templating**
 — keyed by `utils/ck-language-addresses.json` (13 runtime languages, address→ISO,
 runtime-dumped because `LanguageDataBlock`s are runtime-only and the SDK editor API

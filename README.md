@@ -37,9 +37,6 @@ alongside it.
 
 ## Known Limitations
 
-- **Placeholder art.** The rarity border and the scrollbar track/handle use
-  placeholder sprites (see [Credits](#credits)). Real pixel-art is planned for a
-  later version.
 - **No per-variation tracking.** Each item family is tracked once; colour / skin
   / state variants do not get their own row.
 - **Cooked-food Rare/Epic tiers** are included but not yet verified against live
@@ -53,10 +50,10 @@ in `localization/localization.yaml` and rebuild.
 
 ## Credits
 
-Some UI bridge sprites (the rarity border and the scrollbar track/handle) are
-derived from [Item Browser](https://github.com/moorowl/ItemBrowser) by **moorowl**,
-used under the MIT License (© 2026 moorowl). These are placeholders pending the
-mod's own pixel-art (see [Known Limitations](#known-limitations)).
+All shipped UI sprites are original pixel-art. Early development used placeholder
+sprites from [Item Browser](https://github.com/moorowl/ItemBrowser) by **moorowl**
+(MIT License, © 2026 moorowl); these were fully replaced with original art in
+Iter-12 and no longer ship.
 
 ## License
 
