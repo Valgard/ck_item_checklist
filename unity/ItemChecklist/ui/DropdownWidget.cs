@@ -51,7 +51,14 @@ namespace ItemChecklist.UI
             RenderHeader();
             RebuildList();
             SetOpen(false);
-            if (toggle != null) toggle.owner = this;
+            // Wire owner on ALL child toggle buttons (header Display + caret
+            // ToggleButton), not just the serialized `toggle` field. The prefab
+            // owner-ref is fragile across the Dropdown.prefab boundary — extracting
+            // the chrome nulled the header toggle's serialized owner (Iter-13
+            // regression). Wiring at runtime keeps every clickable chrome element
+            // live regardless of how the consumer prefab/variant references it.
+            foreach (var tb in GetComponentsInChildren<DropdownToggleButton>(includeInactive: true))
+                tb.owner = this;
         }
 
         private void EnsurePool(int n)
