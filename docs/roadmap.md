@@ -18,11 +18,21 @@ Frozen 2026-06-04. The backlog of planned iterations (Iter-12 onward).
   (zero IB references remain), deleted the dev-only `Art/Bridge/` folder.
 - **Iter-13 -- `DropdownWidget` prefab extraction.** Extract the widget into a
   standalone/nested prefab for true reuse.
-- **Iter-14 -- code refactor / optimisations + search caret vertical alignment.**
-  General C# cleanup; plus the search caret sits a few px too low --
-  `TextInputField` forces `characterMarkBlinker.transform.position =
-  pugText.position` every frame, so the fix is to move the white_pixel into a child
-  GO with a +Y offset and rewire `CharacterMarkBlinker.sr`.
+- **Iter-14.1 -- search-caret alignment. DONE** (see `docs/iteration-history.md`).
+  The caret sat a few px too low and flush against the text.
+  `TextInputField.Update()` overwrites the caret GO's world X/Y every frame, so
+  the offset cannot live on that GO: a child GO (`CaretSprite`) now carries the
+  caret `SpriteRenderer` at a constant `localPosition` (+1px up to centre, +2px
+  right for a small gap). The caret was also shortened 8px->7px via the sprite's
+  existing vertical 9-slice (SR Sliced draw mode, size 2x7) -- a pure-prefab
+  change, no sheet/generator touch. **Corrected state note:** the sprite swap
+  (1x1 `white_pixel` -> the painted 2x8 `Caret` sheet sprite) and the
+  `{0.8,6,1}` scale-hack removal were already done in Iter-12; only the
+  position/height remained for 14.1.
+- **Iter-14.2 -- code refactor / optimisations.** General C# cleanup (e.g. unify
+  the six `ButtonUIElement` subclasses' guarded `OnLeftClicked` into one abstract
+  base). Open scope -- gets its own brainstorm. Kept off the Iter-13
+  `DropdownWidget` extraction terrain.
 - **Iter-15 (tentative) -- F1 guard misses cutscenes.** *(Loading-screen half DONE
   in Iter-11.6.)* The F1 toggle in `ItemChecklistMod.Update` now blocks opening
   during both load screens via `WorldState.IsInPlayableWorld`, but it does **not**
