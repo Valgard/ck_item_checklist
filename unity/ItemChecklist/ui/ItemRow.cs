@@ -53,6 +53,23 @@ namespace ItemChecklist.UI
                 if (label != null) label.Render("???");
             }
 
+            // Position + size the icon like CK/IB: NATIVE scale (the 1.25u slot fits the
+            // detail icons), positioned by the game's per-item iconOffset — relative to the
+            // slot, since Icon is a child of IconSlot (CK: icon.localPosition = iconOffset).
+            // Reset both each bind (the viewport pool recycles rows).
+            if (icon != null)
+            {
+                icon.transform.localScale = Vector3.one;
+                // iconOffset only for the real item icon; the "?" placeholder stays centred.
+                if (isDiscovered)
+                {
+                    var info = PugDatabase.GetObjectInfo((ObjectID)objectId, 0);
+                    icon.transform.localPosition = info != null ? info.iconOffset : Vector3.zero;
+                }
+                else
+                    icon.transform.localPosition = Vector3.zero;
+            }
+
             // Checkbox: empty box on every row; the requirement icon fills it only
             // when the item is discovered (the checklist "done" tick).
             if (checkmark != null) checkmark.enabled = true;
