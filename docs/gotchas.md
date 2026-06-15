@@ -722,8 +722,35 @@ it is `mtime(edited file)` vs `mtime(CoreKeeperModSDK/Library/SourceAssetDB)`
 (a proxy for the last build's AssetDatabase pass). If the edit is newer, it
 simply wasn't rebuilt yet (and the loader only re-reads the mod on **game
 restart**, so a rebuilt mod still needs a fresh game launch). Editor-made
-changes get cached + built; external symlink-target edits are picked up on the
-next `build.sh` AssetDatabase refresh. A language switch is runtime, not a
-rebuild — identical-build screenshots can differ only in language. Only after
-the mtimes prove a real rebuild happened should you suspect the
+changes get cached + built; external symlink-target edits are *usually* picked
+up on the next `build.sh` AssetDatabase refresh — but **not reliably when
+building from a git worktree** (see the next subsection). A language switch is
+runtime, not a rebuild — identical-build screenshots can differ only in language.
+Only after the mtimes prove a real rebuild happened should you suspect the
 symlink/AssetDatabase cache.
+
+### Worktree builds: AssetDatabase intermittently misses symlink-target edits
+Building a mod from a **git worktree** (`.worktrees/<branch>`) makes `link.sh`
+repoint the SDK `Assets/` symlink into the worktree tree. In that setup Unity's
+AssetDatabase **intermittently fails to detect edits made through the symlink** —
+and the mtime heuristic above gives a **false all-clear**: `build.sh` still
+re-exports the AssetBundle with a fresh mtime, but from the **stale imported**
+asset, so `mtime(bundle) > mtime(edit)` holds even though the change never made
+it in.
+
+Discovered in Iter-14.1: successive prefab edits (a child-GO `localPosition.x`)
+did not appear in-game across several builds with fresh bundle mtimes, while
+*earlier* edits in the same session (a `localPosition.y` and a
+`DrawMode`/`m_Size` change on the same objects) **had** applied — so it is
+intermittent, not a consistent break, and not field-/block-specific.
+
+Fix: force a full reimport by deleting the import caches, then build —
+`rm -rf "$SDK_PATH"/Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}`. During a
+tight visual-calibration loop in a worktree, clear them **proactively before
+each build**: a slower reimport build is cheaper than another "is it stale or
+did the value not work?" round. This is broader than the new-mod `SourceAssetDB`
+reset (the `project-corekeeper-sourceassetdb-reset` memory, first-add only) — it
+hits **existing** mods purely because the build runs from a worktree. The mtime
+check above is still the right *first* step; it just cannot clear the worktree
+case, because a stale-content rebuild is indistinguishable from a real one by
+mtime alone.

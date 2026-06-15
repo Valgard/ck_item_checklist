@@ -271,3 +271,27 @@ follow-up pass that *reactivated* the generator and reworked the icon slot:
   repos (generator + tests in `core_keeper`; sheet + window-prefab, parked
   `ContentMask`, Unknown-Object feature, native-sizing feature, and a
   canonical-serialization commit in `item-checklist`).
+
+**Iter-14.1 (search-caret alignment) — DONE (2026-06-15, branch `iter-14-1`).**
+The blinking search caret sat a few px too low and flush against the text. Root
+cause (Pug.Other decompile): `TextInputField.Update()` recomputes the caret
+position every frame and writes `characterMarkBlinker.transform.position`
+(world X/Y, Z preserved) — so any offset on the caret GO itself is clobbered.
+Fix (pure prefab, zero C#): a child GO `CaretSprite` under the caret GO now
+carries the caret `SpriteRenderer` at a constant `localPosition`
+(`+1px` up to centre, `+2px` right for a small gap); the child inherits the
+per-frame parent position and adds the constant nudge. The `SpriteRenderer`
+kept its fileID (just re-homed to the child), so `CharacterMarkBlinker.sr`
+needed no rewire. The caret was also shortened `8px -> 7px` via the sprite's
+existing vertical 9-slice (SR `DrawMode` Sliced, `m_Size` 2x7) — the 1px
+top/bottom border caps stay fixed and the uniform middle column compresses
+invisibly; no sheet/generator change. All three (height, vertical centre,
+horizontal gap) calibrated in-game. **Corrected a stale assumption:** the
+roadmap/memory still described the caret as a stretched 1x1 `white_pixel`; in
+fact Iter-12 had already swapped it to the painted 2x8 `Caret` sheet sprite and
+removed the `{0.8,6,1}` scale hack — only the position/height remained.
+**Process note:** several confusing calibration rounds were lost to an
+*intermittent* Unity AssetDatabase staleness when building from the worktree
+(symlink-target edits silently not re-imported, fresh bundle mtime
+notwithstanding); the fix is clearing `Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}`
+to force a reimport. Documented in `docs/gotchas.md § Worktree builds`.
