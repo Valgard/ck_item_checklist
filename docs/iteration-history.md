@@ -5,7 +5,7 @@ Iter-14.1), moved out of `CLAUDE.md` to keep that file focused. See `git log` fo
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
 As of 2026-06-16: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, and Iter-14.1 are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, and Iter-18 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -345,3 +345,55 @@ Hard-won points:
 markers) during this iter — invaluable for verifying variant structure (variant
 YAML defeats grep/awk; the PyYAML-based loader is reliable). Branch was rebased
 onto main (3 intervening doc commits) before merge — linear history, no squash.
+
+**Iter-18 (combobox header + skeleton chrome) — DONE (2026-06-16, branch
+`iter-18`).** Merged the dropdown header into a single combobox `Display` field
+and completed the Iter-13 chrome extraction. Two user-facing changes: the
+`Caret` moved *inside* the `Display` (the separate `ToggleButton` GO and its
+button-background sprite are gone — `Display` already carried its own
+`DropdownToggleButton`, so it became the sole open/close target), and the sort
+`AscDesc` toggle moved into the `Display` too (Sort-only). The asc/desc glyph
+took over the leading (`DisplayIcon`) slot — calibrated in-game: `DisplayIcon`
+hidden, `AscDesc` repositioned to the icon slot at full scale, its `BoxCollider`
+pulled forward (`m_Center.z = -0.1`) so CK's `UIMouse` 3D raycast hits it before
+the field's open/close collider (the Iter-9 ClearButton precedent); the shared
+`DisplayLabel` shifted left (x -1.3 → -2.5) so it clears the leading glyph —
+shared in the skeleton because Sort's `AscDesc` and Filter's glyph occupy the
+*same* leading slot, fixing both fields at once.
+
+Structure (the deferred Iter-13 "unified-field" idea, realised as **two sibling
+variants** — the idiomatic Unity handling of "derived" prefabs, chosen over a
+window-level instance-override pile after weighing prefab-variant best practice):
+`Dropdown.prefab` reduced to a pure **skeleton** (`Field/Display{DisplayIcon,
+DisplayLabel, Caret}` + empty `Popup/RowContainer`; no widget component, no
+templates, no asc/desc); `Sort.prefab` (new variant) adds `DropdownWidget` +
+`RowTemplate` + the in-Display `AscDesc`; `FacetedFilter.prefab` renamed to
+**`Filter.prefab`** (GUID preserved, file-and-root-GO renamed together via
+Unity's "Rename File" prompt) and slimmed to inherit the new skeleton. The window
+now nests instances of both variants (0 direct bare-`Dropdown` refs remain).
+**Behaviour unchanged** (popup lists the non-selected modes; selecting closes;
+mode switch preserves direction); `AscDescToggle.cs` and the `DropdownWidget`
+list model untouched. **Pure-prefab, zero behavioural C#** — all serialized refs
+(`caret`/`toggle`/`rowTemplate`/`ascDescToggle`) resolve to the re-homed GOs.
+
+Hard-won points (all caught by per-step `prefab_query.py`/GUID verification
+before the build — every one would have been a *silent* failure that a clean
+Editor compile and even the build would not surface):
+- **Three silent wiring gaps in `Sort.prefab`** (the `AscDesc` GO missing, then
+  `DropdownWidget.rowTemplate` = `fileID: 0`) — a null `rowTemplate` makes
+  `EnsurePool` early-return, so the sort popup would silently be empty. Verified
+  by matching widget fields against the expected component GUIDs, not by eye.
+- **A leftover GO named `RowTemplate` in the Filter variant was NOT dead weight**
+  — it *is* the `checkboxTemplate` (the widget field pointed at its fileID). The
+  GUID/fileID cross-check (field → GO) showed the real usage where the name lied;
+  it was cosmetically renamed `CheckboxTemplate` (fileID preserved → ref holds).
+- **Dangling override:** removing the inherited `AscDescButton` from the base
+  left the Filter variant's old "deactivate AscDescButton" `m_IsActive:0`
+  modification targeting a now-deleted base fileID. Unity **does not prune**
+  target-less modifications (reimport did not clear it) and the Editor cannot
+  surface them for removal (no resolvable target) — they had to be **stripped
+  directly from the variant YAML** (Editor closed), validated by a PyYAML
+  re-parse + the build. A harmless no-op meanwhile (the prefab merge ignores
+  unresolvable targets), but exactly the cruft the clean extraction set out to
+  avoid. The `FacetedFilterWidget` class rename → `FilterWidget` was deferred to
+  Iter-14.2 to keep this iteration prefab-only.

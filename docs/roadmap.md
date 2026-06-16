@@ -39,9 +39,12 @@ remaining backlog.
   `{0.8,6,1}` scale-hack removal were already done in Iter-12; only the
   position/height remained for 14.1.
 - **Iter-14.2 -- code refactor / optimisations.** General C# cleanup (e.g. unify
-  the six `ButtonUIElement` subclasses' guarded `OnLeftClicked` into one abstract
+  the `ButtonUIElement` subclasses' guarded `OnLeftClicked` into one abstract
   base). Open scope -- gets its own brainstorm. Kept off the Iter-13
-  `DropdownWidget` extraction terrain.
+  `DropdownWidget` extraction terrain. Carries two deferred renames from Iter-18:
+  the `FacetedFilterWidget` class -> `FilterWidget` (the prefab is already
+  `Filter.prefab`), and the Filter variant's checkbox-row GO is now
+  `CheckboxTemplate` (an Iter-13 `RowTemplate` naming leftover, fixed in Iter-18).
 - **Iter-15 (tentative) -- F1 guard misses cutscenes.** *(Loading-screen half DONE
   in Iter-11.6.)* The F1 toggle in `ItemChecklistMod.Update` now blocks opening
   during both load screens via `WorldState.IsInPlayableWorld`, but it does **not**
@@ -60,13 +63,16 @@ remaining backlog.
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
   for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
-- **Iter-18 (tentative) -- unified-field header redesign.** Deferred from Iter-13.
-  Today the header is a dark `Display` slot with separate `ToggleButton` (caret)
-  and `AscDescButton` beside it. Idea: integrate the buttons into one cohesive
-  dark `Field` background (combobox-like). Visual redesign (changes the look,
-  out of Iter-13's "visual unchanged" scope), needs its own brainstorm + recalib
-  of both Sort and Filter clusters. The freshly-extracted `Dropdown.prefab` chrome
-  is the ideal base for it.
+- **Iter-18 -- combobox header + skeleton chrome. DONE** (see
+  `docs/iteration-history.md`). The header is now one cohesive `Display` field:
+  the caret moved inside it (the separate `ToggleButton` GO + its button-bg are
+  gone), and the sort `AscDesc` toggle moved into the `Display` too (Sort-only).
+  This also completed the Iter-13 extraction: `Dropdown.prefab` is now a pure
+  **skeleton** (`Field/Display` + empty `Popup/RowContainer`), consumed by **two
+  sibling variants** -- `Sort.prefab` (adds `DropdownWidget` + `RowTemplate` +
+  in-Display `AscDesc`) and `Filter.prefab` (renamed from `FacetedFilter.prefab`,
+  adds its own templates). Pure-prefab, **zero behavioural C#**. The
+  `FacetedFilterWidget` class rename -> `FilterWidget` was deferred to Iter-14.2.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
