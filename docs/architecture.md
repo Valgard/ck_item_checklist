@@ -18,9 +18,16 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
 
 1. `IMod.EarlyInit` — `UserInterfaceModule.LoadSubmodule()`. Must precede
    any `RegisterModUI` call.
-2. `IMod.ModObjectLoaded` — `UserInterfaceModule.RegisterModUI(windowPrefab)`.
-   Called once when the mod's `GameObject` (from the AssetBundle) is
-   available.
+2. `IMod.ModObjectLoaded` — called once per loaded mod `GameObject` (from the
+   AssetBundle). Routing is a **name whitelist** (Iter-13): only
+   `ItemChecklistWindow` is registered as a modal UI via
+   `UserInterfaceModule.RegisterModUI`; `ItemChecklistHUD` is captured for lazy
+   instantiation (see § Mount (non-modal)); everything else is logged and
+   skipped. The building-block prefabs (`Dropdown`, `FacetedFilter`) are nested
+   inside the window and never opened standalone, so they must not be registered
+   as modal UIs. (Since Iter-13 the `Dropdown` chrome is component-less and no
+   longer arrives as a top-level loaded object anyway, but the whitelist makes
+   the routing explicit and defensive.)
 3. CoreLib's postfix on `UIManager.Init` instantiates the prefab into
    `UIManager.chestInventoryUI.transform.parent` — this is the canonical
    CK UI mount point used by every IModUI implementation.
@@ -188,7 +195,7 @@ public interface IScrollable
 
 ## Viewport Virtualization (Iter-3.8)
 
-The catalog grows to ~10720 entries. The pre-Iter-3.8 design instantiated one
+The catalog grows to ~10,800 entries. The pre-Iter-3.8 design instantiated one
 `ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
 window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
 GameObjects recycled as the user scrolls, so the GameObject count is bounded
@@ -200,7 +207,7 @@ cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
 of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
 `num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
 scrolls by translating the whole pool under the clip mask, recycling nothing.
-That is fine for ≤250 recipes but unusable for ~10720 entries. No CK class
+That is fine for ≤250 recipes but unusable for ~10,800 entries. No CK class
 recycles rows by index, so ItemChecklist implements its own on top of the
 `IScrollable` contract.
 
@@ -393,11 +400,11 @@ for i1 in ingredients:
             emit CatalogEntry(tier_objectId, variation=var)
 ```
 
-**Resulting catalog size:** ~10720 entries (~1240 standard + ~9480
+**Resulting catalog size:** ~10,800 entries (~1240 standard + ~9480
 cooked-food permutations: 3160 pairs × 3 tiers).
 
 **Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
-on this machine for the full ~10720-entry bake). Bake time is independent
+on this machine for the full ~10,800-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
@@ -833,7 +840,10 @@ SearchField   (SearchBar + 3D BoxCollider = click/focus target; no SpriteRendere
 │  ├─ Text    (PugText, pugText)
 │  └─ Hint    (PugText, hintText, "Search…")
 ├─ SelectedMarker
-├─ Caret      (CharacterMarkBlinker + white_pixel SpriteRenderer)
+├─ Caret      (CharacterMarkBlinker; TextInputField writes its world X/Y per frame)
+│  └─ CaretSprite (painted 2x8→7px-tall Caret sheet sprite SpriteRenderer at a
+│                  constant localPosition offset; child so the nudge survives the
+│                  per-frame parent reposition — Iter-14.1)
 └─ ClearButton (ClearSearchButton + ui_icon_clear_search + 3D BoxCollider)
 ```
 

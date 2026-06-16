@@ -192,6 +192,7 @@ unity/ItemChecklist/
     ItemListViewModel.cs          order/filter/search view model (Iter-7/8)
     SortMode.cs                   sort-mode enum + comparators (Iter-7)
     DropdownWidget.cs             reusable dropdown (sort/filter) (Iter-7/8)
+    IPopupToggle.cs               toggle-owner seam shared by dropdown + facet toggles (Iter-13)
     DropdownToggleButton.cs       dropdown header toggle button (Iter-7)
     DropdownOptionButton.cs       dropdown popup option button (Iter-7)
     AscDescToggle.cs              ascending/descending direction toggle (Iter-7)
@@ -200,13 +201,14 @@ unity/ItemChecklist/
     ItemCategory.cs               category taxonomy (ObjectType -> bucket) (Iter-10)
     FacetedFilterWidget.cs        sectioned multi-select filter dropdown (Iter-10)
     FacetCheckboxButton.cs        filter checkbox row button (Iter-10)
-    FacetToggleButton.cs          filter header toggle button (Iter-10)
   Localization/
     Generated/                    build-generated .asset TextDataBlocks (gitignored)
   Prefabs/
     ItemChecklistWindow.prefab    window hierarchy
     ItemChecklistHUD.prefab       always-on HUD counter (checkbox icon + PugText) (Iter-11.5)
     ItemRow.prefab                row template (recycled by scroll list)
+    Dropdown.prefab               shared dropdown chrome (header + popup skeleton) (Iter-13)
+    FacetedFilter.prefab          prefab variant of Dropdown.prefab (facet filter) (Iter-13)
   Art/UI/                         tracked pixel-art sheet ui_checklist.png + mask_sprite.png (Iter-12)
   Editor/
     ItemChecklist.Editor.asmdef   editor-only assembly for the CLI helpers
@@ -249,6 +251,14 @@ old GO's list. References elsewhere (other components' serialized fields) are by
 `SpriteRenderer` onto a child `CaretSprite` GO this way, so
 `CharacterMarkBlinker.sr` needed no rewire (see the Iter-14.1 entry in
 `docs/iteration-history.md`).
+
+**Inspect prefab structure with the parser, not grep.**
+`utils/prefab_query.py <prefab> tree [Name]` prints the GameObject hierarchy
+(from a named GO, or all roots when omitted), marking `[inactive]` GOs. Added
+Iter-13 to verify prefab-**variant** structure, where grep/awk over the variant
+YAML is unreliable (variant fileID reassignment + stripped-object stubs defeat
+line-by-line greps). Use the structured loader/`tree` output instead — see
+`docs/gotchas.md`.
 
 ## Documentation Conventions
 

@@ -832,3 +832,27 @@ bounds when both dims > 1) — i.e. it *does* scale-to-fit. For ItemChecklist's
 40×40 padded sprites that shrinks the small visible tool to a dot (the bounds
 include the transparent margin). Rejected in favour of the native-size + 1.25u
 slot above; only `iconOffset` (not the scale) was kept.
+
+## Prefab Variants & Nested Prefabs (Iter-13)
+
+### Don't grep/awk variant prefab YAML — use the structured parser
+Hand grep/awk over a prefab-**variant**'s YAML is unreliable: variants reassign
+`fileID`s and serialize inherited GameObjects as stripped-object stubs, so a
+line-by-line search reads a partial, re-keyed view of the structure. During
+Iter-13 this caused several false alarms ("AscDescButton still in the base",
+"templates tangled", "structure regression"), each disproven by
+`prefab_query.py` (`load` / `tree`) or an in-game test. Use the PyYAML-based
+parser — `utils/prefab_query.py <prefab> tree [Name]` (see
+`docs/conventions.md § Prefab Authoring Conventions`) — not grep archaeology.
+
+### Iter-13 pointers (cross-prefab refs + nested-prefab round-trip)
+Two facts proven in Iter-13, documented in full elsewhere — pointers only:
+- **Serialized cross-prefab `owner` refs are fragile.** Extracting the dropdown
+  chrome nulled the header toggle's serialized `owner` and broke header-click
+  (caught in-game, not by the Editor compile). Fix: wire `owner` at runtime.
+- **Nested `PrefabInstance`s + variants round-trip through the
+  ModBuilder→AssetBundle pipeline** — proven by a tracer before the extraction;
+  the first nested-prefab use in any mod here.
+
+Full mechanism: `docs/architecture.md § Shared Dropdown chrome` and the Iter-13
+entry in `docs/iteration-history.md`.
