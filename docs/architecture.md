@@ -23,8 +23,8 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
    `ItemChecklistWindow` is registered as a modal UI via
    `UserInterfaceModule.RegisterModUI`; `ItemChecklistHUD` is captured for lazy
    instantiation (see § Mount (non-modal)); everything else is logged and
-   skipped. The building-block prefabs (`Dropdown`, `FacetedFilter`) are nested
-   inside the window and never opened standalone, so they must not be registered
+   skipped. The building-block prefabs (`Dropdown` skeleton, `Sort`, `Filter`) are
+   nested inside the window and never opened standalone, so they must not be registered
    as modal UIs. (Since Iter-13 the `Dropdown` chrome is component-less and no
    longer arrives as a top-level loaded object anyway, but the whitelist makes
    the routing explicit and defensive.)
@@ -640,20 +640,27 @@ still filtered).
 
 ### Shared Dropdown chrome (Iter-13)
 
-Both the Sort dropdown and the FacetedFilter share one reusable prefab,
-`Prefabs/Dropdown.prefab` — the **chrome**: a `Field` container with `Display`
-(header slot + label + leading icon), a `ToggleButton` (caret), an
-`AscDescButton`, and a `Popup` (panel + `RowContainer` + an option `RowTemplate`).
-The chrome carries the geometry/sprites/colliders and a `DropdownToggleButton` on
-**both** `Display` and `ToggleButton` (header-click and caret-click both toggle),
-but **no** root widget component. Each consumer adds only what differs:
+Both the Sort dropdown and the Filter share one reusable prefab,
+`Prefabs/Dropdown.prefab` — a pure **skeleton chrome** (Iter-18): a `Field`
+container with `Display` (combobox slot holding `DisplayIcon`, `DisplayLabel`,
+and the `Caret` inside it) and an empty `Popup` (panel + `RowContainer`). The
+skeleton carries geometry/sprites/colliders and the `Display`'s
+`DropdownToggleButton` (the sole open/close target — the separate `ToggleButton`
+GO was removed in Iter-18), but **no** root widget component, **no** option
+template, and **no** asc/desc toggle. Each consumer is a **prefab variant** that
+adds only what differs:
 
-- **Sort** = a nested `Dropdown.prefab` instance in the window + a root
-  `DropdownWidget` component (instance override).
-- **FacetedFilter** = a **prefab variant** of `Dropdown.prefab` (`FacetedFilter.prefab`)
-  + a root `FacetedFilterWidget` + the checkbox/header/action templates, with the
-  inherited `AscDescButton` **deactivated** and header-layout overrides (wider
-  Display, filter glyph, repositioned caret/label) restoring the no-asc-desc look.
+- **Sort** = `Sort.prefab` (variant of `Dropdown.prefab`) + a root
+  `DropdownWidget` + an option `RowTemplate` + an `AscDesc` toggle that lives
+  inside the `Display` (Sort-only). The `AscDesc` and the `Display` open/close
+  toggle are two 3D `BoxCollider`s in one field; the `AscDesc` collider's
+  `m_Center.z` is pulled forward (`-0.1`) so CK's `UIMouse` raycast hits it
+  first (the Iter-9 ClearButton z-stagger precedent).
+- **Filter** = `Filter.prefab` (variant of `Dropdown.prefab`, renamed from
+  `FacetedFilter.prefab` in Iter-18) + a root `FacetedFilterWidget` + the
+  checkbox/header/action templates, with the filter glyph in the leading slot.
+
+The window nests instances of **both** variants (0 direct bare-`Dropdown` refs).
 
 The toggle is shared via **`IPopupToggle { TogglePopup() }`** — implemented by both
 `DropdownWidget` and `FacetedFilterWidget`. `DropdownToggleButton.owner` is typed
@@ -668,10 +675,12 @@ through the ModBuilder→AssetBundle pipeline as a nested prefab + variant.)
 
 `FacetedFilterWidget : UIelement, IPopupToggle` — a multi-select sectioned popup.
 Replaces the Iter-8 `DropdownWidget`-based filter; since Iter-13 it is a **prefab
-variant of the shared `Dropdown.prefab` chrome** (see above).
+variant of the shared `Dropdown.prefab` skeleton** (`Filter.prefab`, renamed
+from `FacetedFilter.prefab` in Iter-18; see above).
 
-**Closed state:** header `PugText` shows `"Filter"` or `"Filter (N)"`.
-The shared chrome's `DropdownToggleButton` (header + caret) opens/closes the popup.
+**Closed state:** the `Display` `PugText` shows `"Filter"` or `"Filter (N)"`.
+The `Display`'s single `DropdownToggleButton` (with the caret now inside the
+Display) opens/closes the popup.
 
 **Open state:** a popup panel showing gray section headers + checkbox rows
 + action rows. Section headers are separate inactive `headerTemplate` rows,

@@ -856,3 +856,20 @@ Two facts proven in Iter-13, documented in full elsewhere — pointers only:
 
 Full mechanism: `docs/architecture.md § Shared Dropdown chrome` and the Iter-13
 entry in `docs/iteration-history.md`.
+
+### Dangling prefab-variant overrides (Iter-18)
+Deleting an inherited GameObject from a **base** prefab leaves any **variant**
+that overrode that GameObject with a target-less `m_Modification` — the override
+now points at a base `fileID` that no longer exists. Unity ignores unresolvable
+modifications at runtime (the prefab merge silently skips them — a harmless
+no-op), so it **never prunes** them, and they are **invisible in the Editor**: the
+Overrides dropdown only lists modifications with a resolvable target, so there is
+no Revert path to click. Reimporting the variant does **not** clear them
+(verified); "Force Reserialize Assets" *might*, but it is broad and not
+guaranteed. The deterministic fix is to strip the modification block directly from
+the variant YAML **with the Editor closed** (concurrent file writes collide with
+the Editor's own reserialization), then validate via a PyYAML re-parse
+(`utils/prefab_query.py`) + a build. Iter-18 hit this: removing the inherited
+`AscDescButton` from the base left `Filter.prefab`'s old "deactivate AscDescButton"
+`m_IsActive: 0` modification dangling against the deleted base fileID — stripped by
+hand and re-validated.

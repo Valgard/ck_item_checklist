@@ -6,6 +6,14 @@
 The letter suffix marks a within-iteration pivot (e.g. `iter-3-5b` was an
 aborted approach, `iter-3-5c` was the successful re-design).
 
+**Iteration numbering runs two logics — timing ≠ number.** Numbers are assigned
+*both* sequentially-by-merge (3.5 → 7 → 9 → 10 → 11 …) *and* topic-reserved
+(15/16/17/18 were named tentative themes with no fixed build order). So a reserved
+number can be built out of sequence: Iter-18 was the reserved number for the
+combobox-header redesign and got built before 14.2/15/16/17 ("Iter-18 pulled
+forward"). A statement about *when* something is done ("wedge it between 14.1 and
+14.2") is about timing, not about renumbering it.
+
 **Commit types** (conventional commit style with scopes):
 
 | Type | When to use |
@@ -207,8 +215,9 @@ unity/ItemChecklist/
     ItemChecklistWindow.prefab    window hierarchy
     ItemChecklistHUD.prefab       always-on HUD counter (checkbox icon + PugText) (Iter-11.5)
     ItemRow.prefab                row template (recycled by scroll list)
-    Dropdown.prefab               shared dropdown chrome (header + popup skeleton) (Iter-13)
-    FacetedFilter.prefab          prefab variant of Dropdown.prefab (facet filter) (Iter-13)
+    Dropdown.prefab               shared dropdown skeleton chrome (Field/Display + empty Popup) (Iter-13/18)
+    Sort.prefab                   sort dropdown — variant of Dropdown.prefab (+ DropdownWidget, in-Display AscDesc) (Iter-18)
+    Filter.prefab                 faceted filter — variant of Dropdown.prefab (renamed from FacetedFilter.prefab, Iter-18)
   Art/UI/                         tracked pixel-art sheet ui_checklist.png + mask_sprite.png (Iter-12)
   Editor/
     ItemChecklist.Editor.asmdef   editor-only assembly for the CLI helpers
@@ -259,6 +268,34 @@ Iter-13 to verify prefab-**variant** structure, where grep/awk over the variant
 YAML is unreliable (variant fileID reassignment + stripped-object stubs defeat
 line-by-line greps). Use the structured loader/`tree` output instead — see
 `docs/gotchas.md`.
+
+**Skeleton + one-level sibling variants for "same chrome, different contents."**
+When several UI elements share one chrome but differ in contents, author one base
+**skeleton** prefab plus one prefab **variant** per consumer (one level deep,
+is-a) — not a window-level pile of instance overrides. Unity's three composition
+mechanisms map onto relationships: Nested prefabs = composition (has-a); Variants
+= inheritance (is-a, **one level** — deep variant chains are a smell); Instance
+Overrides = the fragile situational last-mile (invisible until you inspect the
+instance, and they break silently when the base changes). A large instance-override
+pile carrying *substantial structure* is the anti-pattern to avoid — push that
+structure into a variant instead. Realised in Iter-18 as the `Sort.prefab` /
+`Filter.prefab` sibling variants of `Dropdown.prefab` (see `docs/architecture.md
+§ Shared Dropdown chrome`).
+
+**Verify every serialized ref against the expected component, not the GO name.**
+After each prefab save, check every widget serialized field against the expected
+component's GUID/fileID (`utils/prefab_query.py` / GUID grep). Silent wiring gaps
+— e.g. `DropdownWidget.rowTemplate == fileID 0`, which makes `EnsurePool`
+early-return and the popup renders empty — survive a clean Editor compile **and** a
+successful batchmode build; an unwired component "isn't broken," it just "isn't
+wired." Companion rule: trust the field→fileID over the GO name (an Iter-18 GO
+named `RowTemplate` was actually the filter's `checkboxTemplate`; deleting by name
+would have broken it). This is the prefab-YAML form of "verify against reality, not
+the name," extending the "Editor compile ≠ sandbox pass" caution.
+
+Deleting an inherited GameObject from a base prefab can leave a variant with a
+dangling, target-less override — see `docs/gotchas.md § Dangling prefab-variant
+overrides`.
 
 ## Documentation Conventions
 
