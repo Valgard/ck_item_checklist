@@ -18,8 +18,15 @@ remaining backlog.
   Replaced every Item Browser placeholder sprite with own pixel-art authored in
   Pixaki, generated into a single `ui_checklist` sheet; rewired all prefab refs
   (zero IB references remain), deleted the dev-only `Art/Bridge/` folder.
-- **Iter-13 -- `DropdownWidget` prefab extraction.** Extract the widget into a
-  standalone/nested prefab for true reuse.
+- **Iter-13 -- `DropdownWidget` prefab extraction. DONE** (see
+  `docs/iteration-history.md`). Extracted the dropdown skeleton into one shared
+  `Dropdown.prefab` chrome, consumed by **both** Sort (nested instance) and
+  FacetedFilter (**prefab variant**) — the hand-copied skeleton no longer exists
+  twice in the window. Nested prefabs + variants round-trip through the
+  ModBuilder→AssetBundle pipeline (proven). A minimal `IPopupToggle` seam unified
+  the two toggle classes so the chrome carries one shared toggle type. The
+  unified-field header redesign (Toggle+AscDesc in one dark `Field` background)
+  was explicitly deferred to its own visual iteration.
 - **Iter-14.1 -- search-caret alignment. DONE** (see `docs/iteration-history.md`).
   The caret sat a few px too low and flush against the text.
   `TextInputField.Update()` overwrites the caret GO's world X/Y every frame, so
@@ -53,6 +60,13 @@ remaining backlog.
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
   for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
+- **Iter-18 (tentative) -- unified-field header redesign.** Deferred from Iter-13.
+  Today the header is a dark `Display` slot with separate `ToggleButton` (caret)
+  and `AscDescButton` beside it. Idea: integrate the buttons into one cohesive
+  dark `Field` background (combobox-like). Visual redesign (changes the look,
+  out of Iter-13's "visual unchanged" scope), needs its own brainstorm + recalib
+  of both Sort and Filter clusters. The freshly-extracted `Dropdown.prefab` chrome
+  is the ideal base for it.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.

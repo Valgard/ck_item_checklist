@@ -298,3 +298,50 @@ removed the `{0.8,6,1}` scale hack — only the position/height remained.
 (symlink-target edits silently not re-imported, fresh bundle mtime
 notwithstanding); the fix is clearing `Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}`
 to force a reimport. Documented in `docs/gotchas.md § Worktree builds`.
+
+**Iter-13 (Dropdown prefab extraction) — DONE (2026-06-16, branch `iter-13`).**
+Made the dropdown genuinely reusable: the header+popup skeleton, formerly
+**hand-copied** in the window prefab (Sort cluster + FacetedFilter cluster), now
+lives once as a shared `Dropdown.prefab` **chrome**, consumed by **two** sources —
+Sort as a nested instance, FacetedFilter as a **prefab variant**. The window no
+longer contains a duplicated skeleton (0 concrete `RowTemplate`/`ToggleButton`/
+`Popup`/`RowContainer`). Mechanism chosen after a tracer (Task 1) **proved nested
+PrefabInstances + variants round-trip through the ModBuilder→AssetBundle
+pipeline** — the first nested-prefab use in any mod here (prior art was only
+separate-prefab + runtime-instantiation à la `ItemRow`/HUD). The Editor authored
+the nested instances/variants (their stripped cross-references are exactly what
+hand-YAML gets wrong); the assistant did builds, YAML verification, C#, and docs.
+
+Hard-won points:
+- **Reusable widget = C# class was already reusable; the missing piece was the
+  PREFAB.** The chrome = pure GameObjects/sprites/colliders; consumers only *add*
+  (root widget component, content templates) — never *remove* (Unity variants
+  can't remove inherited components), which is why the base omits the
+  consumer-specific bits.
+- **Serialized cross-prefab `owner` refs are fragile.** Extracting the chrome
+  nulled the header `DropdownToggleButton`'s serialized `owner` → header-click
+  died (caught in-game, not by the Editor compile). Fix: wire `owner` at runtime
+  in `Configure` for *all* child toggles, not just the one serialized `toggle`.
+- **One shared toggle type via a minimal `IPopupToggle` seam.** The chrome can
+  only carry a single toggle component; `DropdownToggleButton` and
+  `FacetToggleButton` differed only in `owner` type. Introduced
+  `IPopupToggle { TogglePopup() }` (both widgets implement it), retyped the
+  toggle's `owner` to it (runtime-wired), and **deleted `FacetToggleButton`**.
+  Narrow, prefab-driven seam — the broad six-subclass unification stays Iter-14.2.
+- **Variant = base chrome + additions + deactivations + layout overrides.** The
+  FacetedFilter variant adds `FacetedFilterWidget` + checkbox/header/action
+  templates, **deactivates** the inherited `AscDescButton` (the filter has no sort
+  direction), and overrides the header layout to the original no-asc-desc look
+  (Display pos/width + collider, DisplayIcon filter glyph + pos, DisplayLabel pos,
+  caret pos) — derived by a systematic diff of the original filter vs the chrome.
+- **`ModObjectLoaded` routing** switched to a name **whitelist** (register only
+  `ItemChecklistWindow`; capture `ItemChecklistHUD`; log-and-skip building blocks).
+  Reducing the chrome to a component-less prefab incidentally dropped it from the
+  top-level loaded-objects set anyway.
+- The **unified-field header redesign** (Toggle+AscDesc in one dark `Field` bg)
+  was deferred to Iter-18 — a visual redesign, out of Iter-13's scope.
+
+`utils/prefab_query.py` gained a `tree` command (GO hierarchy + `[inactive]`
+markers) during this iter — invaluable for verifying variant structure (variant
+YAML defeats grep/awk; the PyYAML-based loader is reliable). Branch was rebased
+onto main (3 intervening doc commits) before merge — linear history, no squash.

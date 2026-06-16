@@ -631,13 +631,40 @@ still filtered).
 
 ---
 
-### FacetedFilterWidget (Iter-10)
+### Shared Dropdown chrome (Iter-13)
 
-`FacetedFilterWidget : UIelement` — a multi-select sectioned popup. Replaces
-the Iter-8 `DropdownWidget`-based filter.
+Both the Sort dropdown and the FacetedFilter share one reusable prefab,
+`Prefabs/Dropdown.prefab` — the **chrome**: a `Field` container with `Display`
+(header slot + label + leading icon), a `ToggleButton` (caret), an
+`AscDescButton`, and a `Popup` (panel + `RowContainer` + an option `RowTemplate`).
+The chrome carries the geometry/sprites/colliders and a `DropdownToggleButton` on
+**both** `Display` and `ToggleButton` (header-click and caret-click both toggle),
+but **no** root widget component. Each consumer adds only what differs:
+
+- **Sort** = a nested `Dropdown.prefab` instance in the window + a root
+  `DropdownWidget` component (instance override).
+- **FacetedFilter** = a **prefab variant** of `Dropdown.prefab` (`FacetedFilter.prefab`)
+  + a root `FacetedFilterWidget` + the checkbox/header/action templates, with the
+  inherited `AscDescButton` **deactivated** and header-layout overrides (wider
+  Display, filter glyph, repositioned caret/label) restoring the no-asc-desc look.
+
+The toggle is shared via **`IPopupToggle { TogglePopup() }`** — implemented by both
+`DropdownWidget` and `FacetedFilterWidget`. `DropdownToggleButton.owner` is typed
+`IPopupToggle` and **wired at runtime** in each widget's `Configure`
+(`GetComponentsInChildren<DropdownToggleButton>` → `tb.owner = this`), not
+serialized — a serialized cross-prefab owner ref is fragile (extracting the chrome
+nulled it and broke header-click). This let one toggle class serve both widgets;
+the former `FacetToggleButton` was deleted. (The chrome was proven to round-trip
+through the ModBuilder→AssetBundle pipeline as a nested prefab + variant.)
+
+### FacetedFilterWidget (Iter-10, prefab variant since Iter-13)
+
+`FacetedFilterWidget : UIelement, IPopupToggle` — a multi-select sectioned popup.
+Replaces the Iter-8 `DropdownWidget`-based filter; since Iter-13 it is a **prefab
+variant of the shared `Dropdown.prefab` chrome** (see above).
 
 **Closed state:** header `PugText` shows `"Filter"` or `"Filter (N)"`.
-A `FacetToggleButton` (the header row) opens/closes the popup.
+The shared chrome's `DropdownToggleButton` (header + caret) opens/closes the popup.
 
 **Open state:** a popup panel showing gray section headers + checkbox rows
 + action rows. Section headers are separate inactive `headerTemplate` rows,
@@ -663,9 +690,10 @@ does not immediately close it.
 
 **Companion files:** `FacetCheckboxButton : ButtonUIElement` (one checkbox
 row — holds `memberId` index + `checkMark SpriteRenderer`; `OnLeftClicked`
-calls `owner.OnMemberClicked(memberId)`), `FacetToggleButton : ButtonUIElement`
-(calls `owner.TogglePopup()`). Each in its own `.cs` file (one MonoBehaviour
-per file rule).
+calls `owner.OnMemberClicked(memberId)`), each in its own `.cs` file (one
+MonoBehaviour per file rule). The header toggle uses the shared
+`DropdownToggleButton` (via `IPopupToggle`) — the old `FacetToggleButton` was
+removed in Iter-13.
 
 ---
 
@@ -677,8 +705,9 @@ All sort controls live in the header strip. Every clickable uses a **3D
 
 #### DropdownWidget (sort)
 
-`DropdownWidget : UIelement` — reusable single-select dropdown (mod-authored,
-not CK-native). Still used for the **Sort** dropdown.
+`DropdownWidget : UIelement, IPopupToggle` — reusable single-select dropdown
+(mod-authored, not CK-native). Used for the **Sort** dropdown, as a nested
+instance of the shared `Dropdown.prefab` chrome (see § Shared Dropdown chrome).
 
 **API:**
 ```csharp
@@ -698,7 +727,10 @@ frame. When `_open && !_armed && !ClickedInsidePopup()` → close.
 #### DropdownToggleButton / DropdownOptionButton
 
 Each in its **own `.cs` file**. Both subclass `ButtonUIElement`. See
-`gotchas.md § Multiple MonoBehaviours in one file`.
+`gotchas.md § Multiple MonoBehaviours in one file`. Since Iter-13
+`DropdownToggleButton.owner` is an **`IPopupToggle`** (DropdownWidget *or*
+FacetedFilterWidget), wired at runtime in `Configure` — so one toggle class
+drives either widget from the shared chrome.
 
 #### AscDescToggle
 
@@ -711,7 +743,7 @@ swaps the asc/desc glyph, triggers `Recompute()` + `RefreshVisible()`.
 
 **ItemChecklist convention — guard FIRST, then base** (consistent across all
 buttons: `DropdownOptionButton`, `DropdownToggleButton`, `AscDescToggle`,
-`ClearSearchButton`, `FacetCheckboxButton`, `FacetToggleButton`):
+`ClearSearchButton`, `FacetCheckboxButton`):
 
 ```csharp
 public override void OnLeftClicked(bool mod1, bool mod2)
