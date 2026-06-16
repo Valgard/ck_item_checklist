@@ -10,7 +10,7 @@ namespace ItemChecklist.UI
     /// Configure with labels + selected index + onSelected callback. Iter-7 uses
     /// it for the sort mode; Iter-8 reuses it for the discovery filter.
     /// </summary>
-    public sealed class DropdownWidget : UIelement
+    public sealed class DropdownWidget : UIelement, IPopupToggle
     {
         // Editor-wired serialized fields.
         public PugText selectedLabel;          // header: shows the current option text

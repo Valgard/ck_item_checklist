@@ -18,11 +18,10 @@ namespace ItemChecklist.UI
     /// "Clear all"): drawn from <see cref="actionTemplate"/>, no checkbox state —
     /// its <c>toggle()</c> just runs the action.
     /// </summary>
-    public sealed class FacetedFilterWidget : UIelement
+    public sealed class FacetedFilterWidget : UIelement, IPopupToggle
     {
         // Editor-wired serialized fields.
         public PugText headerLabel;            // "Filter" / "Filter (N)"
-        public FacetToggleButton toggle;       // header open/close button
         public SpriteRenderer caret;
         public GameObject popupPanel;          // toggled container
         public Transform rowContainer;         // parent for cloned rows + headers
@@ -76,7 +75,12 @@ namespace ItemChecklist.UI
             RenderHeader(activeCount);
             RebuildList();
             SetOpen(false);
-            if (toggle != null) toggle.owner = this;
+            // Wire owner on all child toggle buttons (header + caret) at runtime —
+            // the chrome's shared DropdownToggleButtons drive this widget via the
+            // IPopupToggle contract. Serialization-free, robust across the variant
+            // boundary (mirrors DropdownWidget.Configure).
+            foreach (var tb in GetComponentsInChildren<DropdownToggleButton>(includeInactive: true))
+                tb.owner = this;
         }
 
         private void EnsurePools()
