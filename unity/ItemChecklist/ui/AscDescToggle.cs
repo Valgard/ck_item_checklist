@@ -7,7 +7,7 @@ namespace ItemChecklist.UI
     /// A two-state action button: ascending (asc glyph) <-> descending (desc
     /// glyph). Click flips the state and fires onToggled(ascending).
     /// </summary>
-    public sealed class AscDescToggle : ButtonUIElement
+    public sealed class AscDescToggle : ClickButton
     {
         public SpriteRenderer glyph;     // shows asc/desc sprite
         public Sprite ascSprite;         // ui_icon_sort_order_asc
@@ -23,10 +23,8 @@ namespace ItemChecklist.UI
             Apply();
         }
 
-        public override void OnLeftClicked(bool mod1, bool mod2)
+        protected override void OnClick()
         {
-            if (!canBeClicked) return;
-            base.OnLeftClicked(mod1, mod2);
             _ascending = !_ascending;
             Apply();
             _onToggled?.Invoke(_ascending);
