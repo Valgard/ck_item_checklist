@@ -100,7 +100,12 @@ namespace ItemChecklist.UI
             {
                 var go = UnityEngine.Object.Instantiate(template, rowContainer);
                 var btn = go.GetComponent<FilterCheckboxButton>();
-                if (btn == null) { UnityEngine.Object.Destroy(go); continue; }
+                if (btn == null)
+                {
+                    Debug.LogError("[ItemChecklist] FilterWidget template is missing a FilterCheckboxButton component");
+                    UnityEngine.Object.Destroy(go);
+                    continue;
+                }
                 btn.owner = this;
                 pool.Add(btn);
             }

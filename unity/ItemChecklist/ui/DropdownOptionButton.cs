@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace ItemChecklist.UI
 {
     /// <summary>Click target for one option row inside the popup.</summary>

@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace ItemChecklist.UI
 {
     /// <summary>Click target that toggles its owner's popup. The owner is any

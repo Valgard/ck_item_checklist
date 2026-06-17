@@ -19,7 +19,7 @@ namespace ItemChecklist.UI
         public DropdownWidget sortDropdown;
         public FilterWidget filter;
         public SearchBar searchBar;
-        public ClearSearchButton clearSearchButton;   // declared here; wired to its SearchBar in the window prefab (later task)
+        public ClearSearchButton clearSearchButton;   // declared here; wired to its SearchBar in the window prefab
 
         private ItemChecklistContent _content;
         private ItemListViewModel _wiredModel;   // last model whose OnResultsChanged we subscribed to (for clean re-bake unsubscribe)
