@@ -12,28 +12,20 @@ namespace ItemChecklist.UI
     /// no checkbox). OR within a section, AND across sections — the semantics live
     /// in ItemListViewModel; this widget only renders state and reports clicks.
     /// Reuses the Iter-5 clickable-control pattern (SpriteRenderer + 3D
-    /// BoxCollider + ButtonUIElement) via FilterCheckboxButton.
+    /// BoxCollider + ButtonUIElement) via FilterCheckboxButton. The popup chrome
+    /// (open/close, click-outside, auto-size) lives in <see cref="PopupWidget"/>.
     ///
     /// A member with an **empty section** string is an ACTION row (e.g.
     /// "Clear all"): drawn from <see cref="actionTemplate"/>, no checkbox state —
     /// its <c>toggle()</c> just runs the action.
     /// </summary>
-    public sealed class FilterWidget : UIelement, IPopupToggle
+    public sealed class FilterWidget : PopupWidget
     {
-        // Editor-wired serialized fields.
+        // Editor-wired serialized fields (chrome fields inherited from PopupWidget).
         public PugText headerLabel;            // "Filter" / "Filter (N)"
-        public SpriteRenderer caret;
-        public GameObject popupPanel;          // toggled container
-        public Transform rowContainer;         // parent for cloned rows + headers
         public GameObject checkboxTemplate;    // one FilterCheckboxButton checkbox row (inactive)
         public GameObject headerTemplate;      // one section-header PugText row (inactive)
         public GameObject actionTemplate;      // one action row: glyph + label, no checkbox (inactive)
-        public Sprite caretClosed;
-        public Sprite caretOpen;
-        public float rowSpacing = 0.7f;
-
-        private SpriteRenderer _panel;              // cached popup bg, auto-sized to the row count
-        private float _topY;                        // authored popup top edge (prefab popup.y + size/2), captured once
 
         // One row in the flat member table. An empty section marks an action row.
         private struct Member
@@ -52,8 +44,12 @@ namespace ItemChecklist.UI
         private readonly List<PugText> _headerPool = new List<PugText>();
         private Action _onAnyChange;   // refresh header count after a toggle
         private Action _clearAll;
-        private bool _open;
-        private bool _armed;
+
+        // Filter starts members at popup row 0 (the header is a count label, not a row).
+        protected override int FirstRowOffset => 0;
+
+        // Reflect external changes (e.g. re-bake) whenever the popup opens.
+        protected override void OnPopupOpened() => RebuildList();
 
         /// <summary>(Re)build the member table from the model + a label provider,
         /// then lay out the popup. Called from WireControls.</summary>
@@ -61,12 +57,7 @@ namespace ItemChecklist.UI
             Func<int> activeCount, Action clearAll)
         {
             _members.Clear();
-            if (_panel == null && popupPanel != null)
-            {
-                _panel = popupPanel.GetComponent<SpriteRenderer>();
-                // capture the authored top edge from the prefab (popup.y + half height) so it stays editable there
-                if (_panel != null) _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
-            }
+            EnsurePanel();
             foreach (var m in members)
                 _members.Add(new Member { section = m.section, label = m.label, isOn = m.isOn, toggle = m.toggle });
             _onAnyChange = () => RenderHeader(activeCount);
@@ -182,21 +173,7 @@ namespace ItemChecklist.UI
                 if (p != null && p.gameObject.activeSelf) p.gameObject.SetActive(false);
             }
 
-            // Auto-size the popup to the actual row count (headers + checkbox/action rows):
-            // rows sit at -(pos)*rowSpacing, so their centre is at -(n-1)/2*rowSpacing.
-            int n = pos;
-            if (n > 0)
-            {
-                float h = n * rowSpacing;   // no extra padding — panel hugs the row stack
-                if (rowContainer != null)
-                    rowContainer.localPosition = new Vector3(
-                        rowContainer.localPosition.x, (n - 1) / 2f * rowSpacing, rowContainer.localPosition.z);
-                if (popupPanel != null)     // top-align: keep the authored top edge, panel grows downward
-                    popupPanel.transform.localPosition = new Vector3(
-                        popupPanel.transform.localPosition.x, _topY - h / 2f, popupPanel.transform.localPosition.z);
-                if (_panel != null)
-                    _panel.size = new Vector2(_panel.size.x, h);
-            }
+            AutoSizePopup(pos);
         }
 
         public void OnMemberClicked(int memberId)
@@ -212,24 +189,6 @@ namespace ItemChecklist.UI
             _clearAll?.Invoke();
             RebuildList();
             _onAnyChange?.Invoke();
-        }
-
-        public void TogglePopup() => SetOpen(!_open);
-
-        private void SetOpen(bool open)
-        {
-            _open = open;
-            if (popupPanel != null) popupPanel.SetActive(open);
-            if (caret != null) caret.sprite = open ? caretOpen : caretClosed;
-            if (open) RebuildList();   // reflect external changes (e.g. re-bake)
-        }
-
-        // Click-outside-to-close (identical pattern to DropdownWidget.LateUpdate).
-        private void LateUpdate()
-        {
-            if (!_open) { _armed = false; return; }
-            if (!_armed) { _armed = true; return; }
-            if (Input.GetMouseButtonDown(0)) SetOpen(false);
         }
     }
 }
