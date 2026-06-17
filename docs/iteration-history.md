@@ -4,8 +4,8 @@ Full per-iteration narrative of ItemChecklist's development (Iter-3.5 through
 Iter-14.1), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
-As of 2026-06-16: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, and Iter-18 are DONE on main. Iter-3.8
+As of 2026-06-17: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, and Iter-14.2 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -397,3 +397,59 @@ Editor compile and even the build would not surface):
   unresolvable targets), but exactly the cruft the clean extraction set out to
   avoid. The `FacetedFilterWidget` class rename → `FilterWidget` was deferred to
   Iter-14.2 to keep this iteration prefab-only.
+
+**Iter-14.2 (UI code audit — refactor & consolidation) — DONE (2026-06-17, branch
+`iter-14-2`).** A behaviour-neutral C# refactor over the UI layer, consolidating five
+duplicated patterns into single sources of truth. Build-gated, in risk order, each its
+own commit + in-game smoke test (R1→R2→R4→R5→R3):
+- **R1 — `ClickButton` base.** The five `ButtonUIElement` subclasses
+  (`DropdownOptionButton`/`DropdownToggleButton`/`AscDescToggle`/`ClearSearchButton`/
+  `FilterCheckboxButton`) repeated the identical click prologue (guard `canBeClicked`,
+  call base). Hoisted into `abstract ClickButton : ButtonUIElement` whose
+  `sealed override OnLeftClicked` runs the prologue then calls `protected abstract
+  OnClick()`; subclasses implement only `OnClick`. Prefab-neutral (abstract base never
+  referenced; subclass `fileID 11500000` unchanged).
+- **R2 — `FacetedFilterWidget`→`FilterWidget` + `FacetCheckboxButton`→
+  `FilterCheckboxButton`** (the Iter-18-deferred rename). `git mv` of `.cs`+`.meta`
+  together preserved the GUIDs (`a10e0183`/`7a9577`), so `Filter.prefab` and the
+  window's nested instance kept resolving; the window's serialized field
+  `facetedFilter`→`filter` needed a matching prefab YAML field-key edit, verified with
+  `prefab_query.py` before the build (a mismatched field name deserialises silently to
+  null). Two stale prose comments also de-Facet-ed.
+- **R4 — removed the redundant `_scrollable` reflection.** Decompiling
+  `UIScrollWindow.Awake` showed it copies the prefab's serialized `scrollable` field to
+  its private `_scrollable` itself, so BOTH the `ItemChecklistContent.Awake`
+  self-registration (an *ineffective* guard — Awake checks the public `scrollable`, not
+  `_scrollable`) and the two `ItemChecklistWindow` `SetValue` calls were redundant.
+  Removed both; the duplicated rewire block collapsed to one `RewireScrollHeight()`
+  (UpdateScrollHeight + ResetScroll). Hypothesis-gated: a dedicated scroll smoke test
+  (wheel/drag/sort-filter/reopen, 0 `disabling UIScrollWindow`) confirmed it — and a
+  **main cross-build** reproduced the exact same scroll behaviour, proving redundancy
+  empirically (a conservative-dedup fallback was prepared but not needed).
+  `DefaultExecutionOrder(-100)` kept defensively.
+- **R5 — `PugText.RenderNoWrap` extension.** The `maxWidth = 0f; Render(...)` pair (the
+  PugFont long-label word-wrap crash guard) appeared ~6× across the two widgets; folded
+  into one null-safe extension (all `maxWidth = 0f` now lives only there).
+- **R3 — `PopupWidget` base** (the main payoff, done last). `DropdownWidget` +
+  `FilterWidget` duplicated nearly the whole popup machinery; extracted into
+  `abstract PopupWidget : UIelement, IPopupToggle` carrying the chrome serialized fields
+  (caret/caretClosed/caretOpen/popupPanel/rowContainer/rowSpacing), `SetOpen`/
+  `TogglePopup`, the click-outside `LateUpdate`, and the auto-size. The one-row offset
+  that genuinely differs (Sort reserves popup row 0 for the header-shown selected option
+  → `FirstRowOffset = 1`; Filter starts members at row 0 → `0`) is captured ONCE as the
+  abstract `FirstRowOffset`, feeding both the row layout and `AutoSizePopup` so they
+  cannot drift. Filter's open-time rebuild became an `OnPopupOpened()` override. Moving
+  the chrome fields to the base is prefab-neutral — Unity deserialises inherited public
+  fields by name (all six keys verified present on `Sort.prefab`/`Filter.prefab` before
+  the build); `LateUpdate` became a proper `override`, clearing the long-standing CS0114
+  hide warning.
+
+**Discovered (out of scope, logged → roadmap):** a pre-existing CK PugFont word-wrap
+crash — typing in the search field throws `IndexOutOfRangeException` *per frame*
+(`PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField`, the field's
+`maxWidth: 7.5`). Empirically confirmed on **main** too (127× with the same input, same
+stack), so iter-14-2 neither caused nor worsened it. Net C# **+23 LoC** — three new
+*documented* base/helper files offset the consumer shrinkage; the win is structural
+(single sources of truth), not raw line count. (Process note: Unity overwrites
+`Player.log` per launch, rotating the prior session to `Player-prev.log` — so each
+grep is single-session.)

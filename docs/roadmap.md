@@ -38,13 +38,17 @@ remaining backlog.
   (1x1 `white_pixel` -> the painted 2x8 `Caret` sheet sprite) and the
   `{0.8,6,1}` scale-hack removal were already done in Iter-12; only the
   position/height remained for 14.1.
-- **Iter-14.2 -- code refactor / optimisations.** General C# cleanup (e.g. unify
-  the `ButtonUIElement` subclasses' guarded `OnLeftClicked` into one abstract
-  base). Open scope -- gets its own brainstorm. Kept off the Iter-13
-  `DropdownWidget` extraction terrain. Carries two deferred renames from Iter-18:
-  the `FacetedFilterWidget` class -> `FilterWidget` (the prefab is already
-  `Filter.prefab`), and the Filter variant's checkbox-row GO is now
-  `CheckboxTemplate` (an Iter-13 `RowTemplate` naming leftover, fixed in Iter-18).
+- **Iter-14.2 -- code refactor / optimisations. DONE** (see
+  `docs/iteration-history.md`). Five consolidations, build-gated + smoke-tested
+  (R1→R2→R4→R5→R3): `ClickButton` base for the five `ButtonUIElement` click
+  prologues; `FacetedFilterWidget`→`FilterWidget` + `FacetCheckboxButton`→
+  `FilterCheckboxButton` rename (GUID-preserving `git mv` + verified prefab
+  field-key edit); removed the redundant `_scrollable` reflection (the prefab
+  `scrollable` field is the single source — `UIScrollWindow.Awake` copies it
+  itself, confirmed against a main cross-build); `PugText.RenderNoWrap` helper;
+  and `PopupWidget` base sharing the Sort/Filter popup machinery (the one-row
+  offset captured once as the abstract `FirstRowOffset`). Behaviour-neutral; net
+  C# +23 LoC (structural win — single sources of truth — not line count).
 - **Iter-15 (tentative) -- F1 guard misses cutscenes.** *(Loading-screen half DONE
   in Iter-11.6.)* The F1 toggle in `ItemChecklistMod.Update` now blocks opening
   during both load screens via `WorldState.IsInPlayableWorld`, but it does **not**
@@ -63,6 +67,16 @@ remaining backlog.
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
   for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
+- **Iter-19 (tentative) -- search-field word-wrap crash.** Typing in the search
+  field throws `IndexOutOfRangeException` *per frame* via CK's
+  `PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField` (the search
+  field's serialized `maxWidth: 7.5` triggers PugFont's word-wrap path, which
+  index-out-of-bounds on certain text). Pre-existing (empirically reproduced on
+  **main**: 127× same stack with the same input — discovered during Iter-14.2 R5,
+  unrelated to the refactor). Silent to the player (logged exceptions, UI still
+  filters) but log-spammy. Fix candidate: set the field `pugText.maxWidth = 0`
+  (needs checking it doesn't break the field's visual width/clipping) or guard the
+  wrap. Same CK PugFont bug class the Iter-9 ASCII search-hint mitigated.
 - **Iter-18 -- combobox header + skeleton chrome. DONE** (see
   `docs/iteration-history.md`). The header is now one cohesive `Display` field:
   the caret moved inside it (the separate `ToggleButton` GO + its button-bg are
