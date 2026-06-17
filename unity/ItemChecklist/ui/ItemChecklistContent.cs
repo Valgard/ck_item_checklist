@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using PugMod;
 using UnityEngine;
 
@@ -11,13 +10,14 @@ namespace ItemChecklist.UI
     /// scroll position changes, so only the rows visible in the viewport exist
     /// instead of one GameObject per catalog entry (~10720).
     ///
-    /// DefaultExecutionOrder(-100): self-register as UIScrollWindow._scrollable in
-    /// Awake before UIScrollWindow.Awake runs. Defensive only — the prefab also
-    /// wires `scrollable` directly, so UIScrollWindow.Awake sets _scrollable too.
-    /// Load-bearing prerequisite: UIScrollWindow.Awake sets enabled=false
-    /// PERMANENTLY if its serialized `scrollable` field is not an IScrollable, and
-    /// a disabled UIScrollWindow never runs LateUpdate (scroll-recycle silently
-    /// stops). The prefab must keep `scrollable` pointing at this component.
+    /// Load-bearing prerequisite: the window prefab MUST keep UIScrollWindow's
+    /// serialized `scrollable` field pointing at this component. UIScrollWindow.Awake
+    /// copies `scrollable` → its private `_scrollable` (or, if it is not an
+    /// IScrollable, sets enabled=false PERMANENTLY — a disabled UIScrollWindow never
+    /// runs LateUpdate, silently stopping scroll-recycle). That prefab wiring is the
+    /// single source of truth: as of Iter-14.2 the mod no longer reflects into
+    /// `_scrollable` itself. DefaultExecutionOrder(-100) is retained defensively;
+    /// Awake now only caches the UIScrollWindow reference.
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public sealed class ItemChecklistContent : UIelement, IScrollable
@@ -39,9 +39,6 @@ namespace ItemChecklist.UI
         // offsets each row centre by RowHeight/2).
         private float _maskTopLocalY = 1.25f;
 
-        private static readonly MemberInfo MiScrollable =
-            typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
-
         private readonly List<ItemRow> _pool = new List<ItemRow>();
         private GameObject _rowPrefab;
         private UIScrollWindow _scrollWindow;
@@ -60,8 +57,6 @@ namespace ItemChecklist.UI
         private void Awake()
         {
             _scrollWindow = GetComponentInParent<UIScrollWindow>(true);
-            if (_scrollWindow != null && MiScrollable != null)
-                API.Reflection.SetValue(MiScrollable, _scrollWindow, this);
         }
 
         /// <summary>Idempotent: stores the row prefab and derives RowHeight from its

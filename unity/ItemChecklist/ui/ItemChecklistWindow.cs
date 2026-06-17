@@ -42,7 +42,6 @@ namespace ItemChecklist.UI
             Loc.T("ItemChecklist-Sorters/Value"),
         };
 
-        private static readonly MemberInfo MiScrollable = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "_scrollable");
         private static readonly MemberInfo MiUpdateScrollHeight = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "UpdateScrollHeight");
 
         // IModUI implementation
@@ -134,6 +133,17 @@ namespace ItemChecklist.UI
             root.SetActive(false);
         }
 
+        // After SetCount changes the reported height, recompute the scroll range and
+        // snap to top. _scrollable is already wired by the prefab's `scrollable` field
+        // (UIScrollWindow.Awake copies it to its private _scrollable), so no SetValue
+        // is needed here — only UpdateScrollHeight (private → reflection) + ResetScroll.
+        private void RewireScrollHeight()
+        {
+            if (scrollWindow == null) return;
+            API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
+            scrollWindow.ResetScroll();   // SetScrollValue(1f) = top
+        }
+
         private void PopulateContent()
         {
             var content = Content;
@@ -154,14 +164,9 @@ namespace ItemChecklist.UI
             model?.Recompute();
             content.SetCount(model != null ? model.Count : catalog.Count);
 
-            // Wire IScrollable + refresh scroll range, then snap to top. Uses
-            // API.Reflection (sandbox-safe), NOT System.Reflection on MemberInfo.Name.
-            if (scrollWindow != null)
-            {
-                API.Reflection.SetValue(MiScrollable, scrollWindow, content);
-                API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
-                scrollWindow.ResetScroll();   // SetScrollValue(1f) = top
-            }
+            // Refresh the scroll range, then snap to top. The IScrollable wiring
+            // lives in the prefab's `scrollable` field (see ItemChecklistContent).
+            RewireScrollHeight();
             // Forced rebind so states changed while hidden are reflected even
             // though firstIndex is again 0 after ResetScroll.
             content.RefreshVisible();
@@ -257,12 +262,7 @@ namespace ItemChecklist.UI
             if (content == null) return;
             var model = ItemChecklistMod.ListView;
             content.SetCount(model != null ? model.Count : 0);
-            if (scrollWindow != null)
-            {
-                API.Reflection.SetValue(MiScrollable, scrollWindow, content);
-                API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
-                scrollWindow.ResetScroll();
-            }
+            RewireScrollHeight();
             content.RefreshVisible();
         }
 
