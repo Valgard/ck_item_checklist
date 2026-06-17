@@ -442,7 +442,7 @@ MonoBehaviour:
   scrollWindow: {fileID: 5912629001924931601}
   ascDescToggle: {fileID: 9085077042019157227}
   sortDropdown: {fileID: 8077457188646232969}
-  facetedFilter: {fileID: 3768803542550533302}
+  filter: {fileID: 3768803542550533302}
   searchBar: {fileID: 2236291967643978371}
   clearSearchButton: {fileID: 9066652551706046526}
 --- !u!1 &1000000000000000002

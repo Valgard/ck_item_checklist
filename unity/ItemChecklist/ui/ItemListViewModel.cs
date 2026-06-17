@@ -24,7 +24,7 @@ namespace ItemChecklist.UI
         private static SortMode s_mode = SortMode.Name;
         private static bool s_ascending = true;
 
-        // Faceted filter dimensions (Iter-10). OR within a set, AND across sets.
+        // Filter dimensions (Iter-10). OR within a set, AND across sets.
         // Empty set = no constraint. Static: survive reopen + re-bake, reset on
         // process restart (mirrors the sort state).
         private static readonly HashSet<bool> s_discovery = new HashSet<bool>();      // true=discovered

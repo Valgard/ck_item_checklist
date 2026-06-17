@@ -2,12 +2,12 @@ using UnityEngine;
 
 namespace ItemChecklist.UI
 {
-    /// <summary>One checkbox option row in the faceted filter popup. Carries an
-    /// opaque member id (assigned by FacetedFilterWidget) and reports clicks back
+    /// <summary>One checkbox option row in the filter popup. Carries an
+    /// opaque member id (assigned by FilterWidget) and reports clicks back
     /// to the owning widget, which flips the corresponding model dimension.</summary>
-    public sealed class FacetCheckboxButton : ClickButton
+    public sealed class FilterCheckboxButton : ClickButton
     {
-        public FacetedFilterWidget owner;
+        public FilterWidget owner;
         public int memberId;          // index into the widget's flat member table
         public SpriteRenderer checkMark;   // ui_icon_requirement (shown when checked)
 

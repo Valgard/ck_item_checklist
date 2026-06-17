@@ -12,20 +12,20 @@ namespace ItemChecklist.UI
     /// no checkbox). OR within a section, AND across sections — the semantics live
     /// in ItemListViewModel; this widget only renders state and reports clicks.
     /// Reuses the Iter-5 clickable-control pattern (SpriteRenderer + 3D
-    /// BoxCollider + ButtonUIElement) via FacetCheckboxButton.
+    /// BoxCollider + ButtonUIElement) via FilterCheckboxButton.
     ///
     /// A member with an **empty section** string is an ACTION row (e.g.
     /// "Clear all"): drawn from <see cref="actionTemplate"/>, no checkbox state —
     /// its <c>toggle()</c> just runs the action.
     /// </summary>
-    public sealed class FacetedFilterWidget : UIelement, IPopupToggle
+    public sealed class FilterWidget : UIelement, IPopupToggle
     {
         // Editor-wired serialized fields.
         public PugText headerLabel;            // "Filter" / "Filter (N)"
         public SpriteRenderer caret;
         public GameObject popupPanel;          // toggled container
         public Transform rowContainer;         // parent for cloned rows + headers
-        public GameObject checkboxTemplate;    // one FacetCheckboxButton checkbox row (inactive)
+        public GameObject checkboxTemplate;    // one FilterCheckboxButton checkbox row (inactive)
         public GameObject headerTemplate;      // one section-header PugText row (inactive)
         public GameObject actionTemplate;      // one action row: glyph + label, no checkbox (inactive)
         public Sprite caretClosed;
@@ -47,8 +47,8 @@ namespace ItemChecklist.UI
         private static bool IsAction(Member m) => string.IsNullOrEmpty(m.section);
 
         private readonly List<Member> _members = new List<Member>();
-        private readonly List<FacetCheckboxButton> _rowPool = new List<FacetCheckboxButton>();      // checkbox (filter) rows
-        private readonly List<FacetCheckboxButton> _actionPool = new List<FacetCheckboxButton>();   // action rows
+        private readonly List<FilterCheckboxButton> _rowPool = new List<FilterCheckboxButton>();      // checkbox (filter) rows
+        private readonly List<FilterCheckboxButton> _actionPool = new List<FilterCheckboxButton>();   // action rows
         private readonly List<PugText> _headerPool = new List<PugText>();
         private Action _onAnyChange;   // refresh header count after a toggle
         private Action _clearAll;
@@ -102,13 +102,13 @@ namespace ItemChecklist.UI
                 }
         }
 
-        private void GrowButtonPool(List<FacetCheckboxButton> pool, GameObject template, int target)
+        private void GrowButtonPool(List<FilterCheckboxButton> pool, GameObject template, int target)
         {
             if (template == null) return;
             for (int i = pool.Count; i < target; i++)
             {
                 var go = UnityEngine.Object.Instantiate(template, rowContainer);
-                var btn = go.GetComponent<FacetCheckboxButton>();
+                var btn = go.GetComponent<FilterCheckboxButton>();
                 if (btn == null) { UnityEngine.Object.Destroy(go); continue; }
                 btn.owner = this;
                 pool.Add(btn);
@@ -150,7 +150,7 @@ namespace ItemChecklist.UI
                     }
                 }
 
-                FacetCheckboxButton btn;
+                FilterCheckboxButton btn;
                 if (action)
                 {
                     if (actionIdx >= _actionPool.Count) continue;

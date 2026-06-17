@@ -114,7 +114,7 @@ namespace ItemChecklist
                 //  - the HUD counter is non-modal, captured for our own lazy
                 //    instantiation in Update;
                 //  - everything else is a reusable building-block prefab
-                //    (Dropdown.prefab and its Sort/FacetedFilter variants), nested
+                //    (Dropdown.prefab and its Sort/Filter variants), nested
                 //    into the window and never opened on its own — it must NOT be
                 //    registered as a modal UI.
                 if (go.name == "ItemChecklistWindow")

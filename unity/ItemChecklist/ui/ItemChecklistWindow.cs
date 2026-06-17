@@ -17,7 +17,7 @@ namespace ItemChecklist.UI
         public UIScrollWindow scrollWindow;
         public AscDescToggle ascDescToggle;
         public DropdownWidget sortDropdown;
-        public FacetedFilterWidget facetedFilter;
+        public FilterWidget filter;
         public SearchBar searchBar;
         public ClearSearchButton clearSearchButton;   // declared here; wired to its SearchBar in the window prefab (later task)
 
@@ -89,12 +89,12 @@ namespace ItemChecklist.UI
                 ascDescToggle.Configure(model.Ascending, asc => { model.Ascending = asc; });
             if (sortDropdown != null)
                 sortDropdown.Configure(SortLabels, (int)model.Mode, i => { model.Mode = (SortMode)i; });
-            if (facetedFilter != null)
+            if (filter != null)
             {
                 var members = new System.Collections.Generic.List<(string, string, System.Func<bool>, System.Action)>
                 {
                     // Clear-all pseudo-row (empty section → no header rendered).
-                    ("", Loc.T("ItemChecklist-Filters/ClearAll"), () => false, () => facetedFilter.ClearAll()),
+                    ("", Loc.T("ItemChecklist-Filters/ClearAll"), () => false, () => filter.ClearAll()),
 
                     (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Discovered"),   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
                     (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Undiscovered"), () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
@@ -106,7 +106,7 @@ namespace ItemChecklist.UI
                 members.Add((Loc.T("ItemChecklist-Filters/SecCraftable"), Loc.T("ItemChecklist-Filters/Craftable"),     () => model.CraftSelected(true),  () => model.ToggleCraft(true)));
                 members.Add((Loc.T("ItemChecklist-Filters/SecCraftable"), Loc.T("ItemChecklist-Filters/NotCraftable"), () => model.CraftSelected(false), () => model.ToggleCraft(false)));
 
-                facetedFilter.Configure(members, () => model.ActiveFilterCount, () => model.ClearAllFilters());
+                filter.Configure(members, () => model.ActiveFilterCount, () => model.ClearAllFilters());
             }
             if (searchBar != null)
             {
