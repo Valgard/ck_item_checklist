@@ -114,7 +114,7 @@ Iter-3.5b lessons: `docs/gotchas.md § SpriteMask Clipping`.
 
 ## Iter-Roadmap (live)
 
-As of 2026-06-17: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, and Iter-14.2 are DONE on main. Full per-iteration narrative:
+As of 2026-06-18: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, and Iter-15 are DONE on main. Full per-iteration narrative:
 
 @docs/iteration-history.md
 

@@ -4,8 +4,8 @@ Full per-iteration narrative of ItemChecklist's development (Iter-3.5 through
 Iter-14.1), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
-As of 2026-06-17: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, and Iter-14.2 are DONE on main. Iter-3.8
+As of 2026-06-18: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, and Iter-15 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -453,3 +453,24 @@ stack), so iter-14-2 neither caused nor worsened it. Net C# **+23 LoC** — thre
 (single sources of truth), not raw line count. (Process note: Unity overwrites
 `Player.log` per launch, rotating the prior session to `Player-prev.log` — so each
 grep is single-session.)
+
+**Iter-15 (F1/HUD over the intro cutscene) — DONE (2026-06-18, branch
+`iter-15`).** Closed the cutscene half of the Iter-4/Iter-11.6 toggle-guard work.
+The F1 open-guard already blocked both world-load screens (Iter-11.6 via
+`WorldState.IsInPlayableWorld`) but not the in-game spawn-from-Core intro
+cutscene; F1 could still pop the checklist over it. A latent instance of the same
+bug sat on the always-on HUD: the intro cutscene fades CK's HUD via
+`Manager.ui.FadeOutAllGameplayUI()` (which only fades CK's *own* registered
+gameplay UI), **not** `Manager.camera.ShowHUD(false)` (which would cull our
+layer-27 HUD for free), so the ItemChecklist HUD stayed visible during the
+cutscene. Fix = one term, `&& !sceneHandler.cutsceneIsPlaying`, appended to the
+shared `WorldState.IsInPlayableWorld`; because both the F1 guard and the HUD
+already gate on that predicate, the single edit fixed both. `cutsceneIsPlaying`
+(public `bool` on `SceneHandler`, delegating to `optionalCutsceneHandler.isPlaying`,
+false when no handler) is the canonical signal — CK itself gates a discovery path
+on it (Pug.Other ~301674) with the same companions this predicate uses. Rejected
+the broader `SendClientInputSystem.PlayerInputBlocked()` (overlaps the menu/
+inventory checks the guard already does + per-frame UI-input logic). Sandbox-safe
+by precedent (property access on the already-used `Manager.sceneHandler`),
+confirmed by a clean Phase-1 compile (zero `CompileFailed`). Pure behavioural
+one-liner + docstring/comment hygiene; no prefab/art touch.

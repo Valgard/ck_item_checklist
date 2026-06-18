@@ -49,12 +49,15 @@ remaining backlog.
   and `PopupWidget` base sharing the Sort/Filter popup machinery (the one-row
   offset captured once as the abstract `FirstRowOffset`). Behaviour-neutral; net
   C# +23 LoC (structural win — single sources of truth — not line count).
-- **Iter-15 (tentative) -- F1 guard misses cutscenes.** *(Loading-screen half DONE
-  in Iter-11.6.)* The F1 toggle in `ItemChecklistMod.Update` now blocks opening
-  during both load screens via `WorldState.IsInPlayableWorld`, but it does **not**
-  yet block during in-game **cutscenes/intro**, so F1 can still pop the checklist
-  over those. Remaining fix = a cutscene / input-locked flag (needs ILSpy + sandbox
-  verification). Bugfix follow-up to Iter-4's toggle guard.
+- **Iter-15 -- F1/HUD over the intro cutscene. DONE** (see
+  `docs/iteration-history.md`). Appended `!sceneHandler.cutsceneIsPlaying` to the
+  shared `WorldState.IsInPlayableWorld`, suppressing **both** the F1 open-guard
+  and the always-on HUD during the spawn-from-Core intro cutscene. One-line
+  behavioural change — both consumers already gate on the shared predicate (the
+  Iter-11.6 structure). The cutscene fades CK's own HUD via
+  `FadeOutAllGameplayUI()` (not `ShowHUD(false)`), which does not cull our
+  layer-27 HUD, hence the explicit gate. `cutsceneIsPlaying` is CK's own
+  discovery-path signal; sandbox-safe.
 - **Iter-16 (tentative) -- pet/creature discovery.** The bake blanket-excludes
   `ObjectType.Creature`/`Critter`, so tamed pets/critters never get a row -- same
   bug class as the Iter-7.1 NonUsable fix. IB keeps anything with `PetCD`
