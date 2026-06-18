@@ -411,7 +411,9 @@ PugText word-wrap). Done in `Awake`, not `LateUpdate`, so it holds before the fi
 render — covers `SyncFrom` restoring a long prior search on open. Nothing rewrites
 `pugText.maxWidth` per frame, so one write persists. Same CK PugFont bug class the
 Iter-9 ASCII search-hint and the Iter-11 `RenderNoWrap` (`maxWidth = 0`) labels
-sidestepped — `TextInputField` is the one place the value is reimposed.
+sidestepped — `TextInputField` is the one place the value is reimposed. See the
+canonical root-cause writeup in `§ PugFont.Render crashes on labels exceeding
+maxWidth` (under Localisation (Iter-11)).
 
 
 ## Catalog / Bake (Iter-10)
@@ -616,9 +618,11 @@ home of `maxWidth = 0f`. The order is load-bearing: `maxWidth = 0` MUST precede
 effect. Route every single-line label through `RenderNoWrap`.
 
 This is the same crash class as the thinTiny ellipsis (U+2026) note in
-`§ Item Rows & Header (Iter-9)` — the throw site is identical; the triggers
-differ (ellipsis glyph vs. line-length overflow). Both are fixed by keeping
-single-line labels away from the `AddNewLinesToLinesExceedingMaxWidth` code path.
+`§ Item Rows & Header (Iter-9)` and the `TextInputField` word-wrap note in
+`§ Search Field / Header (Iter-8)` (Iter-19) — the throw site is identical; the
+triggers differ (ellipsis glyph vs. line-length overflow vs. `TextInputField.Awake`
+forcing `pugText.maxWidth`). All three are fixed by keeping single-line text away
+from the `AddNewLinesToLinesExceedingMaxWidth` code path.
 
 **Also:** never use U+2026 (ellipsis `…`) or U+2014 (em-dash `—`) in term
 values — the `LocalizationGenerator` validates term strings and **fails the

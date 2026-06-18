@@ -102,6 +102,14 @@ install path as main (the running game loads from there), and `build.sh` re-runs
 `link.sh` so the SDK symlinks re-point at this worktree. Note the **three** `..`
 levels to `utils/build.sh`.
 
+If you must build from a **bare shell without `direnv`** (e.g. an automated/tool
+shell), reproduce the `source_up` chain by hand by sourcing the parent
+`core_keeper/.envrc` **by absolute path first**, then the worktree `.envrc` (whose
+`$PWD`-relative `MOD_*` exports then resolve to the worktree): `source
+/abs/path/core_keeper/.envrc && source ./.envrc && ../../../utils/build.sh`. The
+worktree `.envrc`'s own `source ../.envrc` fallback does **not** work here — from
+`.worktrees/<branch>` it resolves to the nonexistent `.worktrees/.envrc`.
+
 **superpowers specs → `docs/specs/` (tracked); plans → `docs/superpowers/plans/`
 (gitignored). Author both in the MAIN checkout, not the worktree.** Per the global
 policy the per-iter **spec** is written to `docs/specs/YYYY-MM-DD-<slug>-design.md`
@@ -157,6 +165,21 @@ relaunch CK before the log has been grepped (especially when the assistant reads
 out-of-band). Either leave the game closed until the log is read, or snapshot it
 immediately (`cp Player.log Player.<tag>.log` — the bottle already uses
 `.pre-iterNN-task-test` snapshots).
+
+**Verify WHICH build served the test (fake-ID dev vs. published mod.io).** This
+machine usually has BOTH the fake-ID dev install *and* the published mod.io listing
+subscribed (e.g. ItemChecklist: dev `9999997` + published `6112539`). Before
+trusting a smoke-test result — especially a *negative* one ("0 crashes",
+"bug gone") — confirm the **dev build with your fix actually compiled and ran**, not
+the published copy without it. In `Player.log`: there is exactly one
+`Loading mod with ID <FAKE_ID>` line and one `Successfully compiled <Mod>` line for
+the build that activated; the published listing appears only in the subscription
+enumeration (`loaded mod <Mod> from mod.io (<DisplayName>)`) and is **not** activated
+with an ID. Had the unfixed published copy served the feature, the old symptom would
+re-appear — making a "0 hits" grep meaningless. (Mirrors the global
+`mod-install-topology-from-log` memory: read runtime state from the log, not from
+`.envrc`.) A clean Editor build proves only *compile + install landing*; a
+runtime-only fix is validated only by the in-game smoke test on the correct build.
 
 ### Throwaway test-scaffold pattern
 
@@ -313,6 +336,17 @@ component is missing: both `DropdownWidget.EnsurePool` and
 `FilterWidget.GrowButtonPool` `Debug.LogError` when their template lacks its
 expected button. Silent wiring gaps are the hardest bug class here (they survive
 a clean Editor compile and a successful build) — surface them in the log.
+
+**Subclassing a CK component — `private new void Awake()` + explicit `base.Awake()`.**
+CK component lifecycle methods (`Awake`, …) are **non-virtual** (`protected void
+Awake()`), so a subclass cannot `override` them — hide with `private new void
+Awake()` and call `base.Awake()` explicitly (Unity dispatches the message once, to
+the most-derived method, so the base body runs only if you call it). Use this when
+a subclass must adjust state the base `Awake` sets: `SearchBar` (Iter-19) overrides
+`TextInputField.Awake` to reset `pugText.maxWidth = 0f` *after* `base.Awake()` wrote
+the value that triggers CK's word-wrap crash (see `docs/gotchas.md § Search Field /
+Header`). `Awake` is the right hook (not `LateUpdate`) when the correction must hold
+before the first render and nothing rewrites the value per frame.
 
 ## Prefab Authoring Conventions
 
