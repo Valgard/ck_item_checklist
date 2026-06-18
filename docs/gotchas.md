@@ -388,6 +388,31 @@ checks, the **BoxCollider gizmos** are reliable (that *is* what CK's 3D raycast
 sees). SpriteRenderer pieces (backgrounds, glyphs) *do* render in the Editor
 once their material + sorting layer are correct (see the two traps above).
 
+### `TextInputField` forces its PugText into CK's buggy word-wrap (Iter-19)
+
+Typing in the search field threw `IndexOutOfRangeException` **every frame** via
+`PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField`. A pre-existing CK
+bug — empirically reproduced on stock and on **main** (127× same stack with the
+same input); silent to the player (the UI still filters) but log-spammy.
+
+Root cause (Pug.Other decompile): `TextInputField.Awake` sets
+`pugText.maxWidth = maxWidth + (dontAllowNewLines ? 1 : 0)` — for the search field
+`7.5 + 1 = 8.5`. Any `pugText.Render()` with `maxWidth > 0` then runs the word-wrap
+path, whose `text[num3 - 1]` indexes out of range on certain input. The roadmap's
+"set the prefab `pugText.maxWidth = 0`" candidate is a **no-op**: `Awake`
+overwrites the prefab value at runtime — the fix must come from code.
+
+A single-line field (`dontAllowNewLines: 1`) must never word-wrap, so `SearchBar`
+overrides `Awake` (`private new void Awake()`, calls `base.Awake()`, then
+`pugText.maxWidth = 0f`). **Visual width is unaffected**: the field's *own*
+`maxWidth` (7.5) still clips overflowing characters via
+`TextInputField.TrimTextToFitRestrictions` (a char-trim loop, independent of the
+PugText word-wrap). Done in `Awake`, not `LateUpdate`, so it holds before the first
+render — covers `SyncFrom` restoring a long prior search on open. Nothing rewrites
+`pugText.maxWidth` per frame, so one write persists. Same CK PugFont bug class the
+Iter-9 ASCII search-hint and the Iter-11 `RenderNoWrap` (`maxWidth = 0`) labels
+sidestepped — `TextInputField` is the one place the value is reimposed.
+
 
 ## Catalog / Bake (Iter-10)
 

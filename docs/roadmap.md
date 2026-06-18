@@ -71,16 +71,18 @@ remaining backlog.
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
   for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
-- **Iter-19 (tentative) -- search-field word-wrap crash.** Typing in the search
-  field throws `IndexOutOfRangeException` *per frame* via CK's
-  `PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField` (the search
-  field's serialized `maxWidth: 7.5` triggers PugFont's word-wrap path, which
-  index-out-of-bounds on certain text). Pre-existing (empirically reproduced on
-  **main**: 127× same stack with the same input — discovered during Iter-14.2 R5,
-  unrelated to the refactor). Silent to the player (logged exceptions, UI still
-  filters) but log-spammy. Fix candidate: set the field `pugText.maxWidth = 0`
-  (needs checking it doesn't break the field's visual width/clipping) or guard the
-  wrap. Same CK PugFont bug class the Iter-9 ASCII search-hint mitigated.
+- **Iter-19 -- search-field word-wrap crash. DONE** (see
+  `docs/iteration-history.md`). `SearchBar` overrides `Awake` to force
+  `pugText.maxWidth = 0` after `base.Awake()`, removing the search field's PugText
+  from CK's buggy `PugFont.AddNewLinesToLinesExceedingMaxWidth` word-wrap path
+  (per-frame `IndexOutOfRangeException`, 127× on main → 0). **Corrected the
+  roadmap's own fix candidate:** the prefab `pugText.maxWidth = 0` is a no-op —
+  CK's `TextInputField.Awake` rewrites it to `maxWidth + 1 = 8.5` at runtime, so
+  the fix had to come from code. Visual width clipping is preserved via the field's
+  own `maxWidth` (7.5) through `TrimTextToFitRestrictions` (a char-trim, independent
+  of the word-wrap). Pure behavioural C# (one `Awake` override); no prefab/art
+  touch. Same CK PugFont bug class the Iter-9 ASCII hint + Iter-11 `RenderNoWrap`
+  labels sidestepped.
 - **Iter-18 -- combobox header + skeleton chrome. DONE** (see
   `docs/iteration-history.md`). The header is now one cohesive `Display` field:
   the caret moved inside it (the separate `ToggleButton` GO + its button-bg are

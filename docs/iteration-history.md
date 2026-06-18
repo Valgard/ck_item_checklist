@@ -5,7 +5,7 @@ Iter-15), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
 As of 2026-06-18: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, and Iter-15 are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, and Iter-19 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -474,3 +474,31 @@ inventory checks the guard already does + per-frame UI-input logic). Sandbox-saf
 by precedent (property access on the already-used `Manager.sceneHandler`),
 confirmed by a clean Phase-1 compile (zero `CompileFailed`). Pure behavioural
 one-liner + docstring/comment hygiene; no prefab/art touch.
+
+**Iter-19 (search-field word-wrap crash) — DONE (2026-06-18, branch `iter-19`).**
+Killed the per-frame `IndexOutOfRangeException` thrown while typing in the search
+field via CK's `PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField` — a
+pre-existing CK bug logged out of scope during Iter-14.2 R5 (reproduced on **main**
+too, 127× same stack with the same input; silent to the player but log-spammy).
+Root cause (Pug.Other decompile): `TextInputField.Awake` sets
+`pugText.maxWidth = maxWidth + (dontAllowNewLines ? 1 : 0)` — for this field
+`7.5 + 1 = 8.5` — so every `pugText.Render()` runs the word-wrap path, whose
+`text[num3 - 1]` indexes out of range on certain input. A single-line field
+(`dontAllowNewLines: 1`) must never word-wrap. Fix = `SearchBar` overrides `Awake`
+(`private new void Awake()` — CK's `Awake` is non-virtual; calls `base.Awake()`
+then `pugText.maxWidth = 0f`). **Corrected the roadmap's own fix candidate:** the
+prefab `pugText.maxWidth = 0` is a no-op because `Awake` rewrites it at runtime, so
+the fix had to come from code. **Visual width is preserved**: the field's *own*
+`maxWidth` (7.5) still clips overflowing characters via
+`TextInputField.TrimTextToFitRestrictions` (a char-trim loop, independent of the
+PugText word-wrap) — the two `maxWidth` roles are decoupled. Done in `Awake` (not
+`LateUpdate`, which runs *after* the same-frame render) so it holds before the
+first render — covers `SyncFrom` restoring a long prior search on open; nothing
+rewrites `pugText.maxWidth` per frame, so one write persists. Same CK PugFont bug
+class the Iter-9 ASCII search-hint and the Iter-11 `RenderNoWrap` (`maxWidth = 0`)
+labels sidestepped — `TextInputField` is the one place the value is reimposed.
+Pure behavioural C# (one `Awake` override); no prefab/art touch. Verified in-game
+(1.2.1.4, fake-ID dev build 9999997): clean sandbox compile (passed code security
+verification, `safetyCheck=True`, zero `CompileFailed`), and typing a long string
+produced **0** `IndexOutOfRangeException` (127× on main with the same input). See
+`docs/gotchas.md § Search Field / Header` for the mechanism.
