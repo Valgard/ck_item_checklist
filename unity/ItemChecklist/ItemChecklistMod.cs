@@ -195,8 +195,9 @@ namespace ItemChecklist
                 // inventory/crafting UI, a focused text field, or chat is active —
                 // don't open over it. isPlayerInventoryShowing closes the gap:
                 // IsAnyMenuActive() covers only the menu system, never the
-                // inventory/crafting UI. (Cutscenes/intro need a separate
-                // input-locked signal and remain out of scope — roadmap Iter-15.)
+                // inventory/crafting UI. (The intro spawn-from-Core cutscene is
+                // gated inside WorldState.IsInPlayableWorld via cutsceneIsPlaying
+                // — Iter-15.)
                 else if (!WorldState.IsInPlayableWorld
                     || Manager.menu.IsAnyMenuActive()
                     || Manager.ui.isPlayerInventoryShowing

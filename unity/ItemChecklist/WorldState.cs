@@ -25,9 +25,16 @@ namespace ItemChecklist
     /// where the queue is already cleared but the scene is not yet fully set up.</para>
     ///
     /// <para>Used by both the always-on HUD (<see cref="UI.ItemChecklistHud"/>)
-    /// and the F1 open-guard (<see cref="ItemChecklistMod"/>). Cutscenes/intro
-    /// are a separate input-locked signal and remain out of scope (roadmap
-    /// Iter-15).</para>
+    /// and the F1 open-guard (<see cref="ItemChecklistMod"/>). Iter-15 added the
+    /// <c>!sceneHandler.cutsceneIsPlaying</c> term so neither shows during the
+    /// spawn-from-Core intro cutscene: <c>SceneHandler.cutsceneIsPlaying</c>
+    /// delegates to <c>optionalCutsceneHandler.isPlaying</c> (false when no
+    /// cutscene handler exists), set true in <c>CutsceneHandler.StartPlaying</c>
+    /// and cleared on completion/skip. CK itself gates a discovery path on the
+    /// same signal (Pug.Other ~301674), flanked by the same companions this
+    /// predicate uses. The intro cutscene fades CK's own HUD via
+    /// <c>FadeOutAllGameplayUI()</c> (not <c>ShowHUD(false)</c>), which does not
+    /// cull our layer-27 HUD — hence the explicit gate.</para>
     /// </summary>
     internal static class WorldState
     {
@@ -39,6 +46,7 @@ namespace ItemChecklist
                 return sceneHandler != null
                     && sceneHandler.isInGame
                     && sceneHandler.isSceneHandlerReady       // scene fully set up (false during load)
+                    && !sceneHandler.cutsceneIsPlaying        // intro spawn-from-Core cutscene (input-locked) — Iter-15
                     && Manager.main != null
                     && Manager.main.player != null            // sanity / NRE guard (NOT a load-screen signal)
                     && Manager.load != null
