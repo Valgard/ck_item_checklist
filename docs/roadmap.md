@@ -12,8 +12,9 @@ remaining backlog.
   discovery counter (non-modal `UIelement`; HUD-layer + explicit visibility).
 - **Iter-11.6 — DONE** (see `docs/iteration-history.md`). Load-screen visibility fix:
   shared `WorldState.IsInPlayableWorld` (`isInGame && isSceneHandlerReady &&
-  !Manager.load.IsLoading()`) replaces the unreliable `player != null` gate on both
-  the HUD and the F1 open-guard. Closes the **loading-screen** half of Iter-15 below.
+  !Manager.load.IsLoading()`; Iter-15 later appends `!cutsceneIsPlaying`) replaces the
+  unreliable `player != null` gate on both the HUD and the F1 open-guard. Closes the
+  **loading-screen** half of Iter-15 below.
 - **Iter-12 -- real pixel-art sprites. DONE** (see `docs/iteration-history.md`).
   Replaced every Item Browser placeholder sprite with own pixel-art authored in
   Pixaki, generated into a single `ui_checklist` sheet; rewired all prefab refs

@@ -644,6 +644,15 @@ reasons (a clean Editor build hides both):
 Bonus: being on the HUD layer means `CameraManager.ShowHUD(false)` culls the
 element together with the rest of the gameplay HUD, for free.
 
+**Caveat (Iter-15) — this "for free" only covers the `ShowHUD` path.** The
+spawn-from-Core **intro cutscene** does NOT call `ShowHUD(false)`; it calls
+`Manager.ui.FadeOutAllGameplayUI()` (`CutsceneHandler.StartPlaying`, `Pug.Other`
+~364007), which fades only CK's *own* registered gameplay UI, not arbitrary
+layer-27 renderers. So a mod's layer-27 HUD stays visible during the intro cutscene
+and must be gated explicitly — Iter-15 added `!sceneHandler.cutsceneIsPlaying` to
+`WorldState.IsInPlayableWorld` (see the `SceneHandler.cutsceneIsPlaying` row in
+`CLAUDE.md § CK Decompile References`).
+
 ### `CalcGameplayUITargetScaleMultiplier()` returns (0,0,0) for a mod HUD
 CK's own HUD elements set
 `localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier()` each frame, but for
@@ -664,7 +673,8 @@ flashed on the entry load screen and lingered on the exit fade to the main menu.
 
 The fix (`WorldState.IsInPlayableWorld`) mirrors CK's own gameplay-active gate
 (`PlayerController.PlayerInputBlocked`, decompile `Pug.Other` ~line 130335):
-`Manager.sceneHandler.isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`.
+`Manager.sceneHandler.isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`
+(Iter-15 also appends `!cutsceneIsPlaying`).
 Two non-obvious choices:
 - **`!Manager.load.IsLoading()`** (`loadingQueue != null`), **not** CK's own
   `IsLoadingAndScreenBlack()`. The latter is only true while the screen is *fully
@@ -676,8 +686,10 @@ Two non-obvious choices:
 
 Both signals are the same API category as the already-used `Manager.ui.*` /
 `Manager.menu.*` (not `Manager.saves`, not `System.IO`) → sandbox-safe (confirmed
-in-game: full `Init`/bake lifecycle ran, zero `CompileFailed`). Cutscenes/intro need
-a separate input-locked signal and remain out of scope (roadmap Iter-15).
+in-game: full `Init`/bake lifecycle ran, zero `CompileFailed`). Cutscenes/intro were
+later closed by Iter-15 (the `!sceneHandler.cutsceneIsPlaying` term added to
+`WorldState.IsInPlayableWorld` — see the caveat above and the
+`SceneHandler.cutsceneIsPlaying` decompile row in `CLAUDE.md`).
 
 ### Diagnosing "active but invisible" CK UI — log `isVisible` + `z` + `layer`
 When a UI element is active, on-screen and full-alpha but nothing shows, log

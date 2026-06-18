@@ -83,14 +83,38 @@ since Iter-12 the pixel-art sheet under `Art/UI/` is **tracked**, so
 `git worktree add` checks it out automatically (the old gitignored `Art/Bridge/`
 placeholder sprites were deleted in Iter-12).
 
-**superpowers specs/plans live only in the worktree.** The
-`superpowers:brainstorming` / `writing-plans` skills default their spec and
-plan output to `docs/superpowers/`, which is **gitignored** in this repo (to
-avoid colliding with that default location). Because the worktree's
-`docs/superpowers/` is not tracked, the per-iter spec and plan must be copied
-back to the main checkout **before** `git worktree remove` destroys the
-worktree — otherwise they are lost. Treat copying `docs/superpowers/specs/`
-and `docs/superpowers/plans/` to main as part of worktree teardown.
+**Building from a worktree — use `direnv exec`, not the `.envrc` manual fallback.**
+`build.sh` requires the env vars (`UNITY_BIN`, `SDK_PATH`, `MOD_INSTALL_PATH`, …),
+but the manual `source .envrc && ../utils/build.sh` fallback documented in `.envrc`
+is **broken inside a worktree**: its `source ../.envrc` resolves to
+`.worktrees/.envrc`, which does not exist (the parent `core_keeper/.envrc` is three
+levels up, not one). Robust invocation from the worktree:
+
+```bash
+cd .worktrees/<branch>
+direnv allow .
+direnv exec . bash -c '../../../utils/build.sh 2>&1 | tee "${MOD_INSTALL_PATH%/}/build.log" | tail -45'
+```
+
+`direnv exec` walks the real `source_up` chain (worktree → mod → parent
+`core_keeper/.envrc`); `MOD_INSTALL_PATH` resolves to the *same* shared ModLoader
+install path as main (the running game loads from there), and `build.sh` re-runs
+`link.sh` so the SDK symlinks re-point at this worktree. Note the **three** `..`
+levels to `utils/build.sh`.
+
+**superpowers specs → `docs/specs/` (tracked); plans → `docs/superpowers/plans/`
+(gitignored). Author both in the MAIN checkout, not the worktree.** Per the global
+policy the per-iter **spec** is written to `docs/specs/YYYY-MM-DD-<slug>-design.md`
+— a **tracked** location, and a `PostToolUse` hook enforces it (it rejects specs
+written to `docs/superpowers/specs/` and tells you to move them). The **plan** stays
+under `docs/superpowers/plans/`, which is **gitignored** scratch. Author and edit
+both in the **main checkout**: `git worktree add` only checks out *tracked* files,
+so anything written to the worktree's gitignored `docs/superpowers/` is lost on
+`git worktree remove` (the tracked `docs/specs/` spec would survive, but keep
+authoring in main for consistency). **Spec retention is ADR-gated** — commit the
+`docs/specs/` spec only when the change warrants an ADR; for a routine fix/iter,
+discard it after the ff-merge (do not leave it as an untracked file under the
+tracked `docs/specs/`).
 
 **Before destroying a worktree:**
 
@@ -125,6 +149,14 @@ structure (established in Iter-3.6/3.7):
 
 **Failure budget:** 3 sandbox-compile attempts (Phase 1) before escalating to
 a fresh batchmode build from a clean state. 1-strike for Phase 2 and later.
+
+**Player.log snapshot discipline.** `Player.log` is per-launch — each CK start
+overwrites it and rotates the prior session to `Player-prev.log`, so **two** extra
+launches drop the test session out of both. After an in-game smoke test, do NOT
+relaunch CK before the log has been grepped (especially when the assistant reads it
+out-of-band). Either leave the game closed until the log is read, or snapshot it
+immediately (`cp Player.log Player.<tag>.log` — the bottle already uses
+`.pre-iterNN-task-test` snapshots).
 
 ### Throwaway test-scaffold pattern
 
@@ -227,6 +259,8 @@ unity/ItemChecklist/
     CLIBuildHelper.cs             -> core_keeper/utils/ (shared symlink, gitignored)
     CLIPublishHelper.cs           -> core_keeper/utils/ (shared symlink, gitignored)
     LocalizationGenerator.cs      -> core_keeper/utils/ (shared symlink, gitignored)
+    ItemChecklist_modio.asset     mod.io modId carrier (real ID 6112539) — read by CLIPublishHelper
+    logo.png                      mod.io listing logo (uploaded on publish)
     SDK_SETUP.md                  SDK setup boilerplate (in-tree doc)
 ```
 

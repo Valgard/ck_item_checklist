@@ -1,7 +1,7 @@
 # ItemChecklist — Iteration History
 
 Full per-iteration narrative of ItemChecklist's development (Iter-3.5 through
-Iter-14.1), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
+Iter-15), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
 As of 2026-06-18: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the

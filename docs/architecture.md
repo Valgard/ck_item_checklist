@@ -1062,7 +1062,8 @@ instead toggles `hudRoot` active by explicit signals (`ItemChecklistHud.cs:56`):
 !Manager.menu.IsAnyMenuActive()`. `isAnyInventoryShowing` (the CoreLib-patched
 aggregate) covers the player inventory, crafting, **and** the checklist window.
 The leading gate is the shared `WorldState.IsInPlayableWorld` predicate
-(`isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`), which Iter-11.6
+(`isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`; Iter-15 also
+appends `!cutsceneIsPlaying` to suppress the intro cutscene), which Iter-11.6
 substituted for the original `Manager.main.player != null` term: contrary to the
 earlier assumption, `player != null` does **not** suppress the world-load screen
 (the player object is instantiated at `PlayerController.OnOccupied` *while the

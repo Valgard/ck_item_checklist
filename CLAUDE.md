@@ -62,6 +62,7 @@ DLLs are in CK's installation: `…/Core Keeper/CoreKeeper_Data/Managed/`.
 | `UIManager.GetSlotBorderRarityColor` / `ObjectInfo.rarity` / `enum Rarity` | `Pug.Other.dll` / `Pug.Base.dll` | Iter-6 rarity colouring. `enum Rarity { Poor=-1, Common, Uncommon, Rare, Epic, Legendary }`; `ObjectInfo.rarity` is a plain `public Rarity rarity` field. `Color GetSlotBorderRarityColor(Rarity rarity, bool useDefaultColorForCommon, Color defaultColor)` returns `defaultColor` when `useDefaultColorForCommon && (rarity == Common \|\| rarity == Poor)`, else `Manager.ui.slotBorderRarityColors[(int)(rarity + 1)]` (a `List<Color>`). `Manager.ui.*` is sandbox-safe (already used in this mod). `PugText.color` setter = `SetTempColor(value)` (paints the glyph SpriteRenderers `Render()` rebuilds → set after Render; pass `keepColorOnStart: true` to survive `renderOnStart`). See `docs/architecture.md § Rarity Colouring (Iter-6)` + `docs/gotchas.md § PugText tint`. |
 | `ButtonUIElement` | `Pug.Other.dll` | Iter-7 dropdown/toggle buttons. Clickable widget base class. Override `public override void OnLeftClicked(bool mod1, bool mod2)` — **guard `if (!canBeClicked) return;` FIRST, then call `base.OnLeftClicked(mod1, mod2)`** (the uniform ItemChecklist convention across `DropdownOptionButton`/`DropdownToggleButton`/`AscDescToggle`/`ClearSearchButton`/`FilterCheckboxButton`; when not clickable, base is not run). As of Iter-14.2 this prologue lives **once** in `abstract ClickButton : ButtonUIElement` (a `sealed override OnLeftClicked` → `protected abstract OnClick()`); the five subclasses now extend `ClickButton` and implement only `OnClick()`. Requires a **3D `BoxCollider`** (`!u!65`) — CK `UIMouse` raycasts in 3D. Leave `spritesShownUnpressed` and `spritesShownPressed` empty so `ButtonUIElement.LateUpdate` doesn't toggle GO activity and hide the button's SpriteRenderer (same rule as `ScrollBarHandle`). |
 | `TextInputField` / `CharacterMarkBlinker` | `Pug.Other.dll` | Iter-8 search field — **CK-native text input, NOT uGUI**. `TextInputField : UIelement, InputManager.TextInputInterface` renders via `pugText`/`hintText` (PugText), caret via `characterMarkBlinker` (a `CharacterMarkBlinker` whose single serialized field `sr` is the caret SpriteRenderer); `OnLeftClicked` self-activates (`Manager.input.SetActiveInputField(this)`). Subclass it (`SearchBar`) + poll `GetInputText()` in `LateUpdate`. Key serialized fields: `maxWidth`; **`trim` — keep `0`** (else leading/trailing spaces are stripped per keystroke, breaking multi-word search); **`dontDeactivateOnDeselect` — set `true`** so the field stays focused when the mouse leaves its collider (CK selection is hover-based), then call `Deactivate(false)` on window close or WASD stays blocked. uGUI `InputField` is the wrong abstraction (`UnityInputFieldAdapter` deleted). See `docs/architecture.md § Filter & Search (Iter-8)`. |
+| `SceneHandler.cutsceneIsPlaying` / `CutsceneHandler` | `Pug.Other.dll` | Iter-15 cutscene gate. `cutsceneIsPlaying` is a public `bool` getter on `SceneHandler` delegating to `optionalCutsceneHandler.isPlaying` — returns `false` when no handler exists, so no null-guard is needed at the call site. Set `true` in `CutsceneHandler.StartPlaying()` (`Pug.Other` ~364007), cleared on completion/skip — brackets exactly the spawn-from-Core intro cutscene. **The intro cutscene fades CK's own HUD via `Manager.ui.FadeOutAllGameplayUI()`, NOT `CameraManager.ShowHUD(false)`** — so a mod's layer-27 HUD is *not* culled for free during it and must be gated explicitly. CK itself gates a discovery path on `cutsceneIsPlaying` (`Pug.Other` ~301674), flanked by the same companions `WorldState.IsInPlayableWorld` uses. Property access on the already-used `Manager.sceneHandler` is sandbox-safe (verified: 0 `CompileFailed`). Rejected the broader `SendClientInputSystem.PlayerInputBlocked()` (overlaps the menu/inventory checks the F1 guard already does + per-frame UI-input logic). Consumed by `WorldState.IsInPlayableWorld` (HUD + F1 guard). |
 
 Iter-3.7's α-algorithm derives directly from `InventoryUtility.cs:~1626`:
 for any ingredient pair `(i1, i2)`, the resulting family is
@@ -146,13 +147,17 @@ Backlog of planned iterations (Iter-12 onward):
   is a free prior-session data point. For a **new `.cs` file**, also verify it
   landed in the install `Scripts/` AND in `ModManifest.json` — else the runtime
   sandbox compile fails with the new type missing, invisible to the Editor build.
-- Spec lives in `docs/superpowers/specs/`, plan in
-  `docs/superpowers/plans/`, exploratory research in `docs/research/`.
+- Spec lives in `docs/specs/` (**tracked**; a `PostToolUse` hook enforces this and
+  rejects specs written to `docs/superpowers/specs/`), plan in
+  `docs/superpowers/plans/` (**gitignored**), exploratory research in `docs/research/`.
   Every iter has a 1:1:1 spec/plan/(optional)research mapping.
-- **Write superpowers specs/plans to the *main* tree, not the worktree.**
-  `docs/superpowers/` is gitignored, and `git worktree add` only checks out
-  *tracked* files, so a spec authored inside the worktree is lost on
-  `git worktree remove`. Author/edit specs and plans in the main checkout.
+- **Author superpowers specs/plans in the *main* tree, not the worktree.**
+  `git worktree add` only checks out *tracked* files, so a **plan** written to the
+  worktree's gitignored `docs/superpowers/` is lost on `git worktree remove` (the
+  tracked `docs/specs/` spec survives, but author it in main too for consistency).
+  Spec retention is ADR-gated: commit the `docs/specs/` spec only when the change
+  warrants an ADR — otherwise discard it after the iter merges. See
+  `docs/conventions.md § Worktree Conventions`.
 - **The visual-calibration loop runs inline, not via subagents.** Judging
   margins / flush / spacing from screenshots requires observing the live
   CrossOver game window; a Unity batchmode build also locks the project. A
