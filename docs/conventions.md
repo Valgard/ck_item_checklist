@@ -200,15 +200,18 @@ unity/ItemChecklist/
     ItemListViewModel.cs          order/filter/search view model (Iter-7/8)
     SortMode.cs                   sort-mode enum + comparators (Iter-7)
     DropdownWidget.cs             reusable dropdown (sort/filter) (Iter-7/8)
-    IPopupToggle.cs               toggle-owner seam shared by dropdown + facet toggles (Iter-13)
+    PopupWidget.cs                abstract popup base shared by DropdownWidget/FilterWidget (Iter-14.2)
+    IPopupToggle.cs               toggle-owner seam shared by dropdown + filter toggles (Iter-13)
+    ClickButton.cs                abstract base for click controls (sealed prologue + OnClick) (Iter-14.2)
+    PugTextExtensions.cs          PugText.RenderNoWrap helper — single home of maxWidth=0f (Iter-14.2)
     DropdownToggleButton.cs       dropdown header toggle button (Iter-7)
     DropdownOptionButton.cs       dropdown popup option button (Iter-7)
     AscDescToggle.cs              ascending/descending direction toggle (Iter-7)
     SearchBar.cs                  TextInputField subclass — name search (Iter-8)
     ClearSearchButton.cs          clears the search field (Iter-8)
     ItemCategory.cs               category taxonomy (ObjectType -> bucket) (Iter-10)
-    FacetedFilterWidget.cs        sectioned multi-select filter dropdown (Iter-10)
-    FacetCheckboxButton.cs        filter checkbox row button (Iter-10)
+    FilterWidget.cs               sectioned multi-select filter dropdown (Iter-10, renamed Iter-14.2)
+    FilterCheckboxButton.cs       filter checkbox row button (Iter-10, renamed Iter-14.2)
   Localization/
     Generated/                    build-generated .asset TextDataBlocks (gitignored)
   Prefabs/
@@ -249,7 +252,57 @@ Generated/` (the `.envrc:LOC_OUT` path) at build time.
 - `ui/*.cs` — IModUI, IScrollable, and row logic
 - `Editor/*.cs` — editor-only build/publish helpers (in separate `.asmdef`)
 
+## UI Code Conventions
+
+**Click-button convention — extend `ClickButton`, implement only `OnClick()`.**
+New clickable controls extend `abstract ClickButton : ButtonUIElement` (not
+`ButtonUIElement` directly). The base does the uniform guard-first prologue once
+in a `sealed override OnLeftClicked` (`if (!canBeClicked) return;` →
+`base.OnLeftClicked(…)` → `OnClick()`); the subclass implements only
+`protected override void OnClick()`. The five controls follow this:
+`DropdownOptionButton`, `DropdownToggleButton`, `AscDescToggle`,
+`ClearSearchButton`, `FilterCheckboxButton`. Mechanism + prefab rules (3D
+`BoxCollider`, empty `spritesShown*`) in `docs/architecture.md § ButtonUIElement
+Click Pattern`.
+
+**UI label rendering — route single-line labels through `RenderNoWrap`.**
+Render every localised single-line label (dropdown/option/row/section labels) via
+`PugText.RenderNoWrap` (`ui/PugTextExtensions.cs`) — the single home of
+`maxWidth = 0f`. Order is load-bearing: `maxWidth = 0` MUST precede `Render`, or
+CK's PugFont word-wrap path `IndexOutOfRange`-crashes on long (German) labels and
+aborts `ShowUI`. Do not re-inline the `maxWidth = 0f; Render(…)` pair. See
+`docs/gotchas.md § PugFont.Render crashes`.
+
+**Diagnostics symmetry — no silent prefab-wiring failure.** Parallel pool
+builders that depend on a template's button component must fail loudly when the
+component is missing: both `DropdownWidget.EnsurePool` and
+`FilterWidget.GrowButtonPool` `Debug.LogError` when their template lacks its
+expected button. Silent wiring gaps are the hardest bug class here (they survive
+a clean Editor compile and a successful build) — surface them in the log.
+
 ## Prefab Authoring Conventions
+
+**Abstract MonoBehaviour bases are prefab-neutral — a named exception to the
+one-MonoBehaviour-per-file / `fileID 11500000` rule.** Unity serialises inherited
+public fields **by name**, and an abstract base is never instantiated, so it needs
+no `m_Script`/`fileID` reference in any prefab. Hoisting shared serialized fields
+(or shared logic) into an `abstract` base — `ClickButton`, `PopupWidget` — does
+**not** require a prefab edit: the prefab keeps referencing the concrete subclass
+(`fileID 11500000`), and the inherited fields resolve by their unchanged names.
+This is the documented exception to "one MonoBehaviour per file, each with its own
+`fileID`."
+
+**Class-rename / field-rename procedure.** To rename a MonoBehaviour class,
+`git mv` the `.cs` **and** its `.cs.meta` **together** — the meta carries the GUID,
+and prefab refs are `m_Script: {fileID: 11500000, guid: <meta-guid>}`, so the
+class **name appears nowhere** in the prefab; a GUID-preserving rename is
+prefab-neutral (verified Iter-14.2: `FacetedFilterWidget`→`FilterWidget`,
+`FacetCheckboxButton`→`FilterCheckboxButton`, refs held). **CAVEAT:** renaming a
+*serialized field* is different — the prefab YAML stores the field **by key**, so
+a field rename DOES need a matching prefab YAML field-key edit (a mismatch
+deserialises **silently to null**, no compile error). Verify the field key with
+`utils/prefab_query.py` before the build (Iter-14.2: `facetedFilter`→`filter` on
+the window prefab).
 
 **Re-parent a prefab component without breaking references.** To move a
 component to a different GameObject while keeping every reference to it intact,

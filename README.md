@@ -97,6 +97,7 @@ reads the published version and changelog from the topmost `## [x.y.z]` entry in
 - [Architecture overview](docs/architecture.md)
 - [Code conventions](docs/conventions.md)
 - [Known gotchas](docs/gotchas.md)
+- [Pixel-art authoring](docs/pixel-art-authoring.md)
 - [Iteration history](docs/iteration-history.md)
 - [Future roadmap](docs/roadmap.md)
 - [Mod-internal CLAUDE.md](CLAUDE.md) (for AI assistants working in this repo)

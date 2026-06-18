@@ -576,13 +576,19 @@ whose text length exceeds the configured `maxWidth` — which English text may
 not, but longer translations (e.g. German) routinely do.
 
 Critically, the throw occurs inside `ShowUI()` (via
-`FacetedFilterWidget.RebuildList` / `DropdownWidget` label renders), which
+`FilterWidget.RebuildList` / `DropdownWidget` label renders), which
 aborts before CoreLib sets `currentInterface`. The result: the window opens
 but cannot be closed with ESC or E — only the mod's own F1 toggle works.
 
 Fix: set `PugText.maxWidth = 0f` on every localised single-line label (filter
 rows, section headers, dropdown labels). With `maxWidth == 0f` the wrap path is
 never entered and no crash is possible.
+
+As of Iter-14.2 this `maxWidth = 0f; Render(…)` pair lives in **one** null-safe
+extension, `PugText.RenderNoWrap` (`ui/PugTextExtensions.cs`) — now the single
+home of `maxWidth = 0f`. The order is load-bearing: `maxWidth = 0` MUST precede
+`Render` (the extension does this), or the wrap path runs before the guard takes
+effect. Route every single-line label through `RenderNoWrap`.
 
 This is the same crash class as the thinTiny ellipsis (U+2026) note in
 `§ Item Rows & Header (Iter-9)` — the throw site is identical; the triggers
@@ -721,7 +727,7 @@ to the corner size. (Verify with PIL: crop the sprite rect from the sheet and
 print an alpha map.)
 
 ### A static checkbox box GO needs `m_IsActive: 1` — the code only toggles the fill
-In `FacetCheckboxButton`, the wired `checkMark` SpriteRenderer is the **fill**
+In `FilterCheckboxButton`, the wired `checkMark` SpriteRenderer is the **fill**
 ("Checkbox filled slash", shown only when checked via `SetChecked → .enabled`).
 The empty **box** itself (a separate child GO, "Checkbox empty") is never touched
 by code — it must be statically visible. If that box GO has `m_IsActive: 0`, the

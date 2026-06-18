@@ -112,11 +112,17 @@ diagnosing scroll behavior.
 
 ### Awake Logic
 
-`UIScrollWindow.Awake()` calls `GetComponent<IScrollable>()`. If the result
-is `null`, the scroll window **permanently disables itself** — `enabled = false`
-and the component stops processing input. The `IScrollable` implementor
-(`ItemChecklistContent`) must be on the same `GameObject` as
-`UIScrollWindow`, or `Awake` must fire after the component is added.
+`UIScrollWindow.Awake()` copies its **serialized public `scrollable` field** to
+its private `_scrollable` — so the prefab's `scrollable` reference (pointing at
+`ItemChecklistContent` on the same GameObject) is the single source of truth for
+the wiring. If that field does not resolve to an `IScrollable`, the scroll window
+**permanently disables itself** (`enabled = false`) and stops processing input.
+
+Because `Awake` does the copy itself, the mod no longer reflects into the private
+`_scrollable` (R4, Iter-14.2): the former `API.Reflection.SetValue(MiScrollable, …)`
+calls were redundant and have been removed (`MiScrollable` cache + `System.Linq`
+dropped with them). All that remains after a content change is the
+`UpdateScrollHeight` + `ResetScroll` rewire — see § Post-Content-Spawn Sequence.
 
 ### UpdateScrollHeight
 
@@ -145,14 +151,21 @@ it as the canonical "go to top" call.
 
 ### Post-Content-Spawn Sequence
 
-After spawning or replacing scroll content, call in this order (ItemBrowser
-`EntriesList.SetEntries` pattern):
+After spawning or replacing scroll content, rewire the scroll height. Since R4
+(Iter-14.2) the scrollable wiring comes from the prefab's serialized `scrollable`
+field (copied by `UIScrollWindow.Awake`), so the sequence collapsed from the
+three-call ItemBrowser `EntriesList.SetEntries` pattern (SetValue +
+UpdateScrollHeight + SetScrollValue) to one helper, `RewireScrollHeight()`:
 
 ```csharp
-API.Reflection.SetValue(MiScrollable, scrollWindow, scrollableImpl);
-API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
-scrollWindow.SetScrollValue(1f);  // or scrollWindow.ResetScroll()
+private void RewireScrollHeight()
+{
+    API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);  // private → reflection
+    scrollWindow.ResetScroll();   // == SetScrollValue(1f): go to top
+}
 ```
+
+Order still matters: `UpdateScrollHeight` **before** `ResetScroll`.
 
 ### LateUpdate Scroll Processing
 
@@ -265,11 +278,18 @@ exists for it until it scrolls into view.
 
 1. `EnsurePool` — lazily grows the pool to `ComputePoolSize()` (grows-only).
 2. `SetCount(catalogCount)` — records the full entry count for height reporting.
-3. Reflection-wire the scrollable + invoke `UpdateScrollHeight` (the
-   `UIScrollWindow` post-content-spawn sequence; see § Post-Content-Spawn
-   Sequence). Order matters: `UpdateScrollHeight` **before** `ResetScroll`.
-4. `ResetScroll()` — go to top.
-5. `RefreshVisible()` — forced rebind so the pool shows the correct entries.
+3. `RewireScrollHeight()` — invoke `UpdateScrollHeight` (reflection) then
+   `ResetScroll()` (see § Post-Content-Spawn Sequence). Order matters:
+   `UpdateScrollHeight` **before** `ResetScroll`. Since R4 (Iter-14.2) the
+   scrollable wiring is no longer re-applied here — it comes from the prefab's
+   serialized `scrollable` field, which `UIScrollWindow.Awake` copies itself.
+4. `RefreshVisible()` — forced rebind so the pool shows the correct entries.
+
+`ItemChecklistContent.Awake` no longer self-registers into the scroll window
+(R4): the former self-registration was an ineffective guard (it checked the
+public `scrollable`, not the private `_scrollable`), and the prefab field already
+supplies the wiring. `DefaultExecutionOrder(-100)` is kept defensively; `Awake`
+now only caches the `UIScrollWindow` reference.
 
 `HideUI` no longer destroys anything — it calls `root.SetActive(false)` only,
 so the pool survives across opens. The `PugText.Clear()` pool-teardown (the
@@ -657,13 +677,13 @@ adds only what differs:
   `m_Center.z` is pulled forward (`-0.1`) so CK's `UIMouse` raycast hits it
   first (the Iter-9 ClearButton z-stagger precedent).
 - **Filter** = `Filter.prefab` (variant of `Dropdown.prefab`, renamed from
-  `FacetedFilter.prefab` in Iter-18) + a root `FacetedFilterWidget` + the
+  `FacetedFilter.prefab` in Iter-18) + a root `FilterWidget` + the
   checkbox/header/action templates, with the filter glyph in the leading slot.
 
 The window nests instances of **both** variants (0 direct bare-`Dropdown` refs).
 
 The toggle is shared via **`IPopupToggle { TogglePopup() }`** — implemented by both
-`DropdownWidget` and `FacetedFilterWidget`. `DropdownToggleButton.owner` is typed
+`DropdownWidget` and `FilterWidget`. `DropdownToggleButton.owner` is typed
 `IPopupToggle` and **wired at runtime** in each widget's `Configure`
 (`GetComponentsInChildren<DropdownToggleButton>` → `tb.owner = this`), not
 serialized — a serialized cross-prefab owner ref is fragile (extracting the chrome
@@ -671,12 +691,16 @@ nulled it and broke header-click). This let one toggle class serve both widgets;
 the former `FacetToggleButton` was deleted. (The chrome was proven to round-trip
 through the ModBuilder→AssetBundle pipeline as a nested prefab + variant.)
 
-### FacetedFilterWidget (Iter-10, prefab variant since Iter-13)
+### FilterWidget (Iter-10, prefab variant since Iter-13, renamed Iter-14.2)
 
-`FacetedFilterWidget : UIelement, IPopupToggle` — a multi-select sectioned popup.
-Replaces the Iter-8 `DropdownWidget`-based filter; since Iter-13 it is a **prefab
-variant of the shared `Dropdown.prefab` skeleton** (`Filter.prefab`, renamed
-from `FacetedFilter.prefab` in Iter-18; see above).
+`FilterWidget : PopupWidget` (renamed from `FacetedFilterWidget` in Iter-14.2;
+see § PopupWidget shared base) — a multi-select sectioned popup. Replaces the
+Iter-8 `DropdownWidget`-based filter; since Iter-13 it is a **prefab variant of
+the shared `Dropdown.prefab` skeleton** (`Filter.prefab`, renamed from
+`FacetedFilter.prefab` in Iter-18; see above). The popup chrome (open/close
+state, click-outside auto-close, auto-size) lives in the `PopupWidget` base; this
+section covers only the filter-specific deltas (header, templates, pools,
+`RebuildList`).
 
 **Closed state:** the `Display` `PugText` shows `"Filter"` or `"Filter (N)"`.
 The `Display`'s single `DropdownToggleButton` (with the caret now inside the
@@ -700,16 +724,61 @@ positioning each at `-(pos * rowSpacing)`. After every click (`OnMemberClicked`
 or `ClearAll`), `RebuildList` is called unconditionally to re-sync every
 checkbox visual in both pools.
 
-**Click-outside-to-close:** `LateUpdate` uses the same `_armed` guard as
-`DropdownWidget` — skips the frame that opened the popup so the opening click
-does not immediately close it.
+**Open/close + click-outside:** inherited from `PopupWidget` (`TogglePopup`/
+`SetOpen`, the `_armed`-guarded click-outside `LateUpdate`). Filter overrides
+`OnPopupOpened() => RebuildList()` so the popup is rebuilt at open time.
 
-**Companion files:** `FacetCheckboxButton : ButtonUIElement` (one checkbox
-row — holds `memberId` index + `checkMark SpriteRenderer`; `OnLeftClicked`
-calls `owner.OnMemberClicked(memberId)`), each in its own `.cs` file (one
-MonoBehaviour per file rule). The header toggle uses the shared
-`DropdownToggleButton` (via `IPopupToggle`) — the old `FacetToggleButton` was
-removed in Iter-13.
+**Companion files:** `FilterCheckboxButton : ClickButton` (one checkbox
+row — holds `memberId` index + `checkMark SpriteRenderer`; implements `OnClick()`
+to call `owner.OnMemberClicked(memberId)`, the guard-first prologue living in
+`ClickButton`), each in its own `.cs` file (one MonoBehaviour per file rule).
+The header toggle uses the shared `DropdownToggleButton` (via `IPopupToggle`) —
+the old `FacetToggleButton` was removed in Iter-13.
+
+---
+
+### PopupWidget (shared base, Iter-14.2)
+
+`abstract PopupWidget : UIelement, IPopupToggle` (`ui/PopupWidget.cs`, ~95 LoC)
+consolidates the popup machinery that `DropdownWidget` (Sort) and `FilterWidget`
+(Filter) previously duplicated. Both now derive from it; each subclass keeps only
+its own header, templates, pools, and `RebuildList`.
+
+The base carries:
+
+- **Chrome serialized fields** — `caret` / `caretClosed` / `caretOpen` /
+  `popupPanel` / `rowContainer` / `rowSpacing`. Moving these to the base is
+  prefab-neutral: Unity deserialises inherited public fields **by name**, so the
+  existing prefab wiring resolves unchanged (all six keys are present on both
+  `Sort.prefab` and `Filter.prefab`).
+- **State** — `_open`, `_armed`, plus the captured `_panel` (popup `SpriteRenderer`)
+  and `_topY` (authored popup top edge) via `EnsurePanel()`.
+- **Open/close** — `TogglePopup()` / `SetOpen(bool)`; `SetOpen(true)` calls the
+  virtual `OnPopupOpened()` hook (default no-op for Sort; `FilterWidget` overrides
+  it to `RebuildList()`).
+- **Click-outside-to-close** — a single `LateUpdate` (now a proper `override`,
+  clearing the long-standing CS0114 hide warning; it intentionally does **not**
+  call `base.LateUpdate()`). The `_armed` guard skips the frame the popup opened
+  on, so the opening click does not immediately re-close it.
+- **Parametrized auto-size** — `AutoSizePopup(int rowCount)` centres the
+  `rowContainer` and fits the panel height to the laid-out row stack, top-aligned
+  to the authored top edge captured in `_topY`.
+
+**★ The `FirstRowOffset` contract** (the most non-obvious design rationale of the
+refactor). The single thing that genuinely differs between the two popups is the
+slot offset of the first laid-out row. Captured ONCE as the abstract
+`protected abstract int FirstRowOffset { get; }`:
+
+- **Sort** (`DropdownWidget`) is a true **combobox** — the selected option is shown
+  in the header and OMITTED from the popup, so popup row 0 is reserved for it →
+  `FirstRowOffset = 1`.
+- **Filter** (`FilterWidget`) header is a count label; every member is a real popup
+  row → `FirstRowOffset = 0`.
+
+`FirstRowOffset` feeds BOTH the subclass's row layout AND `AutoSizePopup`'s
+`rowContainer` centring, so the two cannot drift (the one-row-offset trap, the R3
+hazard). It is invisible to the Editor compile — wrong values surface only in-game
+as a mis-positioned or clipped popup.
 
 ---
 
@@ -721,9 +790,12 @@ All sort controls live in the header strip. Every clickable uses a **3D
 
 #### DropdownWidget (sort)
 
-`DropdownWidget : UIelement, IPopupToggle` — reusable single-select dropdown
-(mod-authored, not CK-native). Used for the **Sort** dropdown, as a nested
-instance of the shared `Dropdown.prefab` chrome (see § Shared Dropdown chrome).
+`DropdownWidget : PopupWidget` (since Iter-14.2; was `: UIelement, IPopupToggle`)
+— reusable single-select dropdown (mod-authored, not CK-native). Used for the
+**Sort** dropdown, as a nested instance of the shared `Dropdown.prefab` chrome
+(see § Shared Dropdown chrome). The popup chrome (open/close, click-outside,
+auto-size) lives in the `PopupWidget` base; below are the Sort-specific deltas.
+`FirstRowOffset = 1` (the selected option is shown in the header, not the popup).
 
 **API:**
 ```csharp
@@ -737,15 +809,15 @@ Configure(IReadOnlyList<string> labels, int selectedIndex, Action<int> onSelecte
 `-(pos + 1) * rowSpacing`. `EnsurePool` clones `rowTemplate`; `RebuildList`
 lays them out. Selecting fires `onSelected` and re-`Configure`s.
 
-**Click-outside-to-close (`LateUpdate`):** `_armed` guard skips the opening
-frame. When `_open && !_armed && !ClickedInsidePopup()` → close.
+**Click-outside-to-close:** inherited from `PopupWidget` (the `_armed`-guarded
+`LateUpdate`); Sort does not override `OnPopupOpened()`.
 
 #### DropdownToggleButton / DropdownOptionButton
 
 Each in its **own `.cs` file**. Both subclass `ButtonUIElement`. See
 `gotchas.md § Multiple MonoBehaviours in one file`. Since Iter-13
 `DropdownToggleButton.owner` is an **`IPopupToggle`** (DropdownWidget *or*
-FacetedFilterWidget), wired at runtime in `Configure` — so one toggle class
+FilterWidget), wired at runtime in `Configure` — so one toggle class
 drives either widget from the shared chrome.
 
 #### AscDescToggle
@@ -755,20 +827,32 @@ swaps the asc/desc glyph, triggers `Recompute()` + `RefreshVisible()`.
 
 ---
 
-### ButtonUIElement Click Pattern
+### ButtonUIElement Click Pattern — `ClickButton` base (Iter-14.2)
 
-**ItemChecklist convention — guard FIRST, then base** (consistent across all
-buttons: `DropdownOptionButton`, `DropdownToggleButton`, `AscDescToggle`,
-`ClearSearchButton`, `FacetCheckboxButton`):
+**ItemChecklist convention — guard FIRST, then base.** Until Iter-14.2 every
+clickable repeated the same `OnLeftClicked` prologue (guard `canBeClicked`, call
+base). Iter-14.2 hoisted it into `abstract ClickButton : ButtonUIElement`, whose
+`sealed override OnLeftClicked` runs the prologue once and then calls
+`protected abstract OnClick()`:
 
 ```csharp
-public override void OnLeftClicked(bool mod1, bool mod2)
+public abstract class ClickButton : ButtonUIElement
 {
-    if (!canBeClicked) return;       // guard first: when not clickable, base is NOT run
-    base.OnLeftClicked(mod1, mod2);
-    // … custom logic …
+    public sealed override void OnLeftClicked(bool mod1, bool mod2)
+    {
+        if (!canBeClicked) return;       // guard first: when not clickable, OnClick is NOT run
+        base.OnLeftClicked(mod1, mod2);
+        OnClick();
+    }
+    protected abstract void OnClick();   // the subclass's action
 }
 ```
+
+The five clickable controls extend `ClickButton` and implement only `OnClick()`:
+`DropdownOptionButton`, `DropdownToggleButton`, `AscDescToggle`,
+`ClearSearchButton`, `FilterCheckboxButton`. The abstract base is prefab-neutral
+(never instantiated → no `m_Script`/`fileID` ref; subclass `fileID 11500000`
+unchanged).
 
 **Required prefab rules (same as ScrollBarHandle):**
 
@@ -799,8 +883,9 @@ Button backgrounds use `ui_scrollbar_handle` (`~{1,1}` `m_Size` for correct
 ## Filter & Search (Iter-8 + Iter-10)
 
 Iter-8 introduced the search field and the original discovery-filter dropdown.
-Iter-10 replaced the filter dropdown with `FacetedFilterWidget` (see § Faceted
-filter model above). The search field and its focus model are unchanged.
+Iter-10 replaced the filter dropdown with `FilterWidget` (named
+`FacetedFilterWidget` until Iter-14.2; see § Faceted filter model above). The
+search field and its focus model are unchanged.
 
 ### SearchBar : TextInputField
 
