@@ -16,6 +16,30 @@ namespace ItemChecklist.UI
     {
         private string _lastPushed = "";
 
+        /// <summary>
+        /// Disable the PugText word-wrap path on this single-line field.
+        ///
+        /// CK's <c>TextInputField.Awake</c> sets
+        /// <c>pugText.maxWidth = maxWidth + (dontAllowNewLines ? 1 : 0)</c> — for this
+        /// field 7.5 + 1 = 8.5. Any <c>pugText.Render()</c> with <c>maxWidth &gt; 0</c>
+        /// then runs CK's <c>PugFont.AddNewLinesToLinesExceedingMaxWidth</c>, whose
+        /// word-wrap indexes <c>text[num3 - 1]</c> out of range on certain input,
+        /// throwing <see cref="System.IndexOutOfRangeException"/> *every frame* while
+        /// typing (a pre-existing CK bug, reproduced on stock too; silent to the player
+        /// but log-spammy). A single-line field (<c>dontAllowNewLines: 1</c>) must never
+        /// word-wrap, so force <c>pugText.maxWidth = 0</c>. Visual width is unaffected:
+        /// <c>TextInputField.TrimTextToFitRestrictions</c> still clips overflowing
+        /// characters via the field's own <c>maxWidth</c> (7.5), independent of the
+        /// PugText word-wrap. Done in Awake (not LateUpdate) so it takes effect before
+        /// the first render — covers <see cref="SyncFrom"/> restoring a long prior search
+        /// on open. Nothing rewrites <c>pugText.maxWidth</c> per frame, so one write holds.
+        /// </summary>
+        private new void Awake()
+        {
+            base.Awake();
+            if (pugText != null) pugText.maxWidth = 0f;
+        }
+
         protected override void LateUpdate()
         {
             base.LateUpdate();
