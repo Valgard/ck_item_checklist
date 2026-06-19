@@ -144,7 +144,22 @@ namespace ItemChecklist
                     Debug.Log($"[ItemChecklist] Skipping RegisterModUI for building-block prefab '{go.name}'");
             }
         }
-        public void Shutdown() { }
+        public void Shutdown()
+        {
+            // Backstop autosave on a clean quit (mods unload on "Beenden"), for any
+            // quit path that did not route through a CK character write.
+            SavePossessionLedger();
+        }
+
+        /// <summary>Persist the active character's possession ledger. Driven primarily
+        /// by <see cref="SaveManagerWriteCharacterHook"/> (fires in lockstep with CK's
+        /// own character save — autosave + "Save &amp; Quit"); also called on char-switch
+        /// and Shutdown as backstops. No-op when no character is active.</summary>
+        internal static void SavePossessionLedger()
+        {
+            if (s_ledger != null && !string.IsNullOrEmpty(s_ledgerGuid))
+                PossessionStore.Save(s_ledgerGuid, s_ledger);
+        }
 
         public void Update()
         {
@@ -189,8 +204,7 @@ namespace ItemChecklist
             // Independent of the discovery-snapshot cache below (that can miss).
             if (activeGuid != s_ledgerGuid)
             {
-                if (s_ledger != null && !string.IsNullOrEmpty(s_ledgerGuid))
-                    PossessionStore.Save(s_ledgerGuid, s_ledger);
+                SavePossessionLedger();   // backstop: persist the outgoing char on switch
                 if (string.IsNullOrEmpty(activeGuid))
                 {
                     s_ledger = null;
