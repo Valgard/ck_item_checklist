@@ -43,7 +43,20 @@ namespace ItemChecklist
         // HideAllInventoryAndCraftingUI — the opposite of an always-on HUD).
         private static GameObject hudPrefab;
 
-        private static PossessionLedger s_debugLedger;   // ITER-20 TASK-2 DEBUG
+        // Iter-20: current possession snapshot, read by ItemChecklistContent.Rebind
+        // per visible row. Refreshed on open + a throttled interval; the per-(x,z)
+        // ledger is loaded/saved around character (GUID) activation.
+        internal static PossessionView Possession { get; private set; } = PossessionView.Empty;
+        private static PossessionLedger s_ledger;
+        private static string s_ledgerGuid;
+        private const float PossessionRefreshSeconds = 3f;
+        private float _possessionTimer;
+        // Prune grace: chunks stream in asynchronously after a world load/teleport, so
+        // the self-heal prune must stay off until the world has been continuously
+        // playable for this long (else it deletes not-yet-streamed real storage and
+        // overwrites the persisted file). Reset whenever we leave the playable world.
+        private const float PossessionPruneGraceSeconds = 8f;
+        private float _possessionPlayableTime;
 
         // Rewired player captured via ControlMappingModule.rewiredStart
         // (Rewired is not ready at EarlyInit). Used to poll the bound
@@ -135,17 +148,23 @@ namespace ItemChecklist
 
         public void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-3 DEBUG — removed in Task 7
+            // Iter-20: throttled possession refresh while playing. The prune is only
+            // allowed once the world has been playable past the grace window (chunks
+            // streamed); leaving the playable world re-arms it.
+            if (s_ledger != null && WorldState.IsInPlayableWorld)
             {
-                string guid = SaveManagerActiveSelectHook.ActiveGuid;
-                if (s_debugLedger == null)
+                _possessionPlayableTime += Time.deltaTime;
+                _possessionTimer -= Time.deltaTime;
+                if (_possessionTimer <= 0f)
                 {
-                    s_debugLedger = PossessionStore.Load(guid);
-                    Debug.Log($"[Iter20] LOADED-FROM-DISK containers={s_debugLedger.Containers.Count} guid={guid}");
+                    _possessionTimer = PossessionRefreshSeconds;
+                    bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
+                    Possession = PossessionScanner.Scan(s_ledger, PossessionConfig.AnchorRadius, allowPrune);
                 }
-                var view = PossessionScanner.Scan(s_debugLedger, 48f, false);
-                PossessionStore.Save(guid, s_debugLedger);
-                Debug.Log($"[Iter20] after-scan containers={s_debugLedger.Containers.Count}");
+            }
+            else
+            {
+                _possessionPlayableTime = 0f;   // left the playable world → re-arm grace
             }
 
             // Instantiate the always-on HUD counter once the UIManager and its
@@ -165,6 +184,26 @@ namespace ItemChecklist
             ItemCatalogLocChangeHook.ProcessPending();
 
             string activeGuid = SaveManagerActiveSelectHook.ActiveGuid;
+
+            // Iter-20: load/save the possession ledger on character (GUID) change.
+            // Independent of the discovery-snapshot cache below (that can miss).
+            if (activeGuid != s_ledgerGuid)
+            {
+                if (s_ledger != null && !string.IsNullOrEmpty(s_ledgerGuid))
+                    PossessionStore.Save(s_ledgerGuid, s_ledger);
+                if (string.IsNullOrEmpty(activeGuid))
+                {
+                    s_ledger = null;
+                    Possession = PossessionView.Empty;
+                }
+                else
+                {
+                    s_ledger = PossessionStore.Load(activeGuid);
+                    _possessionPlayableTime = 0f;   // fresh load → withhold prune until grace
+                    Possession = PossessionScanner.Scan(s_ledger, PossessionConfig.AnchorRadius, false);
+                }
+                s_ledgerGuid = activeGuid;
+            }
 
             // No active character (main menu) — clear "applied for"
             // memory so the next char-select pushes a fresh snapshot.
@@ -226,6 +265,12 @@ namespace ItemChecklist
                 {
                     Debug.Log("[ItemChecklist] Hotkey — opening UI");
                     UserInterfaceModule.OpenModUI("ItemChecklist:Window");
+                    // Iter-20: refresh the possession snapshot so the column is current
+                    // on open (prune allowed only if past the grace window).
+                    if (s_ledger != null)
+                        Possession = PossessionScanner.Scan(
+                            s_ledger, PossessionConfig.AnchorRadius,
+                            _possessionPlayableTime > PossessionPruneGraceSeconds);
                 }
             }
         }
