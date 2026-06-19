@@ -66,7 +66,8 @@ re-enters only as a spatial *ownership anchor* (§5).
 - **Carried** is summed separately each snapshot (never persisted — always live).
 - **Display total per item** = carried + Σ(ledger, merged).
 - **Liveness flag per item** = is *any* contributing storage container loaded this
-  snapshot (→ "live"), else the storage part is "remembered".
+  snapshot (→ "live"), else the storage part is "remembered". Computed and exposed
+  on `PossessionView.IsRemembered`, but **not surfaced in the UI** (see §7).
 
 The classification (§5) reads per-entity ECS components (`CraftingCD`,
 `MineableCD`) + the object's `objectType`; the ledger is keyed by container, not
@@ -137,9 +138,11 @@ Key insights baked into the rules (all from the §12 spike, against a real base)
 
 - A **third right-aligned column** on `ItemRow`, beside the Iter-10 Level and Value
   columns: the possession count (carried + storage, merged).
-- **Liveness marker:** when the storage portion is "remembered" (no contributing
-  container loaded this snapshot), render the count dimmed / with a small marker so
-  the player knows it may be stale. Live values render normally.
+- **No liveness marker (as built).** The count renders plainly, exactly like the
+  Lv/Value columns — the design originally dimmed "remembered" values, but in
+  practice the player only cares about the number, not whether the source chunk is
+  currently loaded, so the dimming was dropped. `PossessionView.IsRemembered` is
+  still computed and kept as a data-layer affordance (no current UI consumer).
 - **Spoiler guard:** undiscovered rows show `—` (you cannot meaningfully "own" an
   undiscovered item — acquiring it discovers it), consistent with the Lv/Value
   columns.

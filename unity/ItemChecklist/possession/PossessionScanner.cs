@@ -8,9 +8,9 @@ using UnityEngine;
 namespace ItemChecklist.Possession
 {
     /// <summary>
-    /// Reads the live ECS world and produces possession aggregates. Task 1 ships
-    /// ScanRaw (carried + counted-near-anchor, summed); Task 2 adds the per-(x,z)
-    /// ledger + live/remembered merge.
+    /// Reads the live ECS world each refresh: classifies inventory entities, writes
+    /// the contents of currently-loaded counted containers into the per-(x,z) ledger,
+    /// and returns the merged possession view (carried + live-or-remembered storage).
     /// </summary>
     internal static class PossessionScanner
     {
@@ -29,66 +29,6 @@ namespace ItemChecklist.Possession
                 if (n > bestCount) { bestCount = n; best = w; }
             }
             return best;
-        }
-
-        /// <summary>objectID → total count across the local player's carried inventory
-        /// plus every counted container within `radius` (XZ) of an anchor station.</summary>
-        public static Dictionary<int, int> ScanRaw(float radius)
-        {
-            var totals = new Dictionary<int, int>();
-            var world = ResolveWorld();
-            if (world == null) return totals;
-            var em = world.EntityManager;
-
-            // 1. Anchor positions = all crafting stations (CraftingCD), excluding the player.
-            var anchors = new List<Vector2>();
-            using (var anchorQuery = em.CreateEntityQuery(
-                ComponentType.ReadOnly<CraftingCD>(),
-                ComponentType.ReadOnly<LocalTransform>(),
-                ComponentType.ReadOnly<ObjectDataCD>()))
-            using (var anchorEnts = anchorQuery.ToEntityArray(Allocator.TempJob))
-            {
-                for (int i = 0; i < anchorEnts.Length; i++)
-                {
-                    var od = em.GetComponentData<ObjectDataCD>(anchorEnts[i]);
-                    if (od.objectID == ObjectID.Player) continue;
-                    var p = em.GetComponentData<LocalTransform>(anchorEnts[i]).Position;
-                    anchors.Add(new Vector2(p.x, p.z));
-                }
-            }
-
-            // 2. Inventory entities.
-            using var invQuery = em.CreateEntityQuery(
-                ComponentType.ReadOnly<ContainedObjectsBuffer>(),
-                ComponentType.ReadOnly<ObjectDataCD>(),
-                ComponentType.ReadOnly<LocalTransform>());
-            using var ents = invQuery.ToEntityArray(Allocator.TempJob);
-
-            float r2 = radius * radius;
-            for (int i = 0; i < ents.Length; i++)
-            {
-                var e = ents[i];
-                var od = em.GetComponentData<ObjectDataCD>(e);
-                int id = (int)od.objectID;
-
-                if (od.objectID == ObjectID.Player)
-                {
-                    AddBuffer(em, e, totals);   // carried: always counted
-                    continue;
-                }
-
-                if (em.HasComponent<CraftingCD>(e)) continue;          // station = anchor, not counted
-                if (!em.HasComponent<MineableCD>(e)) continue;          // not ownable/movable
-                if (PossessionClassifier.IsLockedChest(id)) continue;   // contents unknown until opened
-                var info = PugDatabase.GetObjectInfo(od.objectID, 0);
-                if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
-
-                var pos = em.GetComponentData<LocalTransform>(e).Position;
-                if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
-
-                AddBuffer(em, e, totals);
-            }
-            return totals;
         }
 
         /// <summary>Update the ledger from the live world and return the merged view.
