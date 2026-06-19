@@ -278,13 +278,17 @@ namespace ItemChecklist
                 else
                 {
                     Debug.Log("[ItemChecklist] Hotkey — opening UI");
-                    UserInterfaceModule.OpenModUI("ItemChecklist:Window");
-                    // Iter-20: refresh the possession snapshot so the column is current
-                    // on open (prune allowed only if past the grace window).
+                    // Iter-20: refresh possession + Recompute BEFORE opening, so the
+                    // list (counts + active possession filter) is already current when
+                    // the window appears. Doing the Recompute AFTER OpenModUI rebinds the
+                    // rows a second time and races the search field's focus init (the
+                    // field then ignores keystrokes until another widget is clicked).
                     if (s_ledger != null)
                         Possession = PossessionScanner.Scan(
                             s_ledger, PossessionConfig.AnchorRadius,
                             _possessionPlayableTime > PossessionPruneGraceSeconds);
+                    ListView?.Refresh();
+                    UserInterfaceModule.OpenModUI("ItemChecklist:Window");
                 }
             }
         }
