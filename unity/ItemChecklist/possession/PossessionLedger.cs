@@ -59,7 +59,8 @@ namespace ItemChecklist.Possession
                 }
             }
 
-            // Remembered = present somewhere but not in any live source.
+            // Remembered = present somewhere but not in any live source. Kept available
+            // for callers even though the current UI does not surface it.
             var remembered = new HashSet<int>();
             foreach (var id in anyItem)
                 if (!liveItems.Contains(id)) remembered.Add(id);

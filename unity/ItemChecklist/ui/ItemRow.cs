@@ -16,6 +16,7 @@ namespace ItemChecklist.UI
         public PugText levelText;    // Iter-10: right-aligned "Lv N" column ("—" if level 0 / undiscovered)
         public PugText valueText;    // Iter-10: right-aligned sell-value column ("—" if unsellable / undiscovered)
         public SpriteRenderer coinIcon;   // Iter-10: Ancient Coin glyph beside the value (shown only when a value is shown)
+        public PugText possessionText;    // Iter-20: right-aligned "owned" count column
 
         public const float RowHeight = 1.5f; // world units (~24px at 16 PPU)
 
@@ -37,7 +38,8 @@ namespace ItemChecklist.UI
         }
 
         public void Bind(int objectId, Sprite iconSprite, string name, bool isDiscovered,
-            Color rarityColor, Rarity rarity, int level, int sellValue)
+            Color rarityColor, Rarity rarity, int level, int sellValue,
+            int possessionCount)
         {
             if (isDiscovered)
             {
@@ -103,6 +105,13 @@ namespace ItemChecklist.UI
                     coinIcon.sprite = CoinSprite();
                 coinIcon.enabled = showCoin && coinIcon.sprite != null;
             }
+
+            // Iter-20: possession count. Undiscovered = "—" (can't own an undiscovered
+            // item — acquiring discovers it). Rendered plainly like the Lv/Value
+            // columns (no live/remembered marker — the player only cares about the
+            // count, not whether the source chunk is currently loaded).
+            if (possessionText != null)
+                possessionText.Render(isDiscovered ? possessionCount.ToString() : Dash);
         }
     }
 }

@@ -4,7 +4,9 @@ namespace ItemChecklist.Possession
 {
     /// <summary>Immutable per-snapshot lookup: objectID → owned total, plus whether
     /// the storage portion of that total is only "remembered" (no contributing
-    /// container loaded this snapshot). Carried is always live.</summary>
+    /// container loaded this snapshot). Carried is always live. The remembered flag
+    /// is computed and kept available even though the UI currently renders the count
+    /// plainly (no live/remembered marker) — a deliberate data-layer affordance.</summary>
     internal sealed class PossessionView
     {
         public static readonly PossessionView Empty =
