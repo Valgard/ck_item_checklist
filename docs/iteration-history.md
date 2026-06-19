@@ -4,8 +4,8 @@ Full per-iteration narrative of ItemChecklist's development (Iter-3.5 through
 Iter-15), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
-As of 2026-06-18: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, and Iter-19 are DONE on main. Iter-3.8
+As of 2026-06-20: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, and Iter-20 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -502,3 +502,86 @@ Pure behavioural C# (one `Awake` override); no prefab/art touch. Verified in-gam
 verification, `safetyCheck=True`, zero `CompileFailed`), and typing a long string
 produced **0** `IndexOutOfRangeException` (127× on main with the same input). See
 `docs/gotchas.md § Search Field / Header` for the mechanism.
+
+**Iter-20 (possession counts) — DONE (2026-06-20, branch `iter-20`).** A second
+completion axis beside discovery: each checklist row shows how many of that item
+the player currently **owns** (a right-aligned count column), the checkbox + "done"
+tick turn **blue** when owned >=1, and a new **"In / Not in possession"** filter
+section sits under Discovery. The goal is completionists who want "own >=1 of every
+item", not just "discovered every item".
+
+Architecture — a `possession/` package read live from the ECS world each refresh:
+- `PossessionScanner` resolves the inventory world (`World.All`, max
+  `ContainedObjectsBuffer` count = ServerWorld in SP), then scans all placed
+  `ObjectDataCD` entities. **Possession = carried + base storage.** Carried is the
+  player's whole `ContainedObjectsBuffer` (always live; includes the 0–9 equipment
+  slots, so worn gear counts). Base storage = placed furniture/display within
+  `AnchorRadius` of a crafting-station anchor; its contents are read from the
+  entity's buffer.
+- `PossessionLedger` keys containers by world tile `(x,z)` (packed `long`), merges
+  `carried + per-container` in `BuildView`, and marks items present only in
+  not-currently-observed containers as "remembered" (the player can check ownership
+  while away from base). `PossessionStore` persists it per character GUID via
+  `API.ConfigFilesystem` (hand-rolled ASCII, sandbox-safe). `PossessionConfig`
+  exposes `AnchorRadius`; `PossessionClassifier` holds the type/ID predicates.
+
+Hard-won correctness fixes (each its own commit, all caught in-game — none by the
+Editor compile):
+- **Durability vs stack.** `ContainedObjectsBuffer.amount` is double-purposed:
+  stack size for stackables, but **durability** for equipment — a full-durability
+  hat counted as 50. Mirror CK's `GetTotalAmount`: stackable → amount,
+  non-stackable → 1 per slot; look up stackability at **variation 0** (a
+  non-existent `(objectID, variation)` returns null and would wrongly take the
+  durability branch for some skins).
+- **Count placed objects themselves**, not just contents — a workbench / torch /
+  decoration is owned with or without an inventory (broadened the query from
+  `ContainedObjectsBuffer` to all `ObjectDataCD`).
+- **Locked chests + boss statues:** count the placed **object** (owned furniture)
+  but **not** contents (loot is unknown until opened; boss "special" chests are
+  mineable + carriable so the player does own the chest).
+- **Per-tile MERGE.** Multiple counted entities can share a tile (a wall torch
+  standing on a mannequin's tile); the old per-entity `SetLiveContainer` overwrote,
+  so the mannequin's displayed armor counted 0. Accumulate every entity on a tile
+  into one dict (`Tile`/`AddOne`), flush once. Diagnosed from an in-game F-key dump
+  that showed `id=110` (Torch) at the exact mannequin tiles.
+- **Drop the `MineableCD` gate.** `type==PlaceablePrefab` + near a clustered anchor
+  is the ownership test; some owned placeables (a WayPoint) are removed via a menu,
+  not by mining, and were wrongly missed.
+
+**Cluster filter — what counts as "your base".** Using "near a crafting station" as
+the base proxy mis-fired on a remote container near a *world* station: a Copper Key
+in **Ghorm's (boss) unexplored spawn arena** showed as owned because a lone station
+there anchored it. Fix: a station only anchors if it is part of a **cluster** (>=1
+other station within 16 tiles) — a real base packs stations together; a lone
+outpost / boss-arena / NPC station does not. Starter setup (workbench + furnace
+placed together) still qualifies. The `(x,z)` ledger's "remembered" model is the
+counterpart: a real Copper Key at a far waypoint correctly stays counted while away
+(check-anywhere), and self-heals within the load radius (180 tiles) when revisited.
+
+**Persistence — the real fight.** The ledger save was gated on a GUID change to
+empty (`SaveManager.SetCharacterId(-1)`), which a normal **"Save & Quit" does NOT
+reliably trigger** — so the ledger never reached disk on a clean quit (file simply
+stayed absent, no save error; only the discovery-snapshot half of the shared hook,
+which fires on char-*select*, was ever exercised). Root-caused by inspecting the
+on-disk file (absent) + the log (no save error) + the GUID hook. Fix: a Harmony
+postfix on **`SaveManager.WriteCharacter(int)`** — CK's actual character-file write,
+firing on autosave **and** "Save & Quit" — persists the ledger in **lockstep** with
+CK's own save (never ahead of it; symmetric to the `OnAfterDeserialize` load hook).
+All triggers consolidated into one `SavePossessionLedger()`; char-switch + Shutdown
+kept as backstops. (A periodic-timer autosave was prototyped first, then rejected in
+favour of the CK-aligned hook — saving ahead of CK's save risks a post-crash
+desync.)
+
+**Search-field focus regression.** Refreshing the list *after* `OpenModUI` rebound
+the rows a second time and raced the search field's focus init — the caret blinked
+but keystrokes were swallowed until another widget was clicked. Fixed by running the
+scan + `ListView.Refresh()` **before** opening.
+
+**Deferred / known limits:** the mod training **Dummy** is typed `Creature` (900),
+so it (and tamed pets) belong to **Iter-16**, not the furniture path; the "Ancient
+Chest **(Items/...)**" raw-term display is a follow-up; and a *clustered* foreign
+base (NPC village / second base) still anchors — true base detection is unsolved
+(CK has no base concept). Verified in-game (1.2.1.4, fake-ID dev build 9999997):
+clean sandbox compile, possession counts correct across carried / equipped /
+mannequin-displayed / stored, persistence round-trips a base item across a full CK
+restart, and the Ghorm false-positive is filtered out.

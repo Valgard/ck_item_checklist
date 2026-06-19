@@ -94,5 +94,22 @@ remaining backlog.
   adds its own templates). Pure-prefab, **zero behavioural C#**. The
   `FacetedFilterWidget` class rename -> `FilterWidget` was deferred to Iter-14.2.
 
+- **Iter-20 -- possession counts. DONE** (see `docs/iteration-history.md`).
+  A second completion axis beside discovery: per checklist row, how many of that
+  item the player currently **owns** (carried + base storage/display), with the
+  checkbox + tick tinted blue when owned >=1 and an "In/Not in possession" filter.
+  Possession = the player's carried inventory (always live) + placed furniture and
+  storage/display contents within `AnchorRadius` of a **clustered** crafting-station
+  anchor; persisted per character as a per-(x,z) ledger (`API.ConfigFilesystem`),
+  with remote containers "remembered" so the player can check ownership from
+  anywhere. Persistence rides CK's own character save via a `SaveManager.WriteCharacter`
+  Harmony hook (the GUID-clear save never fired on a normal "Save & Quit"). The
+  cluster filter excludes lone remote stations (a boss arena / outpost) from
+  anchoring foreign world loot. **Deferred:** tamed pets + the mod training Dummy
+  (typed `Creature`/900) -> Iter-16; the "Ancient Chest (Items/...)" raw-term
+  display -> follow-up. **Known limitation:** a *clustered* foreign base (NPC
+  village / second base) still anchors -- true base detection is unsolved (CK has no
+  base concept).
+
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
