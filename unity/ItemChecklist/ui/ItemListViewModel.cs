@@ -31,6 +31,7 @@ namespace ItemChecklist.UI
         private static readonly HashSet<Rarity> s_rarity  = new HashSet<Rarity>();
         private static readonly HashSet<ItemCategory> s_category = new HashSet<ItemCategory>();
         private static readonly HashSet<bool> s_craft = new HashSet<bool>();          // true=craftable
+        private static readonly HashSet<bool> s_owned = new HashSet<bool>();          // Iter-20: true=owned (possession ≥1)
 
         private string searchText = "";
 
@@ -66,19 +67,21 @@ namespace ItemChecklist.UI
         public bool RaritySelected(Rarity r)           => s_rarity.Contains(r);
         public bool CategorySelected(ItemCategory c)   => s_category.Contains(c);
         public bool CraftSelected(bool craftable)      => s_craft.Contains(craftable);
+        public bool OwnedSelected(bool owned)          => s_owned.Contains(owned);
 
         public void ToggleDiscovery(bool discovered) => Toggle(s_discovery, discovered);
         public void ToggleRarity(Rarity r)           => Toggle(s_rarity, r);
         public void ToggleCategory(ItemCategory c)   => Toggle(s_category, c);
         public void ToggleCraft(bool craftable)      => Toggle(s_craft, craftable);
+        public void ToggleOwned(bool owned)          => Toggle(s_owned, owned);
 
         public int ActiveFilterCount =>
-            s_discovery.Count + s_rarity.Count + s_category.Count + s_craft.Count;
+            s_discovery.Count + s_rarity.Count + s_category.Count + s_craft.Count + s_owned.Count;
 
         public void ClearAllFilters()
         {
             bool any = ActiveFilterCount > 0;
-            s_discovery.Clear(); s_rarity.Clear(); s_category.Clear(); s_craft.Clear();
+            s_discovery.Clear(); s_rarity.Clear(); s_category.Clear(); s_craft.Clear(); s_owned.Clear();
             if (any) Recompute();
         }
 
@@ -122,6 +125,7 @@ namespace ItemChecklist.UI
                 if (s_rarity.Count   > 0 && !s_rarity.Contains(e.Rarity))   continue;
                 if (s_category.Count > 0 && !s_category.Contains(ItemCategories.Of(e.ObjectType))) continue;
                 if (s_craft.Count    > 0 && !s_craft.Contains(e.IsCraftable)) continue;
+                if (s_owned.Count    > 0 && !s_owned.Contains(ItemChecklistMod.Possession.Count(e.ObjectId) >= 1)) continue;
                 if (needle.Length > 0)
                 {
                     if (e.DisplayName.ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0)

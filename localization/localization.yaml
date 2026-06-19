@@ -33,6 +33,9 @@ ItemChecklist-Filters:
   Undiscovered: { en: "Undiscovered",  de: "Unentdeckt" }
   Craftable:    { en: "Craftable",     de: "Herstellbar" }
   NotCraftable: { en: "Not craftable", de: "Nicht herstellbar" }
+  SecPossession: { en: "Possession",   de: "Besitz" }
+  Owned:        { en: "In possession",     de: "Im Besitz" }
+  NotOwned:     { en: "Not in possession", de: "Nicht im Besitz" }
 ItemChecklist-Rarities:
   Common:    { en: "Common",    de: "Gewöhnlich" }
   Uncommon:  { en: "Uncommon",  de: "Ungewöhnlich" }

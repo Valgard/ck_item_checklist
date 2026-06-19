@@ -97,6 +97,10 @@ namespace ItemChecklist.UI
 
                     (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Discovered"),   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
                     (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Undiscovered"), () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
+
+                    // Iter-20: possession dimension, placed right under Discovery.
+                    (Loc.T("ItemChecklist-Filters/SecPossession"), Loc.T("ItemChecklist-Filters/Owned"),    () => model.OwnedSelected(true),  () => model.ToggleOwned(true)),
+                    (Loc.T("ItemChecklist-Filters/SecPossession"), Loc.T("ItemChecklist-Filters/NotOwned"), () => model.OwnedSelected(false), () => model.ToggleOwned(false)),
                 };
                 foreach (var r in RarityFilterTiers())
                     members.Add((Loc.T("ItemChecklist-Filters/SecRarity"), RarityLabel(r), () => model.RaritySelected(r), () => model.ToggleRarity(r)));
