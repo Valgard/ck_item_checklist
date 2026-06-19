@@ -91,6 +91,83 @@ namespace ItemChecklist.Possession
             return totals;
         }
 
+        /// <summary>Update the ledger from the live world and return the merged view.</summary>
+        public static PossessionView Scan(PossessionLedger ledger, float radius)
+        {
+            var world = ResolveWorld();
+            if (world == null) return PossessionView.Empty;
+            var em = world.EntityManager;
+
+            // Anchors.
+            var anchors = new List<Vector2>();
+            using (var anchorQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<CraftingCD>(),
+                ComponentType.ReadOnly<LocalTransform>(),
+                ComponentType.ReadOnly<ObjectDataCD>()))
+            using (var anchorEnts = anchorQuery.ToEntityArray(Allocator.TempJob))
+            {
+                for (int i = 0; i < anchorEnts.Length; i++)
+                {
+                    var od = em.GetComponentData<ObjectDataCD>(anchorEnts[i]);
+                    if (od.objectID == ObjectID.Player) continue;
+                    var p = em.GetComponentData<LocalTransform>(anchorEnts[i]).Position;
+                    anchors.Add(new Vector2(p.x, p.z));
+                }
+            }
+
+            using var invQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<ContainedObjectsBuffer>(),
+                ComponentType.ReadOnly<ObjectDataCD>(),
+                ComponentType.ReadOnly<LocalTransform>());
+            using var ents = invQuery.ToEntityArray(Allocator.TempJob);
+
+            var carried = new Dictionary<int, int>();
+            var liveKeys = new HashSet<long>();
+            float r2 = radius * radius;
+            Vector2 playerPos = default;
+            bool havePlayer = false;
+
+            for (int i = 0; i < ents.Length; i++)
+            {
+                var e = ents[i];
+                var od = em.GetComponentData<ObjectDataCD>(e);
+                int id = (int)od.objectID;
+
+                if (od.objectID == ObjectID.Player)
+                {
+                    AddBuffer(em, e, carried);
+                    var pp = em.GetComponentData<LocalTransform>(e).Position;
+                    playerPos = new Vector2(pp.x, pp.z);
+                    havePlayer = true;
+                    continue;
+                }
+                if (em.HasComponent<CraftingCD>(e)) continue;
+                if (!em.HasComponent<MineableCD>(e)) continue;
+                if (PossessionClassifier.IsLockedChest(id)) continue;
+                var info = PugDatabase.GetObjectInfo(od.objectID, 0);
+                if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
+
+                var pos = em.GetComponentData<LocalTransform>(e).Position;
+                if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
+
+                int tx = Mathf.RoundToInt(pos.x), tz = Mathf.RoundToInt(pos.z);
+                long key = PossessionLedger.Key(tx, tz);
+                var contents = new Dictionary<int, int>();
+                AddBuffer(em, e, contents);
+                ledger.SetLiveContainer(key, contents);
+                liveKeys.Add(key);
+            }
+
+            // Self-heal: drop remembered containers inside the load bubble that we
+            // did NOT re-observe (destroyed / anchor removed). 180 < ImmediateLoadRadius
+            // (200), so anything within it is definitely loaded this snapshot.
+            const float LoadRadius = 180f;
+            if (havePlayer) ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys);
+
+            ledger.SetCarried(carried);
+            return ledger.BuildView(liveKeys);
+        }
+
         private static bool WithinAnchor(List<Vector2> anchors, float x, float z, float r2)
         {
             for (int i = 0; i < anchors.Count; i++)

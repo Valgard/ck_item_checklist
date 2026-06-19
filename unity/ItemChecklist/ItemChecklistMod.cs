@@ -43,6 +43,8 @@ namespace ItemChecklist
         // HideAllInventoryAndCraftingUI — the opposite of an always-on HUD).
         private static GameObject hudPrefab;
 
+        private static PossessionLedger s_debugLedger;   // ITER-20 TASK-2 DEBUG
+
         // Rewired player captured via ControlMappingModule.rewiredStart
         // (Rewired is not ready at EarlyInit). Used to poll the bound
         // toggle action each frame.
@@ -133,11 +135,16 @@ namespace ItemChecklist
 
         public void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-1 DEBUG — removed in Task 7
+            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-2 DEBUG — removed in Task 7
             {
-                var t = PossessionScanner.ScanRaw(48f);
-                Debug.Log($"[Iter20] ScanRaw items={t.Count}");
-                foreach (var kv in t) Debug.Log($"[Iter20]   id={kv.Key} count={kv.Value}");
+                if (s_debugLedger == null) s_debugLedger = new PossessionLedger();
+                var view = PossessionScanner.Scan(s_debugLedger, 48f);
+                var ids = new System.Collections.Generic.HashSet<int>();
+                foreach (var c in s_debugLedger.Containers.Values)
+                    foreach (var id in c.Keys) ids.Add(id);
+                Debug.Log($"[Iter20] containers={s_debugLedger.Containers.Count} distinctStorageItems={ids.Count}");
+                foreach (var id in ids)
+                    Debug.Log($"[Iter20]   id={id} count={view.Count(id)} remembered={view.IsRemembered(id)}");
             }
 
             // Instantiate the always-on HUD counter once the UIManager and its
