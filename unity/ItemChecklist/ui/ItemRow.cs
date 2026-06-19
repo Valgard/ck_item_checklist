@@ -25,6 +25,11 @@ namespace ItemChecklist.UI
         private static Sprite s_coinSprite;
         private static bool s_coinResolved;
 
+        // Iter-20: the checkbox AND the "done" tick turn blue when the player owns ≥1.
+        // The prefab tints both white, so owned==0 rows just reset to white (the pool
+        // recycles, so the colour must be set each bind).
+        private static readonly Color OwnedTint = new Color(0.35f, 0.65f, 1f);
+
         private static Sprite CoinSprite()
         {
             if (!s_coinResolved)
@@ -74,8 +79,19 @@ namespace ItemChecklist.UI
 
             // Checkbox: empty box on every row; the requirement icon fills it only
             // when the item is discovered (the checklist "done" tick).
-            if (checkmark != null) checkmark.enabled = true;
-            if (checkFill != null) checkFill.enabled = isDiscovered;
+            // Iter-20: both the box and the "done" tick go blue when the player owns ≥1.
+            bool owned = possessionCount >= 1;
+            if (checkmark != null)
+            {
+                checkmark.enabled = true;
+                checkmark.color = owned ? OwnedTint : Color.white;
+            }
+            if (checkFill != null)
+            {
+                checkFill.enabled = isDiscovered;
+                if (isDiscovered)
+                    checkFill.color = owned ? OwnedTint : Color.white;
+            }
 
             // Iter-6 rarity colouring. Set the colour AFTER Render(): SetTempColor
             // writes the glyph SpriteRenderers that Render() rebuilds, so a colour
