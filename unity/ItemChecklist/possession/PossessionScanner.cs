@@ -91,6 +91,18 @@ namespace ItemChecklist.Possession
                 // Cheap range gate first → DB/type checks only for near-anchor entities.
                 if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
                 if (PossessionClassifier.IsLockedChest(id)) continue;
+
+                // Boss statues are typed NonUsable + not Mineable, so they would fail
+                // the generic furniture filter below; count the placed statue itself.
+                if (PossessionClassifier.IsBossStatue(id))
+                {
+                    int sx = Mathf.RoundToInt(pos.x), sz = Mathf.RoundToInt(pos.z);
+                    long sk = PossessionLedger.Key(sx, sz);
+                    ledger.SetLiveContainer(sk, new Dictionary<int, int> { [id] = 1 });
+                    liveKeys.Add(sk);
+                    continue;
+                }
+
                 if (!em.HasComponent<MineableCD>(e)) continue;
                 var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                 if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;

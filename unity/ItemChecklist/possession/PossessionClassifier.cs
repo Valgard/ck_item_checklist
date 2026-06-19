@@ -22,5 +22,11 @@ namespace ItemChecklist.Possession
         };
 
         public static bool IsLockedChest(int objectId) => LockedChestIds.Contains(objectId);
+
+        // Boss-summon statues (LarvaBossStatue 4101 … ExcavationBossStatue 4109 — a
+        // contiguous block). Placeable + in the catalog (discoverable), but typed
+        // NonUsable(0) + not Mineable, so the generic furniture filter misses them.
+        // Counted explicitly as owned placed objects (no contents — they are stations).
+        public static bool IsBossStatue(int objectId) => objectId >= 4101 && objectId <= 4109;
     }
 }
