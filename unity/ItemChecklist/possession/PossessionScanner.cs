@@ -73,6 +73,12 @@ namespace ItemChecklist.Possession
             Vector2 playerPos = default;
             bool havePlayer = false;
 
+            // Accumulate per tile (x,z): multiple counted entities can share a tile
+            // (e.g. a torch standing on a mannequin's tile). Their contents MERGE — an
+            // earlier SetLiveContainer must not be overwritten by the next entity on the
+            // same tile (that lost the mannequin's displayed armor → counted 0).
+            var scan = new Dictionary<long, Dictionary<int, int>>();
+
             for (int i = 0; i < ents.Length; i++)
             {
                 var e = ents[i];
@@ -90,34 +96,37 @@ namespace ItemChecklist.Possession
 
                 // Cheap range gate first → DB/type checks only for near-anchor entities.
                 if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
-                if (PossessionClassifier.IsLockedChest(id)) continue;
 
-                // Boss statues are typed NonUsable + not Mineable, so they would fail
-                // the generic furniture filter below; count the placed statue itself.
-                if (PossessionClassifier.IsBossStatue(id))
+                long key = PossessionLedger.Key(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.z));
+
+                // Locked chests + boss statues: count the placed OBJECT as owned, but
+                // NOT its contents. A locked chest is placeable furniture the player
+                // owns, yet its loot is unknown until opened; a boss statue is typed
+                // NonUsable + not Mineable so it would fail the generic filter below.
+                if (PossessionClassifier.IsLockedChest(id) || PossessionClassifier.IsBossStatue(id))
                 {
-                    int sx = Mathf.RoundToInt(pos.x), sz = Mathf.RoundToInt(pos.z);
-                    long sk = PossessionLedger.Key(sx, sz);
-                    ledger.SetLiveContainer(sk, new Dictionary<int, int> { [id] = 1 });
-                    liveKeys.Add(sk);
+                    AddOne(Tile(scan, key), id);
                     continue;
                 }
 
-                if (!em.HasComponent<MineableCD>(e)) continue;
+                // `ObjectType.PlaceablePrefab` + near-anchor is the "placed furniture I
+                // own" gate. MineableCD is NOT required — some owned placeables (a
+                // training Dummy, a WayPoint) are removed via a menu, not by mining, and
+                // would otherwise be missed. Type 800 already excludes DroppedItem(0),
+                // NPCs(900), TheCore(0); stations fall out via !CraftingCD below.
                 var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                 if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
 
                 // A placed, owned furniture object within range. Count the object itself
                 // (+1), plus — if it is storage/display (not a crafting station) — its
                 // contents. Stations' transient input/output slots are NOT counted.
-                int tx = Mathf.RoundToInt(pos.x), tz = Mathf.RoundToInt(pos.z);
-                long key = PossessionLedger.Key(tx, tz);
-                var contents = new Dictionary<int, int> { [id] = 1 };
+                var tile = Tile(scan, key);
+                AddOne(tile, id);
                 if (!em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e))
-                    AddBuffer(em, e, contents);
-                ledger.SetLiveContainer(key, contents);
-                liveKeys.Add(key);
+                    AddBuffer(em, e, tile);
             }
+
+            foreach (var kv in scan) { ledger.SetLiveContainer(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
 
             // Self-heal: drop remembered containers inside the load bubble that we
             // did NOT re-observe (destroyed / anchor removed). 180 < ImmediateLoadRadius
@@ -151,13 +160,25 @@ namespace ItemChecklist.Possession
                 // `amount` is double-purposed: stack size for stackable items, but
                 // DURABILITY for equipment (tools/armor). So a single full-durability
                 // hat would otherwise count as e.g. 50. Mirror CK's GetTotalAmount:
-                // stackable → amount, non-stackable → 1 per occupied slot.
-                var slotInfo = PugDatabase.GetObjectInfo(item.objectID, item.variation);
+                // stackable → amount, non-stackable → 1 per occupied slot. Look up
+                // stackability at variation 0 — it does not vary by variation, and a
+                // non-existent (objectID, variation) combo returns null (which would
+                // wrongly fall through to the durability branch for some skins).
+                var slotInfo = PugDatabase.GetObjectInfo(item.objectID, 0);
                 int add = (slotInfo != null && slotInfo.isStackable)
                     ? (item.amount > 0 ? item.amount : 1)
                     : 1;
                 totals[id] = (totals.TryGetValue(id, out var c) ? c : 0) + add;
             }
         }
+
+        private static Dictionary<int, int> Tile(Dictionary<long, Dictionary<int, int>> scan, long key)
+        {
+            if (!scan.TryGetValue(key, out var d)) { d = new Dictionary<int, int>(); scan[key] = d; }
+            return d;
+        }
+
+        private static void AddOne(Dictionary<int, int> tile, int id)
+            => tile[id] = (tile.TryGetValue(id, out var c) ? c : 0) + 1;
     }
 }
