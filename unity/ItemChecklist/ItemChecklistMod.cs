@@ -2,6 +2,7 @@ using System.Linq;
 using CoreLib;
 using CoreLib.Submodule.ControlMapping;
 using CoreLib.Submodule.UserInterface;
+using ItemChecklist.Possession;
 using ItemChecklist.UI;
 using PugMod;
 using Rewired;
@@ -132,6 +133,13 @@ namespace ItemChecklist
 
         public void Update()
         {
+            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-1 DEBUG — removed in Task 7
+            {
+                var t = PossessionScanner.ScanRaw(48f);
+                Debug.Log($"[Iter20] ScanRaw items={t.Count}");
+                foreach (var kv in t) Debug.Log($"[Iter20]   id={kv.Key} count={kv.Value}");
+            }
+
             // Instantiate the always-on HUD counter once the UIManager and its
             // HUD hierarchy exist. Parent under chestInventoryUI's parent — the
             // in-game HUD root (where CK's HUD lives and CoreLib mounts modal
