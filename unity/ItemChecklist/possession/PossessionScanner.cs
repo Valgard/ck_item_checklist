@@ -60,6 +60,12 @@ namespace ItemChecklist.Possession
                 }
             }
 
+            // Cluster filter: a station only counts as a BASE anchor if it is part of a
+            // cluster (≥1 other station within ClusterRadius). A real base packs many
+            // stations together; a lone station at a remote outpost / boss arena / world
+            // structure must not anchor foreign world content as "owned".
+            anchors = ClusteredAnchors(anchors);
+
             // ALL placed entities (not just containers) so the placed object itself
             // counts — a workbench/torch/decoration is owned even with no inventory.
             using var objQuery = em.CreateEntityQuery(
@@ -137,6 +143,23 @@ namespace ItemChecklist.Possession
 
             ledger.SetCarried(carried);
             return ledger.BuildView(liveKeys);
+        }
+
+        // Keep only stations that have ≥1 other station within ClusterRadius — a base
+        // packs stations together; a lone remote station is not a base anchor.
+        private static List<Vector2> ClusteredAnchors(List<Vector2> anchors)
+        {
+            const float ClusterRadius = 16f;
+            float c2 = ClusterRadius * ClusterRadius;
+            var clustered = new List<Vector2>();
+            for (int a = 0; a < anchors.Count; a++)
+                for (int b = 0; b < anchors.Count; b++)
+                {
+                    if (a == b) continue;
+                    float dx = anchors[a].x - anchors[b].x, dz = anchors[a].y - anchors[b].y;
+                    if (dx * dx + dz * dz <= c2) { clustered.Add(anchors[a]); break; }
+                }
+            return clustered;
         }
 
         private static bool WithinAnchor(List<Vector2> anchors, float x, float z, float r2)
