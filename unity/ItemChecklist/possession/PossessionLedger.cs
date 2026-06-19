@@ -66,5 +66,45 @@ namespace ItemChecklist.Possession
 
             return new PossessionView(totals, remembered);
         }
+
+        // --- Persistence (storage containers only; carried is never persisted) ---
+        // Format: one line per container "x,z|id:count,id:count".
+
+        public string Serialize()
+        {
+            var lines = new List<string>();
+            foreach (var pair in _containers)
+            {
+                if (pair.Value.Count == 0) continue;
+                var sb = new List<string>(pair.Value.Count);
+                foreach (var kv in pair.Value) sb.Add(kv.Key + ":" + kv.Value);
+                lines.Add(KeyX(pair.Key) + "," + KeyZ(pair.Key) + "|" + string.Join(",", sb));
+            }
+            return string.Join("\n", lines);
+        }
+
+        public void LoadFrom(string text)
+        {
+            _containers.Clear();
+            if (string.IsNullOrEmpty(text)) return;
+            foreach (var line in text.Split('\n'))
+            {
+                if (line.Length == 0) continue;
+                int bar = line.IndexOf('|');
+                if (bar <= 0) continue;
+                var xz = line.Substring(0, bar).Split(',');
+                if (xz.Length != 2 || !int.TryParse(xz[0], out int x) || !int.TryParse(xz[1], out int z)) continue;
+                var contents = new Dictionary<int, int>();
+                foreach (var pair in line.Substring(bar + 1).Split(','))
+                {
+                    int colon = pair.IndexOf(':');
+                    if (colon <= 0) continue;
+                    if (int.TryParse(pair.Substring(0, colon), out int id)
+                        && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                        contents[id] = cnt;
+                }
+                if (contents.Count > 0) _containers[Key(x, z)] = contents;
+            }
+        }
     }
 }

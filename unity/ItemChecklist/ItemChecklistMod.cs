@@ -135,16 +135,17 @@ namespace ItemChecklist
 
         public void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-2 DEBUG — removed in Task 7
+            if (Input.GetKeyDown(KeyCode.F3))   // ITER-20 TASK-3 DEBUG — removed in Task 7
             {
-                if (s_debugLedger == null) s_debugLedger = new PossessionLedger();
-                var view = PossessionScanner.Scan(s_debugLedger, 48f);
-                var ids = new System.Collections.Generic.HashSet<int>();
-                foreach (var c in s_debugLedger.Containers.Values)
-                    foreach (var id in c.Keys) ids.Add(id);
-                Debug.Log($"[Iter20] containers={s_debugLedger.Containers.Count} distinctStorageItems={ids.Count}");
-                foreach (var id in ids)
-                    Debug.Log($"[Iter20]   id={id} count={view.Count(id)} remembered={view.IsRemembered(id)}");
+                string guid = SaveManagerActiveSelectHook.ActiveGuid;
+                if (s_debugLedger == null)
+                {
+                    s_debugLedger = PossessionStore.Load(guid);
+                    Debug.Log($"[Iter20] LOADED-FROM-DISK containers={s_debugLedger.Containers.Count} guid={guid}");
+                }
+                var view = PossessionScanner.Scan(s_debugLedger, 48f, false);
+                PossessionStore.Save(guid, s_debugLedger);
+                Debug.Log($"[Iter20] after-scan containers={s_debugLedger.Containers.Count}");
             }
 
             // Instantiate the always-on HUD counter once the UIManager and its

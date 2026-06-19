@@ -91,8 +91,13 @@ namespace ItemChecklist.Possession
             return totals;
         }
 
-        /// <summary>Update the ledger from the live world and return the merged view.</summary>
-        public static PossessionView Scan(PossessionLedger ledger, float radius)
+        /// <summary>Update the ledger from the live world and return the merged view.
+        /// `allowPrune` MUST be false until the world has been stably loaded for a
+        /// grace period: right after a world load/teleport the chunks stream in
+        /// asynchronously, so a container near the player may be absent from the query
+        /// for a few seconds — pruning then would wrongly delete real (just-not-yet-
+        /// streamed) storage and overwrite the persisted file with the loss.</summary>
+        public static PossessionView Scan(PossessionLedger ledger, float radius, bool allowPrune)
         {
             var world = ResolveWorld();
             if (world == null) return PossessionView.Empty;
@@ -160,9 +165,10 @@ namespace ItemChecklist.Possession
 
             // Self-heal: drop remembered containers inside the load bubble that we
             // did NOT re-observe (destroyed / anchor removed). 180 < ImmediateLoadRadius
-            // (200), so anything within it is definitely loaded this snapshot.
+            // (200), so an in-bubble container is loaded — BUT only once streaming has
+            // settled (allowPrune gates the post-load window; see the doc comment).
             const float LoadRadius = 180f;
-            if (havePlayer) ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys);
+            if (allowPrune && havePlayer) ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys);
 
             ledger.SetCarried(carried);
             return ledger.BuildView(liveKeys);
