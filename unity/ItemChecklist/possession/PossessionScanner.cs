@@ -60,11 +60,12 @@ namespace ItemChecklist.Possession
                 }
             }
 
-            using var invQuery = em.CreateEntityQuery(
-                ComponentType.ReadOnly<ContainedObjectsBuffer>(),
+            // ALL placed entities (not just containers) so the placed object itself
+            // counts — a workbench/torch/decoration is owned even with no inventory.
+            using var objQuery = em.CreateEntityQuery(
                 ComponentType.ReadOnly<ObjectDataCD>(),
                 ComponentType.ReadOnly<LocalTransform>());
-            using var ents = invQuery.ToEntityArray(Allocator.TempJob);
+            using var ents = objQuery.ToEntityArray(Allocator.TempJob);
 
             var carried = new Dictionary<int, int>();
             var liveKeys = new HashSet<long>();
@@ -77,28 +78,31 @@ namespace ItemChecklist.Possession
                 var e = ents[i];
                 var od = em.GetComponentData<ObjectDataCD>(e);
                 int id = (int)od.objectID;
+                var pos = em.GetComponentData<LocalTransform>(e).Position;
 
                 if (od.objectID == ObjectID.Player)
                 {
-                    AddBuffer(em, e, carried);
-                    var pp = em.GetComponentData<LocalTransform>(e).Position;
-                    playerPos = new Vector2(pp.x, pp.z);
+                    if (em.HasComponent<ContainedObjectsBuffer>(e)) AddBuffer(em, e, carried);
+                    playerPos = new Vector2(pos.x, pos.z);
                     havePlayer = true;
                     continue;
                 }
-                if (em.HasComponent<CraftingCD>(e)) continue;
-                if (!em.HasComponent<MineableCD>(e)) continue;
+
+                // Cheap range gate first → DB/type checks only for near-anchor entities.
+                if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
                 if (PossessionClassifier.IsLockedChest(id)) continue;
-                var info = PugDatabase.GetObjectInfo(od.objectID, 0);
+                if (!em.HasComponent<MineableCD>(e)) continue;
+                var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                 if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
 
-                var pos = em.GetComponentData<LocalTransform>(e).Position;
-                if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
-
+                // A placed, owned furniture object within range. Count the object itself
+                // (+1), plus — if it is storage/display (not a crafting station) — its
+                // contents. Stations' transient input/output slots are NOT counted.
                 int tx = Mathf.RoundToInt(pos.x), tz = Mathf.RoundToInt(pos.z);
                 long key = PossessionLedger.Key(tx, tz);
-                var contents = new Dictionary<int, int>();
-                AddBuffer(em, e, contents);
+                var contents = new Dictionary<int, int> { [id] = 1 };
+                if (!em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e))
+                    AddBuffer(em, e, contents);
                 ledger.SetLiveContainer(key, contents);
                 liveKeys.Add(key);
             }
