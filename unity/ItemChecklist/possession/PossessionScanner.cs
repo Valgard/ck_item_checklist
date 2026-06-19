@@ -132,7 +132,14 @@ namespace ItemChecklist.Possession
                 var item = buf[j];
                 if (item.objectID == ObjectID.None) continue;
                 int id = (int)item.objectID;
-                int add = item.amount > 0 ? item.amount : 1;
+                // `amount` is double-purposed: stack size for stackable items, but
+                // DURABILITY for equipment (tools/armor). So a single full-durability
+                // hat would otherwise count as e.g. 50. Mirror CK's GetTotalAmount:
+                // stackable → amount, non-stackable → 1 per occupied slot.
+                var slotInfo = PugDatabase.GetObjectInfo(item.objectID, item.variation);
+                int add = (slotInfo != null && slotInfo.isStackable)
+                    ? (item.amount > 0 ? item.amount : 1)
+                    : 1;
                 totals[id] = (totals.TryGetValue(id, out var c) ? c : 0) + add;
             }
         }
