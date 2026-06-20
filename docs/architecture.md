@@ -1078,3 +1078,60 @@ child `IconFill`), the discovered-row checkbox look. Text = a `PugText` renderin
 footer (`FormatTitle`) uses, so the two never drift. Re-rendered on
 `DiscoveredState.Changed` and after each bake (world-load + loc-change hooks),
 never per frame (`PugText.Render` rebuilds glyph SpriteRenderers).
+
+## Possession (Iter-20) + Discovery Gate (Iter-21)
+
+A second completion axis beside discovery: per row, how many of an item the player
+currently **owns**. The checkbox + "done" tick tint **blue** when owned ≥ 1, a
+right-aligned owned-count column shows the number, and an "In / Not in possession"
+filter section sits under Discovery. Goal: completionists who want "own ≥ 1 of every
+item", not just "discovered every item".
+
+### The `possession/` package (read live from the ECS world)
+
+| Class | Responsibility |
+|---|---|
+| `PossessionScanner` | Resolves the inventory world (`World.All`, max `ContainedObjectsBuffer` count = ServerWorld in SP), then scans **all** placed `ObjectDataCD` entities. **Possession = carried + base storage.** Carried = the player's whole `ContainedObjectsBuffer` (always live; includes the 0–9 equipment slots). Base storage = placed furniture/display within `AnchorRadius` of a **clustered** crafting-station anchor; contents read from the entity buffer. Counts the placed object itself, not just contents. |
+| `PossessionLedger` | Keys containers by world tile `(x,z)` (packed `long`), merges `carried + per-container` in `BuildView`, and marks items present only in not-currently-observed containers as "remembered" (check ownership while away from base). |
+| `PossessionStore` | Persists the ledger per character GUID via `API.ConfigFilesystem` (hand-rolled ASCII, sandbox-safe). |
+| `PossessionConfig` | Exposes `AnchorRadius`. |
+| `PossessionClassifier` | Type/ID predicates: `PlaceablePrefab` = 800 is the ownership gate; locked chests + boss statues count the **object** but not contents (loot unknown / boss chest is carriable). |
+| `PossessionView` | The immutable per-refresh snapshot: `Count(objectId)` → owned total. `ItemChecklistMod.Possession` holds the current one (refreshed on open + a throttled interval). |
+
+**Cluster filter — "your base".** A station only anchors if part of a **cluster**
+(≥ 1 other station within `ClusterRadius` = 16 tiles) — a real base packs stations
+together; a lone outpost / boss-arena / NPC station does not. This stops a remote
+world container (e.g. a Copper Key in Ghorm's spawn arena) from counting as owned.
+
+**Durability vs stack.** `ContainedObjectsBuffer.amount` is double-purposed (stack
+size for stackables, **durability** for equipment). Mirror CK's `GetTotalAmount`:
+stackable → amount, non-stackable → 1 per slot; look up stackability at **variation
+0** (a non-existent `(objectID, variation)` returns null and would wrongly take the
+durability branch).
+
+**Persistence rides CK's own save.** `SaveManagerWriteCharacterHook` (Harmony
+postfix on `SaveManager.WriteCharacter(int)`) persists the ledger in **lockstep**
+with CK's character-file write — it fires on autosave **and** "Save & Quit", unlike
+the GUID-clear save that a clean quit never triggers. Symmetric to the
+`CharacterData.OnAfterDeserialize` load hook.
+
+### Discovery gate (Iter-21)
+
+Possession is **spoiler-gated behind discovery**. An undiscovered (`???`) row
+already em-dashes Level/Value (the Iter-10 spoiler guard); showing an owned count
+there is the same kind of spoiler — and produced the incoherent "owned but never
+discovered" state for **world-spawned placed objects** (a Core WayPoint the player
+never picked up still counts in the world scan).
+
+Single chokepoint: `ItemChecklistMod.OwnedCount(int objectId, int variation)` returns
+`Possession.Count(objectId)` only when
+`DiscoveredState.Instance.IsDiscovered(objectId, variation)` (else 0, also the safe
+default before the discovery snapshot loads). Both read sites route through it —
+`ItemChecklistContent` (owned column + blue tint) and `ItemListViewModel` (the
+In/Not-in-possession filter) — so a `???` row can never show possession, by
+construction. It gates on the **same** discovered flag that drives `???`-vs-name.
+
+> The gate is correct regardless of *why* a row is undiscovered. The distinct
+> variation-keyed-discovery case — a family discovered only at a non-0 variation
+> would still render `???` because the row checks `IsDiscovered(objectId, 0)` — is a
+> separate concern deferred to **Iter-17** (per-variation tracking).

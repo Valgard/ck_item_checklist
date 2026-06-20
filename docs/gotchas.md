@@ -840,6 +840,18 @@ the caret lit.
 This loop must run **inline in the main session** (it needs the live CrossOver
 window and the build lock) — see `docs/conventions.md`.
 
+### A user-shared macOS screenshot in `NSIRD_…` is unreadable (TCC `EPERM`)
+When the user shares a screenshot straight from macOS's screencapture **floating
+thumbnail** (before saving it), its path is a protected temp buffer like
+`/var/folders/…/TemporaryItems/NSIRD_screencaptureui_<rand>/Bildschirmfoto ….png`.
+Both the `Read` tool **and** Bash (`cp`/`cat`) get `Operation not permitted`
+(`EPERM`) on it — TCC sandboxes that directory; it is **not** a quoting/space
+issue. Don't retry variants. Ask the user to either **save** the shot (click the
+thumbnail away / ⌘-save → lands on the Desktop) or drag it into `/tmp/`, then
+re-share the path; or have them describe the relevant pixels. (A screenshot the
+user pastes as an inline image attachment is fine — this only bites raw
+`NSIRD_…` filesystem paths.)
+
 ## Item Icons (Iter-12 extension)
 
 ### CK doesn't scale item icons to fit — it enlarges the slot

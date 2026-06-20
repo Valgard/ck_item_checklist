@@ -235,6 +235,7 @@ unity/ItemChecklist/
   DiscoveredState.cs              in-memory mirror of CK discovery state
   SaveManagerDiscoveryHook.cs     Harmony patch on SaveManager.SetObjectAsDiscovered
   SaveManagerActiveSelectHook.cs  Harmony patch for active-character resolution
+  SaveManagerWriteCharacterHook.cs  Harmony patch — persist possession ledger on character save (Iter-20)
   CharacterDataDiscoverySnapshot.cs  initial-state reader on OnAfterDeserialize
   PascalCaseSplitter.cs           pure utility (display-name fallback formatting)
   Loc.cs                          localisation helpers (Loc.T / Loc.F) (Iter-11)
@@ -267,6 +268,13 @@ unity/ItemChecklist/
     ItemCategory.cs               category taxonomy (ObjectType -> bucket) (Iter-10)
     FilterWidget.cs               sectioned multi-select filter dropdown (Iter-10, renamed Iter-14.2)
     FilterCheckboxButton.cs       filter checkbox row button (Iter-10, renamed Iter-14.2)
+  possession/                     possession scan/ledger/persist package (Iter-20)
+    PossessionScanner.cs          live ECS scan: carried + clustered-base storage
+    PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes
+    PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem)
+    PossessionView.cs             immutable per-refresh snapshot (Count(objectId))
+    PossessionConfig.cs           AnchorRadius + tuning
+    PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues)
   Localization/
     Generated/                    build-generated .asset TextDataBlocks (gitignored)
   Prefabs/

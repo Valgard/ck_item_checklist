@@ -72,39 +72,29 @@ Epic) are looked up via `tierMap[baseFamily]` from `CookedFoodCD`.
 
 ## Mod-Specific Gotchas
 
-- **No unit-test framework** — "testing" is build (`utils/build.sh`) +
-  in-game smoke-test via Player.log grep + manual UI verification.
-  Every Iter ends with a multi-point acceptance test list. See
-  `docs/conventions.md § Testing Conventions` for the canonical 7-phase
-  pattern.
-- **PugText pixel-font U+2014 (em-dash) renders as U+002D (hyphen).**
-  Cosmetic only — title format `"Item Checklist — N / M"` shows as
-  `"… - N / M"` in-game.
-- **`Manager.saves.*` property-access is sandbox-banned**, but
-  field-access on serialized struct-fields (e.g.
-  `__instance.characterGuid`, `objectData.variation`) is OK. This
-  unlocks the character-GUID cache key.
-- **PugText pool-leak:** spawned rows must `Clear()` their `PugText`
-  children, or the shared pool leaks and main-menu PugTexts go blank. As
-  of Iter-3.8 rows live in a persistent pool (no per-close Destroy), so
-  the `Clear()` moved to `ItemChecklistContent.OnDestroy` (teardown only)
-  and the blanking symptom can no longer occur. Detail in
-  `docs/architecture.md § Viewport Virtualization`.
-- **`ex.GetType().Name` inside a catch block is sandbox-banned.** `Type.Name`
-  resolves to `MemberInfo.get_Name()` which is blocked by Roslyn's code-security
-  verification. Symptom: `Illegal Member References = '1'`, `CompileFailed`.
-  Fix: use typed catches (`catch (NullReferenceException ex)`) or log only
-  `ex.Message` (sandbox-safe). Never call any `.Name` property on a reflected
-  type in mod code.
-- **uGUI (Canvas/Image) structurally fails in CK** — no `Collider`, so
-  CK's `Physics.Raycast`-based `UIMouse` never sees it. Use
-  `SpriteRenderer` + Layer 5 + `UIelement` (all 10 surveyed CK UI mods do).
-  Full explanation: `docs/gotchas.md § uGUI structurally fails in CK`.
-- **`PugMod.MemberInfo` vs `System.Reflection.MemberInfo` conflict.** Adding
-  `using System.Reflection;` in any mod file causes `CS0104` ambiguity because
-  `PugMod` also exports a `MemberInfo`. Solution: never add
-  `using System.Reflection;` in mod code. Use `API.Reflection.SetValue` /
-  `API.Reflection.Invoke` wrappers directly — they accept `PugMod.MemberInfo`.
+**Sandbox bans (AI guardrails — each `CompileFailed`s the whole mod on first
+reference; keep these in mind when writing mod code):**
+- **`Manager.saves.*` property-access is banned** — but field-access on serialized
+  struct-fields (`__instance.characterGuid`, `objectData.variation`) is OK.
+- **`.Name` on a reflected type inside a catch is banned** (`Type.Name` →
+  `MemberInfo.get_Name()`; symptom `Illegal Member References`). Use typed catches
+  (`catch (NullReferenceException ex)`) or log only `ex.Message`.
+- **Never `using System.Reflection;`** — it `CS0104`-clashes with
+  `PugMod.MemberInfo`. Use `API.Reflection.SetValue` / `.Invoke` directly.
+- **`System.IO.*` is banned** (also reflection-emit, `System.Diagnostics.Process`).
+  Persist via `API.ConfigFilesystem` (hand-ASCII), not file I/O.
+
+**Other:**
+- **No unit-test framework** — testing = `utils/build.sh` + in-game Player.log grep
+  + manual UI verification; canonical 7-phase list in `docs/conventions.md § Testing`.
+- **uGUI (Canvas/Image) structurally fails in CK** (no `Collider` → CK's
+  `Physics.Raycast` `UIMouse` never sees it) — use `SpriteRenderer` + Layer 5 +
+  `UIelement`. See `docs/gotchas.md § uGUI structurally fails in CK`.
+- **PugText pool-leak** — spawned rows must `Clear()` their `PugText` children on
+  teardown (now in `ItemChecklistContent.OnDestroy`). See `docs/architecture.md
+  § Viewport Virtualization`.
+- **Em-dash cosmetic** — PugText's pixel-font renders U+2014 as `-` (the title
+  `"Item Checklist — N / M"` shows as `"… - N / M"`).
 
 ## UI Clipping Pattern
 
@@ -127,39 +117,22 @@ Backlog of planned iterations (Iter-12 onward):
 
 ## Conventions
 
-- Documentation files (`README.md`, this `CLAUDE.md`, `docs/`) are
-  English. Inline code-comments are mixed (English for class/method
-  doc-comments, occasional German in research/spec narrative where
-  shorter to express).
-- Branch naming: `iter-<n>[.<m>[-letter]]`, e.g. `iter-3-7`, `iter-3-5c`.
-  Each iter ends with a ff-merge to main (no squash, per parent global
-  convention). See `docs/conventions.md` for full commit-type conventions,
-  worktree hygiene, and the canonical per-iter test-phase structure.
-- File layout: `docs/conventions.md § File Layout` for the authoritative
-  `unity/ItemChecklist/` directory map.
-- Build-verify (Editor compile ≠ sandbox pass): after a build, grep
-  `Player.log` for the load/compile markers —
-  `grep -iE "error CS|Build complete|Install complete|CompileFailed" Player.log`.
-  A clean Editor build can still `CompileFailed` in the runtime sandbox.
-  Unity **overwrites** `Player.log` per launch (rotating the prior session to
-  `Player-prev.log`) — NOT cumulative; one `Mono path[0]` / `Initialize engine`
-  line = exactly one session, so each grep is single-session and `Player-prev.log`
-  is a free prior-session data point. For a **new `.cs` file**, also verify it
-  landed in the install `Scripts/` AND in `ModManifest.json` — else the runtime
-  sandbox compile fails with the new type missing, invisible to the Editor build.
-- Spec lives in `docs/specs/` (**tracked**; a `PostToolUse` hook enforces this and
-  rejects specs written to `docs/superpowers/specs/`), plan in
-  `docs/superpowers/plans/` (**gitignored**), exploratory research in `docs/research/`.
-  Every iter has a 1:1:1 spec/plan/(optional)research mapping.
-- **Author superpowers specs/plans in the *main* tree, not the worktree.**
-  `git worktree add` only checks out *tracked* files, so a **plan** written to the
-  worktree's gitignored `docs/superpowers/` is lost on `git worktree remove` (the
-  tracked `docs/specs/` spec survives, but author it in main too for consistency).
-  Spec retention is ADR-gated: commit the `docs/specs/` spec only when the change
-  warrants an ADR — otherwise discard it after the iter merges. See
+- **Docs in English** (this `CLAUDE.md`, `README.md`, `docs/`); chat answers German.
+  Inline code-comments mixed (English doc-comments; occasional German in spec/research).
+- **Branch** `iter-<n>[.<m>[-letter]]`; each iter ends with a **ff-merge to main, no
+  squash**. Full commit-type / worktree / per-iter test conventions + the authoritative
+  `unity/ItemChecklist/` File Layout map: `docs/conventions.md`.
+- **Editor compile ≠ sandbox pass.** After a build, grep `Player.log` for
+  `error CS|Build complete|CompileFailed`; a clean Editor build can still
+  `CompileFailed` in the runtime sandbox. `Player.log` is per-launch (prior session
+  rotates to `Player-prev.log`). A **new `.cs` file** must also land in the install
+  `Scripts/` **and** `ModManifest.json`, else the sandbox compile fails on the missing
+  type (invisible to the Editor build).
+- **superpowers spec → `docs/specs/`** (tracked; a `PostToolUse` hook rejects specs
+  written to `docs/superpowers/specs/`); **plan → `docs/superpowers/plans/`**
+  (gitignored); research → `docs/research/`. **Author spec + plan in the MAIN tree**
+  (a worktree's gitignored plan is lost on `git worktree remove`). Spec retention is
+  **ADR-gated** — commit only when ADR-worthy, else discard after the merge. See
   `docs/conventions.md § Worktree Conventions`.
-- **The visual-calibration loop runs inline, not via subagents.** Judging
-  margins / flush / spacing from screenshots requires observing the live
-  CrossOver game window; a Unity batchmode build also locks the project. A
-  subagent can neither see the window nor share the lock, so do this work in
-  the main session.
+- **The visual-calibration / in-game loop runs inline, not via subagents** — it needs
+  the live CrossOver window and the build lock.

@@ -13,6 +13,10 @@ Discovery is tracked **per world × per player**.
   name and discovered/undiscovered state; undiscovered items show as `???`.
 - **Always-on HUD counter** — `N / M (p.p%)` discovered, top-right above the
   minimap, updating live.
+- **Possession tracking** — per row, how many of an item you currently own
+  (carried + base storage/display); the checkbox tints **blue** when owned ≥ 1,
+  with an "in / not in possession" filter. Spoiler-safe: undiscovered (`???`) rows
+  never reveal possession.
 - **Sort** by name, rarity, level or value (ascending/descending).
 - **Faceted filter** — discovery, category, rarity and craftability
   (multi-select; OR within a dimension, AND across dimensions).
@@ -81,9 +85,12 @@ build/install system and CrossOver/macOS specifics.
 
 **Building from a git worktree:** `../utils/build.sh` is correct from the mod
 root, but from inside a worktree (`.worktrees/<branch>/`) the same relative path
-resolves to `.worktrees/utils/`, which does not exist. From a worktree, use an
-absolute path to the shared `utils/` directory, or the worktree-relative
-`../../../utils/build.sh`.
+resolves to `.worktrees/utils/`, which does not exist — use the worktree-relative
+`../../../utils/build.sh` (three levels up). The `.envrc` env chain also breaks in
+a worktree (its `source ../.envrc` fallback points one level too shallow): with
+`direnv`, `direnv exec . …`; without it, source the parent `core_keeper/.envrc` by
+absolute path first, then the worktree `.envrc`. Full recipe in
+`docs/conventions.md § Worktree Conventions`.
 
 ### Publishing
 
