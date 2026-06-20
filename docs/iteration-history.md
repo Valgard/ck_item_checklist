@@ -5,7 +5,7 @@ Iter-15), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
 
 As of 2026-06-20: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, and Iter-20 are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, and Iter-21 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -585,3 +585,56 @@ base (NPC village / second base) still anchors — true base detection is unsolv
 clean sandbox compile, possession counts correct across carried / equipped /
 mannequin-displayed / stored, persistence round-trips a base item across a full CK
 restart, and the Ghorm false-positive is filtered out.
+
+**Iter-21 (possession spoiler-gated behind discovery) — DONE (2026-06-20, branch
+`iter-21`).** Began as the tentative "missing catalog entries (waypoints)" item and
+**re-scoped after diagnosis disproved the premise**. The user reported waypoints
+never getting a checklist row; the roadmap guessed `ItemCatalog.Bake` dropped them
+into an excluded `ObjectType` bucket (most likely `NonObtainable`). The code
+contradicted that guess — `PossessionScanner` already recognised a waypoint as
+`PlaceablePrefab` (which the catalog does **not** filter) — so the exclusion path was
+genuinely unknown and had to be measured, not assumed.
+
+**Diagnostic probe (throwaway, two detectors).** A temporary `RunIter21Probe()` was
+folded into `ItemCatalog.Bake` (committed, then reverted before the fix — net-zero on
+`ItemCatalog.cs`): **(A)** a bake self-audit re-classifying every `objectsByType` key
+with the Loop-1 branch logic, and **(B)** a cross-source diff against the live ECS
+world (mirroring `PossessionScanner`'s world resolution) for placed obtainable
+entities absent from the bake source. In-game (1.2.1.4) result — the decisive line:
+`WayPoint(6514): hasVar0=True … type=PlaceablePrefab icon=has rarity=Epic` → it is
+`ACCEPTED`, i.e. **already in the catalog**; (B) reported **0** missing; the 272
+`NonObtainable` sampled as genuinely non-obtainable (boss spawn anchors,
+`Affix*` projectiles, boss attack entities). **There was no catalog-completeness
+bug.**
+
+**Why the waypoint showed `???`.** It *is* in the catalog but rendered undiscovered.
+Two hypotheses: **H0** — a world-spawned Core waypoint the player never picked up
+(genuinely undiscovered; `???` correct); **H1** — discovered at a non-0 variation
+while the row checks variation 0 (`IsDiscovered(objectId, 0)` exact-match miss →
+a real variation-keyed-discovery bug). The mine-and-recheck test that would separate
+them was unavailable (mining damage too low to harvest a waypoint — itself strong
+evidence for H0: never harvestable ⇒ never held ⇒ never discovered ⇒ the owned one is
+world-spawned).
+
+**The fix the user chose dissolves H0/H1 for this iteration.** A screenshot showed
+the incoherent state directly: an undiscovered (`???`) waypoint row with a **blue**
+(owned) checkbox — Iter-20's world scan counts the placed object regardless of
+discovery. Decision: **possession is spoiler-gated behind discovery.** This aligns
+possession with the existing Iter-10 spoiler guard (Level/Value already em-dashed
+for undiscovered rows) and is internally consistent by construction — it ties
+possession to the *same* discovered flag that drives `???`-vs-name, so a `???` row
+can never show possession, whichever hypothesis is true.
+
+Implementation — one chokepoint: `ItemChecklistMod.OwnedCount(int objectId, int
+variation)` returns `Possession.Count(objectId)` only when
+`DiscoveredState.Instance.IsDiscovered(objectId, variation)` (else 0, also the safe
+default before the discovery snapshot loads). Both prior read sites route through it:
+`ItemChecklistContent` (owned column + blue tint) and `ItemListViewModel` (the
+In/Not-in-possession filter). Pure behavioural C# (+20/−2 across three files); no
+prefab/art touch. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox compile
+(`ItemChecklist safetyCheck=True`, 0 `CompileFailed`); the undiscovered waypoint row
+keeps `???`, drops the blue checkbox and shows `—` for owned, and is excluded from
+"In possession" / included in "Not in possession"; a discovered owned item still
+shows blue + count. **Deferred:** the H1 variation-keyed-discovery case (a family
+discovered only at a non-0 variation still showing `???`) → **Iter-17**
+(per-variation tracking); the gate is correct independent of it.

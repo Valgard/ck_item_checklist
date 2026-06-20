@@ -110,25 +110,25 @@ remaining backlog.
   display -> follow-up. **Known limitation:** a *clustered* foreign base (NPC
   village / second base) still anchors -- true base detection is unsolved (CK has no
   base concept).
-- **Iter-21 (tentative) -- missing catalog entries (e.g. waypoints).** Some items
-  -- waypoints (Wegpunkte) among them -- never get a checklist row. Same bug class
-  as Iter-7.1 (NonUsable raw materials) and Iter-16 (Creature/Critter): the
-  `ItemCatalog.Bake` filter (`ItemCatalog.cs:157-177`) drops whole `ObjectType`
-  buckets (`NonObtainable`/`Creature`/`Critter`/`PlayerType`, plus icon-less
-  `NonUsable`), and waypoints likely fall into one of them (most plausibly
-  `NonObtainable`, where CK tends to file placeable world prefabs). Notable tension
-  for the diagnosis pass: the Iter-20 `PossessionScanner` already recognises a
-  waypoint as a `PlaceablePrefab` and counts it in possession
-  (`PossessionScanner.cs:120`), so the item is known to the *world scan* but absent
-  from the *catalog* -- the exact exclusion path is to be confirmed in-game, not
-  assumed. Open questions for the design pass: (1) which `ObjectType` / filter
-  branch actually drops the waypoint (decompile + in-game `GetObjectInfo` probe on
-  the waypoint ObjectID), (2) whether the fix is a narrow allow-list (like the
-  Iter-7.1 icon guard) or a broader rethink of the type-exclusion list, and
-  (3) whether other placeable prefabs are silently missing for the same reason --
-  audit the full set, don't patch waypoints alone. As with Iter-7.1, IB's full
-  `IsNonObtainable` can't be reused (needs ECS/registry APIs the sandbox blocks).
-  Not yet elaborated.
+- **Iter-21 -- possession spoiler-gated behind discovery. DONE** (see
+  `docs/iteration-history.md`). **Re-scoped** from the tentative "missing catalog
+  entries (waypoints)" framing: a throwaway diagnostic probe proved the catalog is
+  **complete** -- the WayPoint (ObjectID 6514) *is* baked at variation 0
+  (`ACCEPTED`, `type=PlaceablePrefab`, icon present); the cross-source diff found
+  **0** obtainable items missing from the bake source; and the 272 `NonObtainable`
+  drops are genuinely non-obtainable (boss spawn anchors, projectiles, affixes).
+  The real issue: an **undiscovered** (`???`) row still showed an owned count + blue
+  checkbox -- the incoherent "owned but never discovered" state for **world-spawned
+  placed objects** (a Core WayPoint the player never mined, which the Iter-20 world
+  scan counts). Fix: `ItemChecklistMod.OwnedCount(objectId, variation)` returns 0
+  unless the row is discovered (the same flag that drives `???`-vs-name), so the
+  owned column, blue tint, **and** the In/Not-in-possession filter all treat an
+  undiscovered item as not owned -- aligning possession with the existing Iter-10
+  spoiler guard (Level/Value already em-dashed when undiscovered). One chokepoint,
+  both read sites routed through it. Pure behavioural C# (+20/-2); no prefab/art
+  touch. The variation-keyed-discovery question (a family discovered only at a
+  non-0 variation would still show `???`) was raised during diagnosis and
+  **deferred to Iter-17** -- the gate is correct regardless of that.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
