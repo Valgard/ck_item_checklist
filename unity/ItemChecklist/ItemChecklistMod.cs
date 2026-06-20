@@ -47,6 +47,24 @@ namespace ItemChecklist
         // per visible row. Refreshed on open + a throttled interval; the per-(x,z)
         // ledger is loaded/saved around character (GUID) activation.
         internal static PossessionView Possession { get; private set; } = PossessionView.Empty;
+
+        // Iter-21: possession is spoiler-gated behind discovery. An undiscovered row
+        // renders "???" and already em-dashes Level/Value (Iter-10 spoiler guard);
+        // showing an owned count there is the same kind of spoiler — and produced the
+        // incoherent "owned but never discovered" state for world-spawned placed
+        // objects (e.g. a Core WayPoint the player never picked up, which the Iter-20
+        // world scan counts). Gate on the SAME discovered flag the row uses for
+        // ???-vs-name, so an undiscovered row can never show possession. Returns 0
+        // (treated as "not owned" by the column, blue tint, and the possession filter)
+        // when undiscovered or before the discovery snapshot has loaded.
+        internal static int OwnedCount(int objectId, int variation)
+        {
+            var disc = DiscoveredState.Instance;
+            return disc != null && disc.IsDiscovered(objectId, variation)
+                ? Possession.Count(objectId)
+                : 0;
+        }
+
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
         private const float PossessionRefreshSeconds = 3f;

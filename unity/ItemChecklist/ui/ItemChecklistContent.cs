@@ -186,7 +186,7 @@ namespace ItemChecklist.UI
                 // Uncommon+ get slotBorderRarityColors[(int)(rarity+1)].
                 Color rarityColor = Manager.ui.GetSlotBorderRarityColor(
                     entry.Rarity, useDefaultColorForCommon: true, defaultColor: _defaultLabelColor);
-                int owned = ItemChecklistMod.Possession.Count(entry.ObjectId);
+                int owned = ItemChecklistMod.OwnedCount(entry.ObjectId, entry.Variation);
                 row.Bind(entry.ObjectId, entry.Icon, entry.DisplayName,
                     state.IsDiscovered(entry.ObjectId, entry.Variation),
                     rarityColor, entry.Rarity, entry.Level, entry.SellValue,
