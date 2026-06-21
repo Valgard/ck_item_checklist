@@ -2,7 +2,8 @@
 
 Full per-iteration narrative of ItemChecklist's development (Iter-3.5
 onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
-canonical per-iter merge points and `docs/superpowers/specs/` for design docs.
+canonical per-iter merge points; retained (ADR-gated) design specs live under
+`docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
 As of 2026-06-20: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
 Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, and Iter-21 are DONE on main. Iter-3.8
@@ -655,7 +656,9 @@ and only surfaced by measuring.
 **randomly** on hatch (`rng.NextInt(maxSkins)`). All skins of a pet share one
 ObjectID. **CK tracks no per-skin discovery** and has no native skin-collection.
 Skins render as gradient recolors of one base sprite. (Full facts in the
-`reference_ck_pet_critter_discovery_model` memory + `docs/specs/`.)
+`reference_ck_pet_critter_discovery_model` memory, the diagnostic probe
+`docs/research/iter-16-1-pet-probe.md`, and the retained design spec
+`docs/specs/2026-06-21-iter-16-1-pet-skin-collection-design.md`.)
 
 **Decision (the user's framing): each skin is a separate collectible.** So the
 single skinless pet row is replaced by one row per skin (`skins.Count` rows; ~63

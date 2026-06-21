@@ -76,7 +76,8 @@ remaining backlog.
   catchable subset (icon-guard vs. component vs. ID range) via a probe; non-catchable
   ambient critters must stay out (would be permanent `???`).
 - **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
-  family to its `variation == 0` entry (`ItemCatalog.cs:130`), so colour/skin/state
+  family to its `variation == 0` entry (the `od.variation != 0` guard in
+  `ItemCatalog.Bake`), so colour/skin/state
   variants never get their own row. CK tracks discovery per `(objectID, variation)`
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
@@ -157,5 +158,11 @@ remaining backlog.
   scroll its `RowContainer`, mirroring the main list's `UIScrollWindow`/SpriteMask
   pattern) instead of overflowing. Requested 2026-06-21.
 
-See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
-for design docs.
+> **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
+> sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
+> tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
+> `docs/conventions.md § Branch + Commit Conventions`.
+
+See `git log` for canonical per-iter merge points. Design docs: retained
+(ADR-gated) specs live under `docs/specs/`; transient plans + brainstorming scratch
+under `docs/superpowers/` (gitignored).
