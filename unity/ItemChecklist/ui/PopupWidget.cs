@@ -20,7 +20,7 @@ namespace ItemChecklist.UI
         public Sprite caretOpen;               // ui_group_collapse (expanded)
         public GameObject popupPanel;          // toggled container holding the rows
         public Transform rowContainer;         // parent for cloned rows
-        public float rowSpacing = 0.7f;        // compact row spacing (NOT the big list RowHeight)
+        public float rowSpacing = 0.625f;      // compact row spacing (NOT the big list RowHeight); matches the prefab
 
         protected SpriteRenderer _panel;       // cached popup bg, auto-sized to the row count
         protected float _topY;                 // authored popup top edge (popup.y + size/2), captured once
@@ -33,10 +33,10 @@ namespace ItemChecklist.UI
         // a newly-added serialized float is absent from legacy prefab YAML (Unity
         // deserialises it to 0), so existing popups stay uncapped → today's centred
         // behaviour, build-neutral.
-        public float MaxPopupHeight = 0f;              // 0 = no cap; a prefab overrides (skeleton 4.2u)
-        public GameObject scrollMask;                  // popup-local SpriteMask GO (skeleton); null on legacy prefabs
-        public PopupScrollHandle scrollHandle;         // hand-rolled handle (skeleton); nullable
-        public float WheelStep = 0.7f;                 // one row per wheel notch (Task 3 calibration)
+        public int MaxVisibleRows = 6;                 // cap = MaxVisibleRows * rowSpacing; 0 = no cap. Base default → every variant scrolls past it (Sort can override).
+        public GameObject scrollMask;                  // popup SpriteMask GO; auto-discovered from the inherited skeleton child if unset (no serialized cross-ref)
+        public PopupScrollHandle scrollHandle;         // hand-rolled handle; nullable
+        public float WheelStep = 0.625f;               // one row per wheel notch (= rowSpacing)
 
         protected bool _scrollActive;
         protected float _scrollOffset;   // [0, contentH - viewportH]; 0 = top
@@ -59,6 +59,13 @@ namespace ItemChecklist.UI
                 // capture the authored top edge from the prefab (popup.y + half height)
                 if (_panel != null) _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
             }
+            // Auto-discover the popup SpriteMask (inherited from the Dropdown skeleton) so no
+            // variant needs to serialize a fragile cross-prefab ref — the Iter-13 runtime-wire rule.
+            if (scrollMask == null && popupPanel != null)
+            {
+                var sm = popupPanel.GetComponentInChildren<SpriteMask>(includeInactive: true);
+                if (sm != null) scrollMask = sm.gameObject;
+            }
         }
 
         /// <summary>Fit the panel to the laid-out row stack, capped at MaxPopupHeight
@@ -70,9 +77,10 @@ namespace ItemChecklist.UI
         {
             if (rowCount <= 0) return;
             _contentH = rowCount * rowSpacing;
-            bool capped = MaxPopupHeight > 0f;                       // <= 0 → no cap (legacy popups)
-            _viewportH = capped ? Mathf.Min(_contentH, MaxPopupHeight) : _contentH;
-            _scrollActive = capped && _contentH > MaxPopupHeight + 1e-4f;
+            float cap = MaxVisibleRows > 0 ? MaxVisibleRows * rowSpacing : 0f;   // 0 = no cap
+            bool capped = cap > 0f;
+            _viewportH = capped ? Mathf.Min(_contentH, cap) : _contentH;
+            _scrollActive = capped && _contentH > cap + 1e-4f;
 
             // Panel: top-aligned to the authored top edge, grows downward, bounded by the cap.
             if (popupPanel != null)
@@ -100,9 +108,12 @@ namespace ItemChecklist.UI
                 }
             }
 
-            // Gate the scroll chrome fully off when the content fits (D7).
-            if (scrollMask != null && scrollMask.activeSelf != _scrollActive)
-                scrollMask.SetActive(_scrollActive);
+            // The mask stays active whenever the popup is open (it is a child of popupPanel, so it
+            // follows the popup's active state). Sized to the cap, it clips only when content
+            // exceeds it and shows everything when it fits — so a short popup never hits the
+            // VisibleInsideMask-with-no-active-mask invisibility (docs/gotchas § SpriteMask).
+            // Only the scrollbar/handle is gated on actual overflow (D7).
+            if (scrollMask != null && !scrollMask.activeSelf) scrollMask.SetActive(true);
             if (scrollHandle != null)
             {
                 scrollHandle.SetActiveScrolling(_scrollActive);
@@ -110,10 +121,12 @@ namespace ItemChecklist.UI
             }
         }
 
-        /// <summary>rowContainer.y that puts row 0's top flush to the mask top edge.
-        /// Rows lay out downward from y=0 under rowContainer; the offset is the
-        /// authored top edge minus half a row (calibrated in-game in Task 3).</summary>
-        protected float RowTopY => _topY - rowSpacing / 2f;
+        /// <summary>rowContainer.y that puts row 0's top flush to the capped panel's
+        /// top edge. AutoSizePopup moves the Popup GO itself to (_topY - viewportH/2)
+        /// so the centred 9-slice BG sits cap-high + top-aligned; the rows are its
+        /// children, so in that moved frame row 0 is flush at viewportH/2 - rowSpacing/2.
+        /// (Fine-tuned in-game in Task 3.)</summary>
+        protected float RowTopY => _viewportH / 2f - rowSpacing / 2f;
 
         public void TogglePopup() => SetOpen(!_open);
 
