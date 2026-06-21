@@ -16,6 +16,10 @@ ItemChecklist-General:
     hint: "Per-row level column. {0} = level number."
     en: "Lv {0}"
     de: "St. {0}"
+  SkinSuffix:
+    hint: "Pet skin row suffix. {0} = 1-based skin number."
+    en: "(Skin {0})"
+    de: "(Skin {0})"
 ItemChecklist-Sorters:
   Name:   { en: "Name",   de: "Name" }
   Rarity: { en: "Rarity", de: "Seltenheit" }
@@ -52,6 +56,7 @@ ItemChecklist-Categories:
   Valuables:        { en: "Valuables",           de: "Wertgegenstände" }
   KeyItems:         { en: "Key Items",           de: "Schlüsselobjekte" }
   Instruments:      { en: "Instruments",         de: "Instrumente" }
+  Pets:             { en: "Pets",                 de: "Haustiere" }
   Other:            { en: "Other",               de: "Sonstiges" }
 ControlMapper:
   ItemChecklist-ToggleChecklistPC:
