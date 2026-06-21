@@ -185,11 +185,24 @@ namespace ItemChecklist
                     // everything that *isn't* a categorically-non-item type. This
                     // exclusion list mirrors ItemBrowser's ObjectUtility.IsNonObtainable
                     // (ObjectUtility.cs:393), which excludes NonObtainable / Creature /
-                    // Critter / PlayerType — but **not** NonUsable.
+                    // Critter / PlayerType — but **not** NonUsable. (Critter is relaxed
+                    // back in just below for the catchable subset — see Iter-16.2.)
                     if (info.objectType == ObjectType.NonObtainable) continue;
                     if (info.objectType == ObjectType.Creature)      continue;
-                    if (info.objectType == ObjectType.Critter)       continue;
                     if (info.objectType == ObjectType.PlayerType)    continue;
+
+                    // Iter-16.2: catchable critters are the EXCEPTION to the IB mirror
+                    // above. CK's static DB holds 25 ObjectType.Critter item-forms, all
+                    // with inventory icons and all obtainable → all discovery-tracked
+                    // (SetObjectAsDiscovered has no Critter special-case): the 20 bug-net
+                    // critters (ObjectIDs 9800–9819) PLUS the 5 Fireflies / Glowbugs
+                    // (3500–3504, FireflyCD not CritterCD, but still carriable — verified
+                    // in-game: present in player chests). The "~15, 9800–9819 only" figure
+                    // a decompile probe produced was wrong on both count and range — count
+                    // confirmed = 25 in-game. Keep them all, with the Iter-7.1 icon-guard
+                    // dropping any icon-less stub defensively.
+                    if (info.objectType == ObjectType.Critter
+                        && info.smallIcon == null && info.icon == null) continue;
 
                     // Iter-7.1 catalog-completeness fix: ObjectType.NonUsable is NOT
                     // "garbage". CK assigns it to raw materials — ores, bars, raw wood,
