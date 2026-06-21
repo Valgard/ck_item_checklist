@@ -39,6 +39,10 @@ namespace ItemChecklist
         public static long PackKey(int objectId, int variation) =>
             ((long)objectId << 32) | (uint)variation;
 
+        // Symmetric unpack of PackKey (Iter-16.1: PetCollection serialises by id+skin).
+        public static int KeyObjectId(long key) => (int)(key >> 32);
+        public static int KeyVariation(long key) => (int)(uint)key;
+
         public int Count => keys.Count;
         public bool IsDiscovered(int objectId, int variation) =>
             keys.Contains(PackKey(objectId, variation));
