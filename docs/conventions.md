@@ -237,6 +237,26 @@ pkill -KILL -f "Core Keeper"   # GNU pgrep/pkill -f variant; macOS-safe
 
 Do not use the normal quit path — it blocks and the process must be killed.
 
+### Catalog inclusion/exclusion: trust the in-game size delta, not a decompile count
+
+When relaxing or tightening an `ItemCatalog.Bake` filter (the Iter-7.1 /
+Iter-16.2 pattern), a decompile is **inference, not ground truth** — it has been
+wrong three times on critters alone (the "KilledEnemiesBuffer-only" miss, the
+Iter-16.1 pet guess, and Iter-16.2's "~15 at 9800–9819" that omitted 5 Fireflies
+and mis-flagged real IDs as gaps). Discipline:
+
+1. Predict the catalog-size delta and gate the iteration on it. The bake's
+   `ItemCatalog baked: N items` log line is the **trip-wire** — if the delta is
+   off (e.g. `+25` against an expected `+15`), STOP; do not proceed.
+2. Resolve the discrepancy with a **throwaway in-game probe that enumerates every
+   entry the predicate admits** (ObjectID + localized name + icon presence →
+   `Player.log`), plus one or two live-play observations (e.g. "is it catchable /
+   already in a chest?"). That is what separates legitimate entries from
+   permanent-`???` ghost rows — a decompile count cannot.
+
+The size-delta is the trip-wire; the enumeration + live play is the resolver.
+Catalog-specific application of the global `verify-empirically` rule.
+
 ## File Layout
 
 Canonical layout under `unity/ItemChecklist/` (source of truth is the git

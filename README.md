@@ -26,7 +26,7 @@ Discovery is tracked **per world × per player**.
   undiscovered matches stay `???`.
 - **Per-row Level and Value** columns (sell value in Ancient Coins).
 - **Rarity colouring** of item names and icon borders (undiscovered rows too).
-- **Per-permutation cooked-food tracking** (~10,800 catalog entries; Mushroom
+- **Per-permutation cooked-food tracking** (~10,900 catalog entries; Mushroom
   Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
 - **English and German**, following the in-game language; switches live.
 

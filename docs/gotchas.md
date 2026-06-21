@@ -312,6 +312,30 @@ per-entry `nameNoIcon` name logging) in Loop 1, read from `Player.log` after a
 world-load, is how the 117-vs-9 split and the 9 names were confirmed before
 choosing the icon guard. Stripped before merge.
 
+### `ObjectType.Critter` spans two ID ranges incl. Fireflies (Iter-16.2)
+
+Same shape as NonUsable: Loop 1 used to blanket-`continue` on
+`ObjectType.Critter` (801); Iter-16.2 relaxed that to the identical icon-guard,
+because caught critters become carriable, discovery-tracked items at their own
+ObjectID (`SaveManager.SetObjectAsDiscovered` has **no** Critter special-case).
+On game version 1.2.1.4 the static DB holds **25** `ObjectType.Critter`
+item-forms, all with inventory icons, across **two** ID ranges:
+
+- **9800–9819** — 20 bug-net critters (`CritterBeetle` … `CritterLarvaVoid`),
+  gap-free in the live DB (contradicting a decompile probe that called 9803–9807
+  empty and 9813 `CritterCrab2` unused — both are real, e.g. 9813 *Sonnen-Zange*).
+- **3500–3504** — 5 Fireflies / Glowbugs (`YellowFirefly` … `PurpleFirefly`,
+  German *Glimmkäfer*).
+
+**Catch-path red herring:** the Fireflies are `ObjectType.Critter`-typed but
+their `FireflyConverter` adds **`FireflyCD`, not `CritterCD`** — and the Bug
+Net's `TryCatchAnyCritters` gates on `CritterCD`. So `CritterCD` is **not** a
+complete "net-catchable" predicate; chasing it down the decompile wastes a cycle.
+All 25 are obtainable (confirmed in-game: Glimmkäfer ARE net-catchable and sit in
+player chests) → all discovery-tracked → no permanent `???` ghost rows. The clean
+predicate is just `objectType == Critter && smallIcon == null && icon == null →
+continue` (icon-guard, mirroring NonUsable).
+
 ## Search Field / Header (Iter-8)
 
 ### The search input is `TextInputField` (CK-native), NOT uGUI

@@ -208,7 +208,7 @@ public interface IScrollable
 
 ## Viewport Virtualization (Iter-3.8)
 
-The catalog grows to ~10,800 entries. The pre-Iter-3.8 design instantiated one
+The catalog grows to ~10,900 entries. The pre-Iter-3.8 design instantiated one
 `ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
 window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
 GameObjects recycled as the user scrolls, so the GameObject count is bounded
@@ -220,7 +220,7 @@ cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
 of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
 `num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
 scrolls by translating the whole pool under the clip mask, recycling nothing.
-That is fine for ≤250 recipes but unusable for ~10,800 entries. No CK class
+That is fine for ≤250 recipes but unusable for ~10,900 entries. No CK class
 recycles rows by index, so ItemChecklist implements its own on top of the
 `IScrollable` contract.
 
@@ -388,7 +388,7 @@ fine-tuning + real sprites are deferred to Iter-12 (pixel-art).
 
 ## Data Architecture
 
-### ItemCatalog Two-Loop Bake (Iter-3.7)
+### ItemCatalog Three-Loop Bake (Iter-3.7 / Iter-16.1)
 
 `ItemCatalog.Bake()` runs once per world-load, triggered from the
 `PlayerController.OnOccupied` coroutine (after
@@ -420,11 +420,11 @@ for i1 in ingredients:
             emit CatalogEntry(tier_objectId, variation=var)
 ```
 
-**Resulting catalog size:** ~10,800 entries (~1240 standard + ~9480
+**Resulting catalog size:** ~10,900 entries (~1240 standard + ~9480
 cooked-food permutations: 3160 pairs × 3 tiers).
 
 **Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
-on this machine for the full ~10,800-entry bake). Bake time is independent
+on this machine for the full ~10,900-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
@@ -1178,7 +1178,7 @@ outside the possession scan's `ContainedObjectsBuffer`).
 `ItemCatalog.Bake` Loop 3 emits one `Entry` per `(petObjectID, skinIndex)`, with
 `skinIndex` stored in the entry's **`Variation`** slot and `IsPetSkin: true`. The
 per-skin names are unique, so these rows bypass Loop 1's name-conflict pass. (See
-the three-loop overview in § ItemCatalog Two-Loop Bake — Loop 3 is the pet axis.)
+the three-loop overview in § ItemCatalog Three-Loop Bake — Loop 3 is the pet axis.)
 
 ### Pet collection ledger (not CK `DiscoveredState`)
 
