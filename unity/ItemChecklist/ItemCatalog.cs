@@ -53,10 +53,11 @@ namespace ItemChecklist
             public readonly int Level;          // CK ObjectInfo.level
             public readonly int SellValue;      // 0 = unsellable/legendary; >0 = computed sell value
             public readonly bool IsCraftable;   // ObjectInfo.requiredObjectsToCraft non-empty
+            public readonly bool IsPetSkin;     // Iter-16.1: pet-skin row — Variation carries skinIndex, collected via PetCollection
 
             public Entry(int objectId, int variation, string displayName, Sprite icon,
                 string modOrigin, Rarity rarity, ObjectType objectType,
-                int level, int sellValue, bool isCraftable)
+                int level, int sellValue, bool isCraftable, bool isPetSkin = false)
             {
                 ObjectId = objectId;
                 Variation = variation;
@@ -68,6 +69,7 @@ namespace ItemChecklist
                 Level = level;
                 SellValue = sellValue;
                 IsCraftable = isCraftable;
+                IsPetSkin = isPetSkin;
             }
         }
 
@@ -78,6 +80,19 @@ namespace ItemChecklist
         public Entry GetByIndex(int index) => entries[index];
         public bool TryGetIndex(int objectId, int variation, out int index) =>
             keyToIndex.TryGetValue(DiscoveredState.PackKey(objectId, variation), out index);
+
+        public bool TryGetEntry(int objectId, int variation, out Entry entry)
+        {
+            if (keyToIndex.TryGetValue(DiscoveredState.PackKey(objectId, variation), out int idx))
+            { entry = entries[idx]; return true; }
+            entry = default;
+            return false;
+        }
+
+        // Iter-16.1: pet-skin rows route possession/discovery through PetCollection
+        // instead of CK's skin-blind DiscoveredState (OwnedCount uses this).
+        public bool IsPetSkinEntry(int objectId, int variation)
+            => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
         /// <summary>
         /// Build the catalog. Iterates every <c>ObjectDataCD</c> in
@@ -144,6 +159,10 @@ namespace ItemChecklist
                     // handled by the α-enumeration loop further down — skip them here
                     // so they don't appear as variation=0 placeholder entries.
                     if (od.objectID.IsCookedFood()) continue;
+
+                    // Iter-16.1: pets are emitted per-skin by the pet loop below — skip the
+                    // skinless variation-0 form here (same pattern as cooked food).
+                    if (PugDatabase.HasComponent<PetCD>(od)) continue;
 
                     var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                     if (info == null) continue;
@@ -261,6 +280,46 @@ namespace ItemChecklist
                     }
                 }
 
+                // ─── Loop 3: per-skin pet entries (Iter-16.1) ──────────────────
+                // Pets always live at variation 0 in CK; the skin is separate aux
+                // data (PetSkinCD.skinIndex). Emit one row per skin, keyed
+                // (objectID, skinIndex) via the entry's Variation slot. Names are
+                // unique per skin so they bypass the conflict pass above. Level/Value
+                // are em-dashed for pets: LevelCD.level (7/10/16) is a prefab tier
+                // field, NOT the pet's trainable per-instance gameplay level (1 in a
+                // chest, 8 when equipped — verified in-game); a per-species row cannot
+                // show a per-instance level. Value is just the rarity echo. Both → "—".
+                var petEntries = new List<Entry>();
+                foreach (var od in PugDatabase.objectsByType.Keys)
+                {
+                    if (od.variation != 0 || !PugDatabase.HasComponent<PetCD>(od)) continue;
+                    var petInfo = PugDatabase.GetObjectInfo(od.objectID, 0);
+                    if (petInfo == null) continue;
+
+                    var (petLoc, petDont) = ResolveOne(od, localize: true);
+                    var (petRaw, _)       = ResolveOne(od, localize: false);
+                    if (petDont && !string.IsNullOrEmpty(petRaw)) petLoc = petRaw;
+                    if (string.IsNullOrEmpty(petLoc))
+                        petLoc = PascalCaseSplitter.Split(od.objectID.ToString());
+
+                    var skinInfo = (Manager.ui != null && Manager.ui.petInfosTable != null)
+                        ? Manager.ui.petInfosTable.GetPetSkinInfo(od.objectID) : null;
+                    int skinCount = (skinInfo != null && skinInfo.skins != null && skinInfo.skins.Count > 0)
+                        ? skinInfo.skins.Count
+                        : (PugDatabase.TryGetComponent<PetCD>(od, out var pcd) ? Math.Max(1, pcd.maxSkins) : 1);
+
+                    var petIcon = petInfo.smallIcon != null ? petInfo.smallIcon : petInfo.icon;
+                    string petMod = ResolveModOrigin(od, modIdToName);
+                    for (int skin = 0; skin < skinCount; skin++)
+                    {
+                        string skinName = $"{petLoc} {Loc.F("ItemChecklist-General/SkinSuffix", skin + 1)}";
+                        petEntries.Add(new Entry(
+                            (int)od.objectID, skin, skinName, petIcon, petMod,
+                            petInfo.rarity, ObjectType.Pet,
+                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: true));
+                    }
+                }
+
                 // Conflict detection: count occurrences of each localized name.
                 var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
                 foreach (var locName in localizedNames.Values)
@@ -283,6 +342,9 @@ namespace ItemChecklist
                         modOrigin, rarityCache[key], objectTypeCache[key],
                         levelCache[key], sellValueCache[key], craftableCache[key]));
                 }
+
+                // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
+                list.AddRange(petEntries);
 
                 entries = list
                     .OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
