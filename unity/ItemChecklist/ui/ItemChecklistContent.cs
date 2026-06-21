@@ -114,6 +114,10 @@ namespace ItemChecklist.UI
                 _defaultLabelColor = _pool[0].label.color;   // PugText.color getter → style.color
                 _defaultLabelColorCaptured = true;
             }
+            // Iter-16.1: capture the pristine icon material once (before any pet-skin
+            // recolor) so non-pet rows can be restored exactly.
+            if (_pool.Count > 0 && _pool[0] != null)
+                PetSkinIcon.CaptureBase(_pool[0].icon);
         }
 
         private int ComputePoolSize()
