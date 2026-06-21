@@ -268,11 +268,14 @@ namespace ItemChecklist
                 Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
             }
 
-            // Hotkey poll. Rewired is the production target (rebindable via
-            // game settings); raw Input is the diagnostic fallback.
-            bool rewiredFired = rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName);
-            bool rawFired = Input.GetKeyDown(KeyCode.F1);
-            if (rewiredFired || rawFired)
+            // Hotkey poll — the rebindable Rewired action is the SOLE toggle
+            // trigger (default F1, remappable via the game's input settings).
+            // A raw Input.GetKeyDown(KeyCode.F1) used to OR in here as a
+            // "diagnostic fallback", but it was never gated to diagnostic-only,
+            // so it kept F1 hardcoded as an opener even after the player rebound
+            // the key — the rebind appeared not to take (Iter-23). Dropped: the
+            // Rewired path already covers the default F1 binding.
+            if (rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName))
             {
                 // Open-state is read from ACTUAL visibility (Root.activeSelf is
                 // the canonical open/closed signal), not CoreLib's
