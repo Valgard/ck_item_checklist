@@ -59,12 +59,22 @@ remaining backlog.
   `FadeOutAllGameplayUI()` (not `ShowHUD(false)`), which does not cull our
   layer-27 HUD, hence the explicit gate. `cutsceneIsPlaying` is CK's own
   discovery-path signal; sandbox-safe.
-- **Iter-16 (tentative) -- pet/creature discovery.** The bake blanket-excludes
-  `ObjectType.Creature`/`Critter`, so tamed pets/critters never get a row -- same
-  bug class as the Iter-7.1 NonUsable fix. IB keeps anything with `PetCD`
-  (`ObjectUtility.cs:390`) and craftable non-cattle creatures (`CraftingCD &&
-  !CattleCD`, `:393`); a fix would mirror those, still dropping wild mobs.
-  `PugDatabase.HasComponent<T>` is sandbox-safe here. Sibling to Iter-7.1.
+- **Iter-16.1 -- per-skin pet collection. DONE** (see `docs/iteration-history.md`).
+  **Re-scoped:** the roadmap's premise was wrong -- `ObjectType.Pet` (802) is not
+  excluded, so pets were already in the catalog. Real work: each pet **skin** is a
+  separate collectible. One catalog row per `(objectID, skinIndex)`; a mod-owned
+  "ever-owned" `PetCollection` ledger (CK tracks no per-skin discovery) persisted via
+  the Iter-20 store; spoiler-consistent display (species name vs `???`, collected vs
+  unknown icon); gradient skin icons via the `Amplify/UISpriteColorReplace` shader
+  (the Item Browser recipe); active summoned pet now counted (fixes the Iter-20
+  Terrier 7-vs-8 undercount); Level/Value em-dashed (LevelCD is a tier field, not the
+  trainable per-instance level); new "Pets" filter category.
+- **Iter-16.2 (tentative) -- critter collection.** `ObjectType.Critter` (801) IS
+  excluded by the bake, but caught critters (Bug Net; ObjectIDs 9800-9819, ~15) carry
+  the same ObjectID and ARE discovery-tracked (no Critter special-case in
+  `SetObjectAsDiscovered`) -- a genuine Iter-7.1-style filter relaxation. Select the
+  catchable subset (icon-guard vs. component vs. ID range) via a probe; non-catchable
+  ambient critters must stay out (would be permanent `???`).
 - **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
   family to its `variation == 0` entry (`ItemCatalog.cs:130`), so colour/skin/state
   variants never get their own row. CK tracks discovery per `(objectID, variation)`

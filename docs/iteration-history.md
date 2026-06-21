@@ -638,3 +638,75 @@ keeps `???`, drops the blue checkbox and shows `—` for owned, and is excluded 
 shows blue + count. **Deferred:** the H1 variation-keyed-discovery case (a family
 discovered only at a non-0 variation still showing `???`) → **Iter-17**
 (per-variation tracking); the gate is correct independent of it.
+
+**Iter-16.1 (per-skin pet collection) — DONE (2026-06-21, branch `iter-16-1`).**
+**Re-scoped from the frozen roadmap's "pet/creature discovery" guess** (the THIRD
+time a roadmap catalog-exclusion guess was wrong — cf. Iter-21 waypoints). The
+roadmap said the bake "blanket-excludes Creature/Critter so tamed pets never get a
+row." Five decompile probes + in-game observation disproved that: `ObjectType.Pet`
+is **802**, NOT `Creature` (900) — and 802 is **not** on the bake's exclusion list,
+so **pets were already in the catalog** (confirmed in-game: Subterrier/Eulux/
+Glutschweif all present, discovered, with owned counts). The real gap was different
+and only surfaced by measuring.
+
+**The verified CK pet model.** Pets always sit at `variation 0` in CK
+(`SaveManager.SetObjectAsDiscovered` force-zeroes pet variation); the skin lives in
+`PetSkinCD.skinIndex` (world-global inventory aux data, NOT in variation), assigned
+**randomly** on hatch (`rng.NextInt(maxSkins)`). All skins of a pet share one
+ObjectID. **CK tracks no per-skin discovery** and has no native skin-collection.
+Skins render as gradient recolors of one base sprite. (Full facts in the
+`reference_ck_pet_critter_discovery_model` memory + `docs/specs/`.)
+
+**Decision (the user's framing): each skin is a separate collectible.** So the
+single skinless pet row is replaced by one row per skin (`skins.Count` rows; ~63
+total replacing 14). Settled design: **D1** collected = "ever-owned" (CK gives
+nothing per-skin → a mod-owned `(objectID, skinIndex)` ledger, persisted via the
+Iter-20 `PossessionStore` mechanism); **D2** spoiler-consistent display (species
+`???` if undiscovered; known species' uncollected skin shows the name + unknown
+icon + `—`; collected → skin icon + count); **D3** rows named `"<Pet> (Skin n)"`
+(localized suffix; CK has no skin names). A Task-0 throwaway probe drove one
+mid-flight correction: Level/Value are **em-dashed for pets** — `LevelCD.level`
+(7/10/16) is a prefab tier field, NOT the pet's trainable per-instance gameplay
+level (1 in a chest, 8 equipped — caught in-game), and a per-species row cannot show
+a per-instance level.
+
+**Architecture (one scan path, three outputs).** `ItemCatalog.Bake` Loop 3 emits
+per-`(objectID, skinIndex)` entries (skinIndex in the entry's `Variation` slot,
+`IsPetSkin` flag). `PossessionScanner` reads each owned pet's `PetSkinCD.skinIndex`
+(carried + containers via `InventoryHandler.TryGetExtraInventoryData`, **plus the
+active summoned pet** via `PetOwnerCD.PetEntity` — fixing the Iter-20-deferred
+Terrier 7-vs-8 undercount), tallies per skin, and marks the persistent
+`PetCollection` ledger. `ItemChecklistMod.OwnedCount` + the row-bind route pet
+entries through `PetCollection` (collected) + species discovery (name) instead of
+CK's skin-blind `DiscoveredState`.
+
+**Gradient icons — the hard-won part (3 attempts, systematic-debugging).** Recoloring
+needs a material on the right shader. Attempt 1 (keyword on the default material) =
+no-op. Attempt 2 (`new Material(Shader.Find("Radical/SpritesDefault"))`, a decompile
+agent's hedged guess) = still no-op — `Shader.Find` returned a real but **wrong**
+shader, masking the error. The fix came from the **working reference, Item Browser**:
+its `GetUISpriteColorReplaceMaterial()` is `new Material(Shader.Find("Amplify/
+UISpriteColorReplace"))` — that shader carries `_GradientMap` + `USE_GRADIENT_MAP`.
+One per-skin material on it (cached, assigned via `sharedMaterial`; base material
+restored for non-pet rows) → skins recolor correctly, no cross-row contamination.
+Needed an asmdef reference to `ScriptableData.dll` (`GradientMapDataBlock` lives
+there — caught by the Task-0 probe's `CS0012`).
+
+**Process notes.** Worktree AssetDatabase staleness bit repeatedly — clear
+`Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}` before every worktree build. A
+`cd ~/.claude` for a memory commit reset the shell cwd and mis-targeted one build
+(empty `MOD_INSTALL_PATH`); builds/git made cwd-independent thereafter (absolute
+paths, `git -C`). A Steam-Cloud-conflict native crash (unrelated) blocked the first
+in-game run until Steam Cloud was disabled globally.
+
+**Verified in-game (1.2.1.4, fake-ID 9999997):** clean sandbox compile
+(`safetyCheck=True`, 0 `CompileFailed`); per-skin rows with distinct gradient icons;
+active pet counted (Terrier 8 not 7); Level/Value `—`; Pets filter category;
+spoiler states correct; normal rows unaffected by the material swap. **Not
+separately re-verified:** the collected-ledger persistence round-trip (random-skin
+egg hatching made it impractical to test on demand) — it rides the Iter-20-proven
+`WriteCharacter`/`PossessionStore` mechanism. **Follow-ups logged during this iter:**
+Iter-22 (row-hover tooltips), Iter-23 (rebound toggle key ignored — F1 always
+opens), Iter-24 (scrollable filter pane). **Iter-16.2 (critters)** remains: caught
+critters (ObjectIDs 9800–9819) carry `ObjectType.Critter` (801, excluded) yet ARE
+discovery-tracked via the bug net — a genuine Iter-7.1-style filter relaxation.
