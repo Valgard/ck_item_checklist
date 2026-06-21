@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-20: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, and Iter-21 are DONE on main. Iter-3.8
+As of 2026-06-21: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, and Iter-16.2 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -710,6 +710,41 @@ separately re-verified:** the collected-ledger persistence round-trip (random-sk
 egg hatching made it impractical to test on demand) — it rides the Iter-20-proven
 `WriteCharacter`/`PossessionStore` mechanism. **Follow-ups logged during this iter:**
 Iter-22 (row-hover tooltips), Iter-23 (rebound toggle key ignored — F1 always
-opens), Iter-24 (scrollable filter pane). **Iter-16.2 (critters)** remains: caught
-critters (ObjectIDs 9800–9819) carry `ObjectType.Critter` (801, excluded) yet ARE
-discovery-tracked via the bug net — a genuine Iter-7.1-style filter relaxation.
+opens), Iter-24 (scrollable filter pane).
+
+**Iter-16.2 (critter collection) — DONE (2026-06-21, branch `iter-16-2`).** A pure
+Iter-7.1-style bake-filter relaxation: `ItemCatalog.Bake` Loop 1's blanket
+`ObjectType.Critter` exclusion became an icon-guarded keep (mirroring the NonUsable
+line below it), so the net-catchable critters flow through every existing mechanism
+(name/icon/rarity/value, discovery hook, Iter-20 possession scan, row rendering). A
+new `Critters` (`Krabbeltiere`) filter category (enum + `All[]` + `ItemCategories.Of`
+mapping + one yaml loc line) classifies them. Level/Value/Discovery/Possession needed
+**zero new code** — the natural Loop-1 path gives Level `—` (critters carry no
+`LevelCD`) and Value when real, and caught critters are ordinary inventory items the
+Iter-10/20/21 machinery already handles. Catalog 10885 → **10910**.
+
+**The decompile probe was wrong — a THIRD time on critters** (cf. the earlier
+"KilledEnemiesBuffer-only" miss, and Iter-16.1's pet guess). It predicted "~15
+catchable, ObjectIDs 9800–9819 with gaps (9803–9807 empty, 9813 unused), ambient
+critters runtime-only / never DB objects." A throwaway in-game probe (enumerate every
+static `ObjectType.Critter(var0)` with name + icon) found **25**, all with inventory
+icons: the full **20** at 9800–9819 (no gaps; 9803–9807 and 9813 are all real, e.g.
+`Sonnen-Zange`) **plus 5 Fireflies / Glowbugs** at **3500–3504** (`YellowFirefly`…
+`PurpleFirefly`, German `Glimmkäfer`) the probe missed entirely (different ID range).
+A decompile detour — Fireflies carry `FireflyCD`, not the `CritterCD` the bug net's
+`TryCatchAnyCritters` checks — was a **red herring**: ground truth from the player
+settled it (they already had Glimmkäfer **in chests** = obtainable + discovery-tracked,
+and confirmed Glimmkäfer **are** bug-net-catchable via a firefly-specific path). So all
+25 are legitimate, discovery-trackable, no permanent-`???` ghost rows — the predicate
+needed no tightening; `ObjectType.Critter` + icon-guard admits exactly the right set.
+The lesson is the project's standing one: **in-game ground truth beats decompile
+inference**, especially on critters, where it has now been wrong three times.
+
+Verified in-game (1.2.1.4, fake-ID dev build 9999997): clean sandbox compile
+(`safetyCheck=True`, 0 `CompileFailed`), `ItemCatalog baked: 10910 items`,
+`Krabbeltiere` category between Pets and Other, ~25 critter rows, Glimmkäfer rows
+discovered with owned counts from chests (discovery + possession + loc in one), no
+ghost rows. **Not separately stressed:** the Phase-3 pool-leak multi-open (the change
+is additive — no row-pool/render touch). The generated loc assets under
+`Localization/Generated/` are gitignored build artifacts (regenerated from the yaml
+each build), so only the `localization.yaml` line is committed.

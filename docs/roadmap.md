@@ -69,12 +69,15 @@ remaining backlog.
   (the Item Browser recipe); active summoned pet now counted (fixes the Iter-20
   Terrier 7-vs-8 undercount); Level/Value em-dashed (LevelCD is a tier field, not the
   trainable per-instance level); new "Pets" filter category.
-- **Iter-16.2 (tentative) -- critter collection.** `ObjectType.Critter` (801) IS
-  excluded by the bake, but caught critters (Bug Net; ObjectIDs 9800-9819, ~15) carry
-  the same ObjectID and ARE discovery-tracked (no Critter special-case in
-  `SetObjectAsDiscovered`) -- a genuine Iter-7.1-style filter relaxation. Select the
-  catchable subset (icon-guard vs. component vs. ID range) via a probe; non-catchable
-  ambient critters must stay out (would be permanent `???`).
+- **Iter-16.2 -- critter collection. DONE** (see `docs/iteration-history.md`).
+  Iter-7.1-style relaxation of the `ObjectType.Critter` bake exclusion to an
+  icon-guarded keep; the catchable critters flow through the existing discovery /
+  possession / rendering machinery (zero code for Level/Value/Discovery/Possession).
+  New `Critters` / `Krabbeltiere` filter category. **The "~15, 9800-9819" probe figure
+  was wrong** -- an in-game probe found **25** (the full 20 at 9800-9819 + 5 Fireflies
+  at 3500-3504, German `Glimmkäfer`); ground truth (player had them in chests + they
+  ARE bug-net-catchable) confirmed all 25 are discovery-trackable, no ghost rows.
+  Catalog 10885 -> 10910.
 - **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
   family to its `variation == 0` entry (the `od.variation != 0` guard in
   `ItemCatalog.Bake`), so colour/skin/state
