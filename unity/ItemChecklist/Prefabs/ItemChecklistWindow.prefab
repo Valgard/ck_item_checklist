@@ -2013,7 +2013,7 @@ PrefabInstance:
     - target: {fileID: 5278107263486996915, guid: c879a93c2fbd047239838208194ff168,
         type: 3}
       propertyPath: m_Name
-      value: FacetedFilter
+      value: Filter
       objectReference: {fileID: 0}
     - target: {fileID: 8313071973495812531, guid: c879a93c2fbd047239838208194ff168,
         type: 3}
