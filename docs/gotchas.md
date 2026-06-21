@@ -278,6 +278,25 @@ just by a green Editor build.
 
 See `CLAUDE.md § Build-verify` for the canonical `Player.log` grep pattern.
 
+**Corollary — deletion-only fixes are near-zero sandbox risk.** The gate fires on
+*additions* of new BCL surface (a newly-referenced `System.IO.*`, reflection-emit,
+`System.Diagnostics.Process`, …). A fix that only **removes** a call leaves a
+strict subset of an already-passing file, so it cannot introduce new banned surface
+and is effectively guaranteed to still pass the runtime sandbox compile. (Iter-23
+removed a `UnityEngine.Input.GetKeyDown` read; the remaining code had already passed
+every prior iteration's sandbox.)
+
+### Lying comments misdirect diagnosis
+
+A comment that asserts behavior the code does not implement is worse than
+obviously-wrong code — it actively misdirects root-cause analysis. Iter-23's
+`Update` hotkey poll carried `// … raw Input is the diagnostic fallback`, but the
+raw `Input.GetKeyDown(KeyCode.F1)` was a co-equal `||` term firing every frame,
+not a gated fallback. The comment steered diagnosis toward "why isn't the fallback
+gating?" instead of "this OR-term always fires." Rule: when forming a root cause,
+verify the actual code path, never the comment; and when you fix the code, delete
+the misleading comment with it so what remains describes real behavior.
+
 ### `ui_scrollbar_handle` button background needs `~{1,1}` m_Size to read as raised
 
 9-slicing the narrow 4×8 `ui_scrollbar_handle` sprite with a small or

@@ -11,8 +11,7 @@ Discovery is tracked **per world × per player**.
 
 - **Discovery checklist (F1)** — every discoverable item with its icon, localized
   name and discovered/undiscovered state; undiscovered items show as `???`. The
-  toggle key is rebindable in settings, but a known bug (roadmap Iter-23) means F1
-  still also opens it regardless of the rebind.
+  toggle key is rebindable in the game's input settings (default F1).
 - **Always-on HUD counter** — `N / M (p.p%)` discovered, top-right above the
   minimap, updating live.
 - **Possession tracking** — per row, how many of an item you currently own
@@ -26,7 +25,7 @@ Discovery is tracked **per world × per player**.
   undiscovered matches stay `???`.
 - **Per-row Level and Value** columns (sell value in Ancient Coins).
 - **Rarity colouring** of item names and icon borders (undiscovered rows too).
-- **Per-permutation cooked-food tracking** (~10,900 catalog entries; Mushroom
+- **Per-permutation cooked-food tracking** (~10,910 catalog entries; Mushroom
   Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
 - **English and German**, following the in-game language; switches live.
 

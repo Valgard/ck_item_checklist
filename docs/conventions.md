@@ -204,7 +204,8 @@ debug scaffold *in front of* the reviewed core — then remove it via
 `git restore` before merge so the merged code stays byte-identical to the
 reviewed version.
 
-Iter-3.8 example: reaching the end of the ~10720-entry list by scrolling takes
+Iter-3.8 example: reaching the end of the list (~10,720 entries at Iter-3.8;
+~10,910 today) by scrolling takes
 too long to verify flush-geometry on the last row. A throwaway
 `DebugDiscoveredOnly` index-remap was added in front of the recycler
 (`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of the list
@@ -394,6 +395,21 @@ a subclass must adjust state the base `Awake` sets: `SearchBar` (Iter-19) overri
 the value that triggers CK's word-wrap crash (see `docs/gotchas.md § Search Field /
 Header`). `Awake` is the right hook (not `LateUpdate`) when the correction must hold
 before the first render and nothing rewrites the value per frame.
+
+## Input / Keybind Conventions
+
+**One toggle, one mechanism — the rebindable Rewired action is the sole trigger.**
+The checklist toggle is registered once via CoreLib
+`ControlMappingModule.AddKeyboardBind(ToggleActionName, defaultKeyCode: F1)` in
+`IMod.EarlyInit`, and polled in `IMod.Update` as
+`rewiredPlayer.GetButtonDown(ToggleActionName)`. Do **not** add a parallel raw
+`Input.GetKeyDown(KeyCode.F1)` OR-term: the action's `defaultKeyCode` already
+covers default-F1, so a raw read adds nothing but a hardcoded phantom opener that
+survives the player rebinding the key in the game's input settings (the bound key
+works, yet old F1 keeps opening too). Iter-23 removed exactly such a raw fallback
+(see `docs/iteration-history.md`); the misleading comment that had called it a
+"diagnostic fallback" is the cautionary case in `docs/gotchas.md § Lying comments
+misdirect diagnosis`.
 
 ## Prefab Authoring Conventions
 

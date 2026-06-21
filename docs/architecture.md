@@ -42,9 +42,11 @@ explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
    - window visible → close via
      `Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false)` (the same
      path Escape/E use — see Close path);
-   - else a Vanilla menu/inventory is open
-     (`Manager.ui.isPlayerInventoryShowing`) → ignore, so F1 never opens on
-     top of one;
+   - else a Vanilla menu/inventory is open, a text field/chat is focused,
+     or the world is not playable
+     (`Manager.menu.IsAnyMenuActive()` / `Manager.ui.isPlayerInventoryShowing`
+     / `Manager.input.textInputIsActive` / chat focus /
+     `!WorldState.IsInPlayableWorld`) → ignore, so F1 never opens on top of one;
    - else → `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`.
 5. CoreLib calls `ItemChecklistWindow.ShowUI()`.
 6. `ShowUI` delegates to `ItemChecklistContent.PopulateContent` (Iter-3.8):
@@ -208,7 +210,7 @@ public interface IScrollable
 
 ## Viewport Virtualization (Iter-3.8)
 
-The catalog grows to ~10,900 entries. The pre-Iter-3.8 design instantiated one
+The catalog grows to ~10,910 entries. The pre-Iter-3.8 design instantiated one
 `ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
 window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
 GameObjects recycled as the user scrolls, so the GameObject count is bounded
@@ -220,7 +222,7 @@ cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
 of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
 `num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
 scrolls by translating the whole pool under the clip mask, recycling nothing.
-That is fine for ≤250 recipes but unusable for ~10,900 entries. No CK class
+That is fine for ≤250 recipes but unusable for ~10,910 entries. No CK class
 recycles rows by index, so ItemChecklist implements its own on top of the
 `IScrollable` contract.
 
@@ -420,11 +422,11 @@ for i1 in ingredients:
             emit CatalogEntry(tier_objectId, variation=var)
 ```
 
-**Resulting catalog size:** ~10,900 entries (~1240 standard + ~9480
+**Resulting catalog size:** ~10,910 entries (~1240 standard + ~9480
 cooked-food permutations: 3160 pairs × 3 tiers).
 
 **Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
-on this machine for the full ~10,900-entry bake). Bake time is independent
+on this machine for the full ~10,910-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
@@ -1146,7 +1148,8 @@ collectible, riding a mod-owned ledger).
 
 ### Why pets were already in the catalog
 
-The bake excludes `NonObtainable` / `Creature` / `Critter` / `PlayerType`. The
+The bake excludes `NonObtainable` / `Creature` / `PlayerType` (`Critter` is kept
+since Iter-16.2 behind an icon-guard). The
 relevant `ObjectType` enum values are `PlaceablePrefab = 800`, `Critter = 801`,
 **`Pet = 802`**, `Creature = 900`, `PlayerType = 6000` — so **`Pet` (802) is
 not on the exclusion list** and pets were always in the catalog (the roadmap's
