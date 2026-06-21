@@ -129,6 +129,12 @@ remaining backlog.
   touch. The variation-keyed-discovery question (a family discovered only at a
   non-0 variation would still show `???`) was raised during diagnosis and
   **deferred to Iter-17** -- the gate is correct regardless of that.
+- **Iter-22 (tentative) -- row-hover tooltips.** On hovering a checklist row, show
+  the item tooltip like CK's normal inventory slots do (name, description, stats).
+  CK renders slot tooltips via its own tooltip UI on hover; a row would need to
+  feed that tooltip system (or a mod-built equivalent) the row's `(objectID,
+  variation)`. Requested 2026-06-21. Scope/feasibility (which tooltip API is
+  reachable + spoiler-gating for undiscovered rows) to be measured before design.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
