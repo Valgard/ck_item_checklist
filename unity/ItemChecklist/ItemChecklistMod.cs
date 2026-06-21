@@ -48,6 +48,11 @@ namespace ItemChecklist
         // ledger is loaded/saved around character (GUID) activation.
         internal static PossessionView Possession { get; private set; } = PossessionView.Empty;
 
+        // Iter-16.1: mod-owned per-skin "ever-owned" collection (CK does not track pet
+        // skin discovery). Loaded/saved per character GUID alongside the possession
+        // ledger; updated each scan; drives pet-skin rows' collected flag.
+        internal static PetCollection Pets { get; private set; }
+
         // Iter-21: possession is spoiler-gated behind discovery. An undiscovered row
         // renders "???" and already em-dashes Level/Value (Iter-10 spoiler guard);
         // showing an owned count there is the same kind of spoiler — and produced the
@@ -59,6 +64,14 @@ namespace ItemChecklist
         // when undiscovered or before the discovery snapshot has loaded.
         internal static int OwnedCount(int objectId, int variation)
         {
+            // Iter-16.1: pet-skin rows route through PetCollection (collected) + the
+            // per-skin live count — CK's DiscoveredState is blind to skins (variation
+            // is force-zeroed for pets). For pets, `variation` carries the skinIndex.
+            if (Catalog != null && Catalog.IsPetSkinEntry(objectId, variation))
+                return Pets != null && Pets.IsCollected(objectId, variation)
+                    ? Possession.CountSkin(objectId, variation)
+                    : 0;
+
             var disc = DiscoveredState.Instance;
             return disc != null && disc.IsDiscovered(objectId, variation)
                 ? Possession.Count(objectId)
@@ -177,6 +190,8 @@ namespace ItemChecklist
         {
             if (s_ledger != null && !string.IsNullOrEmpty(s_ledgerGuid))
                 PossessionStore.Save(s_ledgerGuid, s_ledger);
+            if (Pets != null && Pets.Dirty && !string.IsNullOrEmpty(s_ledgerGuid))
+                PetCollectionStore.Save(s_ledgerGuid, Pets);
         }
 
         public void Update()
@@ -192,7 +207,7 @@ namespace ItemChecklist
                 {
                     _possessionTimer = PossessionRefreshSeconds;
                     bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
-                    Possession = PossessionScanner.Scan(s_ledger, PossessionConfig.AnchorRadius, allowPrune);
+                    Possession = PossessionScanner.Scan(s_ledger, Pets, PossessionConfig.AnchorRadius, allowPrune);
                 }
             }
             else
@@ -226,13 +241,15 @@ namespace ItemChecklist
                 if (string.IsNullOrEmpty(activeGuid))
                 {
                     s_ledger = null;
+                    Pets = null;
                     Possession = PossessionView.Empty;
                 }
                 else
                 {
                     s_ledger = PossessionStore.Load(activeGuid);
+                    Pets = PetCollectionStore.Load(activeGuid);
                     _possessionPlayableTime = 0f;   // fresh load → withhold prune until grace
-                    Possession = PossessionScanner.Scan(s_ledger, PossessionConfig.AnchorRadius, false);
+                    Possession = PossessionScanner.Scan(s_ledger, Pets, PossessionConfig.AnchorRadius, false);
                 }
                 s_ledgerGuid = activeGuid;
             }
@@ -303,7 +320,7 @@ namespace ItemChecklist
                     // field then ignores keystrokes until another widget is clicked).
                     if (s_ledger != null)
                         Possession = PossessionScanner.Scan(
-                            s_ledger, PossessionConfig.AnchorRadius,
+                            s_ledger, Pets, PossessionConfig.AnchorRadius,
                             _possessionPlayableTime > PossessionPruneGraceSeconds);
                     ListView?.Refresh();
                     UserInterfaceModule.OpenModUI("ItemChecklist:Window");

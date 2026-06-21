@@ -37,7 +37,7 @@ namespace ItemChecklist.Possession
         /// asynchronously, so a container near the player may be absent from the query
         /// for a few seconds — pruning then would wrongly delete real (just-not-yet-
         /// streamed) storage and overwrite the persisted file with the loss.</summary>
-        public static PossessionView Scan(PossessionLedger ledger, float radius, bool allowPrune)
+        public static PossessionView Scan(PossessionLedger ledger, PetCollection pets, float radius, bool allowPrune)
         {
             var world = ResolveWorld();
             if (world == null) return PossessionView.Empty;
@@ -74,6 +74,7 @@ namespace ItemChecklist.Possession
             using var ents = objQuery.ToEntityArray(Allocator.TempJob);
 
             var carried = new Dictionary<int, int>();
+            var petSkins = new Dictionary<long, int>();   // Iter-16.1: live per-(objectId, skinIndex)
             var liveKeys = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
@@ -94,7 +95,25 @@ namespace ItemChecklist.Possession
 
                 if (od.objectID == ObjectID.Player)
                 {
-                    if (em.HasComponent<ContainedObjectsBuffer>(e)) AddBuffer(em, e, carried);
+                    if (em.HasComponent<ContainedObjectsBuffer>(e)) AddBuffer(em, e, carried, petSkins);
+                    // Iter-16.1: the active/summoned pet is a live entity, NOT in the
+                    // player's ContainedObjectsBuffer — count it explicitly so it isn't
+                    // undercounted (the Iter-20-deferred Terrier 7-vs-8 bug).
+                    if (em.HasComponent<PetOwnerCD>(e))
+                    {
+                        var owner = em.GetComponentData<PetOwnerCD>(e);
+                        if (owner.PetEntity != Entity.Null && em.Exists(owner.PetEntity)
+                            && em.HasComponent<PetCD>(owner.PetEntity)
+                            && em.HasComponent<ObjectDataCD>(owner.PetEntity))
+                        {
+                            var pod = em.GetComponentData<ObjectDataCD>(owner.PetEntity);
+                            var pcd = em.GetComponentData<PetCD>(owner.PetEntity);
+                            int skin = InventoryHandler.TryGetExtraInventoryData<PetSkinCD>(
+                                pcd.inventoryAuxDataIndex, out var sd) ? sd.skinIndex : 0;
+                            long pk = DiscoveredState.PackKey((int)pod.objectID, skin);
+                            petSkins[pk] = (petSkins.TryGetValue(pk, out var pc) ? pc : 0) + 1;
+                        }
+                    }
                     playerPos = new Vector2(pos.x, pos.z);
                     havePlayer = true;
                     continue;
@@ -129,7 +148,7 @@ namespace ItemChecklist.Possession
                 var tile = Tile(scan, key);
                 AddOne(tile, id);
                 if (!em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e))
-                    AddBuffer(em, e, tile);
+                    AddBuffer(em, e, tile, petSkins);
             }
 
             foreach (var kv in scan) { ledger.SetLiveContainer(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
@@ -141,8 +160,15 @@ namespace ItemChecklist.Possession
             const float LoadRadius = 180f;
             if (allowPrune && havePlayer) ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys);
 
+            // Iter-16.1: any skin currently owned (carried/container/active) is collected
+            // forever (persistent ledger; drives the row's collected flag in T6).
+            if (pets != null)
+                foreach (var kv in petSkins)
+                    if (kv.Value > 0)
+                        pets.MarkCollected(DiscoveredState.KeyObjectId(kv.Key), DiscoveredState.KeyVariation(kv.Key));
+
             ledger.SetCarried(carried);
-            return ledger.BuildView(liveKeys);
+            return ledger.BuildView(liveKeys, petSkins);
         }
 
         // Keep only stations that have ≥1 other station within ClusterRadius — a base
@@ -172,7 +198,8 @@ namespace ItemChecklist.Possession
             return false;
         }
 
-        private static void AddBuffer(EntityManager em, Entity e, Dictionary<int, int> totals)
+        private static void AddBuffer(EntityManager em, Entity e, Dictionary<int, int> totals,
+            Dictionary<long, int> petSkins)
         {
             var buf = em.GetBuffer<ContainedObjectsBuffer>(e);
             for (int j = 0; j < buf.Length; j++)
@@ -180,6 +207,15 @@ namespace ItemChecklist.Possession
                 var item = buf[j];
                 if (item.objectID == ObjectID.None) continue;
                 int id = (int)item.objectID;
+
+                // Iter-16.1: a pet item carries its skin in PetSkinCD aux data. Tally
+                // per-(objectId, skinIndex) so each skin's owned count is separate.
+                if (PugDatabase.HasComponent<PetCD>(item.objectID))
+                {
+                    int skin = InventoryHandler.TryGetExtraInventoryData<PetSkinCD>(item, out var sd) ? sd.skinIndex : 0;
+                    long pk = DiscoveredState.PackKey(id, skin);
+                    petSkins[pk] = (petSkins.TryGetValue(pk, out var pc) ? pc : 0) + 1;
+                }
                 // `amount` is double-purposed: stack size for stackable items, but
                 // DURABILITY for equipment (tools/armor). So a single full-durability
                 // hat would otherwise count as e.g. 50. Mirror CK's GetTotalAmount:

@@ -14,14 +14,26 @@ namespace ItemChecklist.Possession
 
         private readonly Dictionary<int, int> _totals;
         private readonly HashSet<int> _remembered;
+        private readonly Dictionary<long, int> _petSkins;   // Iter-16.1: PackKey(objectId, skinIndex) → live count
 
-        public PossessionView(Dictionary<int, int> totals, HashSet<int> remembered)
+        public PossessionView(Dictionary<int, int> totals, HashSet<int> remembered,
+            Dictionary<long, int> petSkins = null)
         {
             _totals = totals;
             _remembered = remembered;
+            _petSkins = petSkins ?? new Dictionary<long, int>();
         }
 
         public int Count(int objectId) => _totals.TryGetValue(objectId, out var c) ? c : 0;
         public bool IsRemembered(int objectId) => _remembered.Contains(objectId);
+
+        // Iter-16.1: live per-(objectId, skinIndex) count for pet-skin rows (carried +
+        // loaded containers + active pet; not "remembered" — the PetCollection ledger
+        // carries the durable collected flag).
+        public int CountSkin(int objectId, int skinIndex)
+            => _petSkins.TryGetValue(DiscoveredState.PackKey(objectId, skinIndex), out var c) ? c : 0;
+
+        public PossessionView WithPetSkins(Dictionary<long, int> petSkins)
+            => new PossessionView(_totals, _remembered, petSkins);
     }
 }

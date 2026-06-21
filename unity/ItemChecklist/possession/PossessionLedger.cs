@@ -42,6 +42,10 @@ namespace ItemChecklist.Possession
             if (drop != null) foreach (var k in drop) _containers.Remove(k);
         }
 
+        // Iter-16.1: same totals/remembered build, plus the live per-pet-skin counts.
+        public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins)
+            => BuildView(liveKeys).WithPetSkins(petSkins);
+
         public PossessionView BuildView(HashSet<long> liveKeys)
         {
             var totals = new Dictionary<int, int>(_carried);   // carried first (always live)
