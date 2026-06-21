@@ -932,3 +932,56 @@ the Editor's own reserialization), then validate via a PyYAML re-parse
 `AscDescButton` from the base left `Filter.prefab`'s old "deactivate AscDescButton"
 `m_IsActive: 0` modification dangling against the deleted base fileID — stripped by
 hand and re-validated.
+
+## Pet Skins (Iter-16.1)
+
+### Gradient-recolor shader: `Amplify/UISpriteColorReplace`, and the existent-but-wrong-shader no-op
+The gradient-capable UI shader CK uses to recolor pet-skin icons is
+**`Amplify/UISpriteColorReplace`** — it carries the `_GradientMap` property + the
+`USE_GRADIENT_MAP` keyword. The icon needs a `Material` on **this** shader; the
+mod's default icon material lacks the property, so enabling the keyword alone is a
+silent no-op (the sprite renders, no recolor).
+
+**The trap:** two decompile agents guessed `Radical/SpritesDefault`. That shader
+**also exists**, so `Shader.Find("Radical/SpritesDefault")` returned a non-null
+(but wrong) shader, masking the failure — the icon still rendered, the keyword was
+ignored, and nothing recolored, with no error to point at the cause. Lesson: an
+existent-but-wrong shader name silently no-ops; `Shader.Find` returning non-null
+proves nothing. The fix came from the **working reference mod** — Item Browser's
+`GetUISpriteColorReplaceMaterial()` is literally
+`new Material(Shader.Find("Amplify/UISpriteColorReplace"))` — which beat two
+decompile guesses. Full recipe (shared per-skin material, keyword + gradient
+texture, base-material restore for non-pet rows) in `ui/PetSkinIcon.cs`.
+
+### `GradientMapDataBlock` needs `ScriptableData.dll` in `precompiledReferences`
+`GradientMapDataBlock` (the pet-skin gradient source) extends
+`ScriptableDataBlock`, which lives in **`ScriptableData.dll`**. The runtime
+`.asmdef` already referenced `ScriptableData.Addressables.dll` but **not**
+`ScriptableData.dll`, so the first build referencing `GradientMapDataBlock` failed
+with `CS0012` (type defined in a not-referenced assembly). Fix: add
+`"ScriptableData.dll"` to the asmdef `precompiledReferences`. (Same class as the
+Iter-9 `PugSprite.dll` / Iter-11 `ScriptableData.dll`-GUID references — a game type
+used directly needs its DLL in `precompiledReferences`.)
+
+### Worktree builds — cwd reset + stale build log
+The worktree AssetDatabase-staleness cache-clear (clear
+`Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}` before each worktree build) is
+the existing `§ Worktree builds` note / `project-corekeeper-sourceassetdb-reset`
+memory; the env-chain `direnv exec` recipe is `docs/conventions.md § Worktree
+Conventions`. Iter-16.1 added two cwd/log traps on top of those:
+
+- **A `cd` elsewhere mid-iteration resets the Bash cwd and breaks relative build
+  invocations — silently.** Running `cd ~/.claude` to make a memory commit reset
+  the cwd from the worktree to `core_keeper`; the next relative build invocation
+  then misfired with no obvious error: `tee: /build.log: Read-only file system`
+  (empty `MOD_INSTALL_PATH`), `../../../utils/build.sh: No such file`, and a
+  **stale** `✓ Build complete` left in the log from the *prior* build. The "build
+  succeeded" line was real — for the previous run. Fix: make builds/git
+  cwd-independent — use absolute paths, `git -C "$WT"`, and call
+  `build.sh "$REPO_ROOT"` with an explicit path arg rather than relying on `$PWD`
+  or `../../../`.
+- The env-chain fix itself (the copied worktree `.envrc` does `source ../.envrc`,
+  which from the worktree resolves to `.worktrees/.envrc`, not `core_keeper/.envrc`)
+  is covered in `docs/conventions.md § Worktree Conventions`: build via
+  `direnv exec "$WT" bash -c '…'`, which walks the real `source_up` chain
+  (worktree → mod → parent).
