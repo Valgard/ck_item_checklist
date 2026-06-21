@@ -135,6 +135,11 @@ remaining backlog.
   feed that tooltip system (or a mod-built equivalent) the row's `(objectID,
   variation)`. Requested 2026-06-21. Scope/feasibility (which tooltip API is
   reachable + spoiler-gating for undiscovered rows) to be measured before design.
+- **Iter-23 (bug) -- rebound toggle key ignored; F1 always opens.** `ItemChecklistMod.Update`
+  polls BOTH the rebindable Rewired action (`GetButtonDown(ToggleActionName)`) AND a raw
+  `Input.GetKeyDown(KeyCode.F1)` fallback, so F1 stays hardcoded as an opener even after the
+  player rebinds the key in settings. Fix: drop the raw-F1 fallback (or gate it as
+  diagnostic-only) so only the bound action toggles the window. Requested 2026-06-21.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
