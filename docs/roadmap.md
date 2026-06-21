@@ -140,6 +140,12 @@ remaining backlog.
   `Input.GetKeyDown(KeyCode.F1)` fallback, so F1 stays hardcoded as an opener even after the
   player rebinds the key in settings. Fix: drop the raw-F1 fallback (or gate it as
   diagnostic-only) so only the bound action toggles the window. Requested 2026-06-21.
+- **Iter-24 (tentative) -- scrollable filter pane.** The Filter popup auto-sizes its
+  height from the row count (`PopupWidget`/`FilterWidget`); with all sections expanded
+  (Discovery/Category/Rarity/Craftable/Possession -- the Category list grew by "Pets"
+  in Iter-16.1) it can exceed the viewport. Make the popup pane scrollable (clip +
+  scroll its `RowContainer`, mirroring the main list's `UIScrollWindow`/SpriteMask
+  pattern) instead of overflowing. Requested 2026-06-21.
 
 See `git log` for canonical per-iter merge points and `docs/superpowers/specs/`
 for design docs.
