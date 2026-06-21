@@ -95,15 +95,28 @@ namespace ItemChecklist
             => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
         /// <summary>
-        /// Build the catalog. Iterates every <c>ObjectDataCD</c> in
-        /// <c>PugDatabase.objectsByType.Keys</c>, keeps only the canonical
-        /// (variation == 0) entries whose <c>ObjectType</c> is not one of
-        /// the categorically-non-item discriminators (NonObtainable, Creature,
-        /// Critter, PlayerType), resolves the localized display name via two
-        /// GetObjectName passes (localized + unlocalized), detects name
-        /// conflicts and appends a disambiguation note, then sorts alphabetically
-        /// and builds the id → index map. Safe to call multiple times — replaces
-        /// the previous catalog atomically from a single-caller perspective.
+        /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
+        /// <list type="bullet">
+        /// <item><b>Loop 1 — standard items.</b> Keeps the canonical
+        /// (variation == 0) entries whose <c>ObjectType</c> is not one of the
+        /// categorically-non-item discriminators (NonObtainable, Creature,
+        /// Critter, PlayerType), with an Iter-7.1 icon-guard that keeps
+        /// <c>NonUsable</c> raw materials but drops the icon-less internal engine
+        /// entities filed under that type. Cooked-food (re-emitted by Loop 2) and
+        /// pets (re-emitted by Loop 3) are skipped here.</item>
+        /// <item><b>Loop 2 — cooked-food α-enumeration.</b> Cartesians the
+        /// ingredient pairs to emit cooked-food permutations × 3 tier-variants
+        /// (Base/Rare/Epic), keyed by the food variation.</item>
+        /// <item><b>Loop 3 — per-skin pet entries (Iter-16.1).</b> One row per
+        /// <c>(petObjectID, skinIndex)</c>, with <c>skinIndex</c> stored in the
+        /// entry's <c>Variation</c> slot and <c>IsPetSkin</c> set; skin-unique
+        /// names bypass the conflict pass.</item>
+        /// </list>
+        /// Each entry resolves its localized display name via two GetObjectName
+        /// passes (localized + unlocalized); Loop 1 detects name conflicts and
+        /// appends a disambiguation note. Finally sorts alphabetically and builds
+        /// the id → index map. Safe to call multiple times — replaces the previous
+        /// catalog atomically from a single-caller perspective.
         /// </summary>
         public void Bake()
         {

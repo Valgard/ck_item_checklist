@@ -14,7 +14,7 @@ Discovery state is split across four collaborating classes:
 
 | Class | Responsibility |
 |---|---|
-| `ItemCatalog` | Static catalog of every discoverable item, baked once per world-load. Iter-3.7: two-loop architecture — Loop 1 enumerates standard items from `PugDatabase.objectsByType.Keys` (skipping items with `IsCookedFood()`); Loop 2 (α-enumeration) cartesians ingredient-pairs to emit cooked-food permutations × 3 tier-variants. Catalog grows to ~10,800 entries. |
+| `ItemCatalog` | Static catalog of every discoverable item, baked once per world-load. **Three-loop architecture:** Loop 1 (Iter-3.7) enumerates standard items from `PugDatabase.objectsByType.Keys` (skipping `IsCookedFood()` and pets, both re-emitted later); Loop 2 (α-enumeration) cartesians ingredient-pairs to emit cooked-food permutations × 3 tier-variants; Loop 3 (Iter-16.1) emits one entry per `(petObjectID, skinIndex)`. Catalog grows to ~10,800 entries. |
 | `DiscoveredState` | In-memory mirror of `CharacterData.discoveredObjects2` for the active character. Keyed on packed `long` (`(objectId << 32) \| (uint)variation`) via `PackKey`. Two events: `Discovered(int, int)` per new pickup, `Changed` after any mutation. |
 | `SaveManagerDiscoveryHook` | Harmony postfix on `SaveManager.SetObjectAsDiscovered`. Filters `__result == true` (CK fires the method ~261×/30s including non-new from `DetectUndiscoveredObjectsInInventory`). Mirrors `(objectID, variation)` into `DiscoveredState`. |
 | `CharacterDataDiscoverySnapshot` | Harmony postfix on `CharacterData.OnAfterDeserialize`. Cache keyed on `characterGuid` (read directly via `__instance.characterGuid` field-access — the sandbox-safe path after several banned alternatives). Active-char resolution piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`. |
@@ -136,3 +136,9 @@ Backlog of planned iterations (Iter-12 onward):
   `docs/conventions.md § Worktree Conventions`.
 - **The visual-calibration / in-game loop runs inline, not via subagents** — it needs
   the live CrossOver window and the build lock.
+- **For CK-UI "how does CK do X?" questions, read the working reference mod (Item
+  Browser) before decompile guessing.** Decompile agents repeatedly guessed wrong on
+  CK-UI internals; the ground truth came from IB source. The gradient shader name
+  (`Amplify/UISpriteColorReplace`, not the guessed `Radical/SpritesDefault`) and the
+  tooltip/gradient `SlotUIBase` architecture both came from IB after decompile agents
+  guessed wrong. IB's working code beats a plausible-looking decompile inference.
