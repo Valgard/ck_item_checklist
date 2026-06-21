@@ -130,10 +130,16 @@ namespace ItemChecklist.UI
 
         public void TogglePopup() => SetOpen(!_open);
 
+        // The most-recently-opened popup, for gap-F: the wheel-suppression Harmony patch on
+        // UIScrollWindow asks whether an open popup currently owns the wheel (cursor over it).
+        private static PopupWidget _openInstance;
+        public static bool OpenPopupCapturesWheel() => _openInstance != null && _openInstance._open && _openInstance.PointerOverPanel();
+
         protected void SetOpen(bool open)
         {
             _open = open;
-            if (open) _scrollOffset = 0f;          // Iter-24: always open at the top (D9)
+            if (open) { _scrollOffset = 0f; _openInstance = this; }   // track for gap-F wheel ownership
+            else if (_openInstance == this) _openInstance = null;
             if (popupPanel != null) popupPanel.SetActive(open);
             if (caret != null) caret.sprite = open ? caretOpen : caretClosed;
             if (open) OnPopupOpened();
