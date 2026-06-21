@@ -3,7 +3,7 @@ namespace ItemChecklist.UI
     public enum ItemCategory
     {
         Weapons, ArmorAccessories, Tools, Food, Placeables,
-        Materials, Valuables, KeyItems, Instruments, Pets, Other
+        Materials, Valuables, KeyItems, Instruments, Pets, Critters, Other
     }
 
     public static class ItemCategories
@@ -14,7 +14,7 @@ namespace ItemChecklist.UI
             ItemCategory.Weapons, ItemCategory.ArmorAccessories, ItemCategory.Tools,
             ItemCategory.Food, ItemCategory.Placeables, ItemCategory.Materials,
             ItemCategory.Valuables, ItemCategory.KeyItems, ItemCategory.Instruments,
-            ItemCategory.Pets, ItemCategory.Other
+            ItemCategory.Pets, ItemCategory.Critters, ItemCategory.Other
         };
 
         public static ItemCategory Of(ObjectType t)
@@ -75,6 +75,9 @@ namespace ItemChecklist.UI
 
                 case ObjectType.Pet:
                     return ItemCategory.Pets;
+
+                case ObjectType.Critter:        // Iter-16.2: net-catchable critters + fireflies
+                    return ItemCategory.Critters;
 
                 default:
                     return ItemCategory.Other;
