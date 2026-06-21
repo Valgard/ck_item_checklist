@@ -27,6 +27,22 @@ namespace ItemChecklist.UI
         protected bool _open;
         private bool _armed;                   // click-outside arming: skip the frame the popup opened
 
+        // --- Iter-24 scroll (manual translate; gated by _scrollActive) ---
+        // Dormant until a prefab caps the height: the Dropdown skeleton sets
+        // MaxPopupHeight = 4.2 (6 rows). MaxPopupHeight <= 0 means "no cap" — and
+        // a newly-added serialized float is absent from legacy prefab YAML (Unity
+        // deserialises it to 0), so existing popups stay uncapped → today's centred
+        // behaviour, build-neutral.
+        public float MaxPopupHeight = 0f;              // 0 = no cap; a prefab overrides (skeleton 4.2u)
+        public GameObject scrollMask;                  // popup-local SpriteMask GO (skeleton); null on legacy prefabs
+        public PopupScrollHandle scrollHandle;         // hand-rolled handle (skeleton); nullable
+        public float WheelStep = 0.7f;                 // one row per wheel notch (Task 3 calibration)
+
+        protected bool _scrollActive;
+        protected float _scrollOffset;   // [0, contentH - viewportH]; 0 = top
+        protected float _contentH;       // last laid-out stack height
+        protected float _viewportH;      // min(contentH, MaxPopupHeight) = mask height when scrolling
+
         /// <summary>Slot offset of the first laid-out row. Sort reserves row 0 for
         /// the header-shown selected option (=> 1); Filter starts members at row 0
         /// (=> 0). Feeds AutoSizePopup's rowContainer centring AND each subclass's
@@ -45,30 +61,66 @@ namespace ItemChecklist.UI
             }
         }
 
-        /// <summary>Centre the rowContainer on its origin and fit the panel height to
-        /// the laid-out row stack, top-aligned to the authored top edge. rowCount =
-        /// number of rows the subclass laid out this rebuild.</summary>
+        /// <summary>Fit the panel to the laid-out row stack, capped at MaxPopupHeight
+        /// and top-aligned to the authored top edge. Below the cap the rowContainer is
+        /// centred (today's behaviour); at/above the cap it is top-aligned and the
+        /// scroll chrome (mask + handle) is engaged. rowCount = number of rows the
+        /// subclass laid out this rebuild.</summary>
         protected void AutoSizePopup(int rowCount)
         {
             if (rowCount <= 0) return;
-            float h = rowCount * rowSpacing;   // no extra padding — panel hugs the stack
-            if (rowContainer != null)
-                rowContainer.localPosition = new Vector3(
-                    rowContainer.localPosition.x,
-                    (FirstRowOffset + (rowCount - 1) / 2f) * rowSpacing,
-                    rowContainer.localPosition.z);
-            if (popupPanel != null)     // top-align: keep the authored top edge, panel grows downward
+            _contentH = rowCount * rowSpacing;
+            bool capped = MaxPopupHeight > 0f;                       // <= 0 → no cap (legacy popups)
+            _viewportH = capped ? Mathf.Min(_contentH, MaxPopupHeight) : _contentH;
+            _scrollActive = capped && _contentH > MaxPopupHeight + 1e-4f;
+
+            // Panel: top-aligned to the authored top edge, grows downward, bounded by the cap.
+            if (popupPanel != null)
                 popupPanel.transform.localPosition = new Vector3(
-                    popupPanel.transform.localPosition.x, _topY - h / 2f, popupPanel.transform.localPosition.z);
+                    popupPanel.transform.localPosition.x, _topY - _viewportH / 2f, popupPanel.transform.localPosition.z);
             if (_panel != null)
-                _panel.size = new Vector2(_panel.size.x, h);
+                _panel.size = new Vector2(_panel.size.x, _viewportH);
+
+            if (rowContainer != null)
+            {
+                if (_scrollActive)
+                {
+                    // Top-align row 0 to the mask top, then apply the scroll offset.
+                    _scrollOffset = Mathf.Clamp(_scrollOffset, 0f, _contentH - _viewportH);
+                    rowContainer.localPosition = new Vector3(
+                        rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
+                }
+                else
+                {
+                    _scrollOffset = 0f;
+                    rowContainer.localPosition = new Vector3(
+                        rowContainer.localPosition.x,
+                        (FirstRowOffset + (rowCount - 1) / 2f) * rowSpacing,   // unchanged centring
+                        rowContainer.localPosition.z);
+                }
+            }
+
+            // Gate the scroll chrome fully off when the content fits (D7).
+            if (scrollMask != null && scrollMask.activeSelf != _scrollActive)
+                scrollMask.SetActive(_scrollActive);
+            if (scrollHandle != null)
+            {
+                scrollHandle.SetActiveScrolling(_scrollActive);
+                if (_scrollActive) scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
+            }
         }
+
+        /// <summary>rowContainer.y that puts row 0's top flush to the mask top edge.
+        /// Rows lay out downward from y=0 under rowContainer; the offset is the
+        /// authored top edge minus half a row (calibrated in-game in Task 3).</summary>
+        protected float RowTopY => _topY - rowSpacing / 2f;
 
         public void TogglePopup() => SetOpen(!_open);
 
         protected void SetOpen(bool open)
         {
             _open = open;
+            if (open) _scrollOffset = 0f;          // Iter-24: always open at the top (D9)
             if (popupPanel != null) popupPanel.SetActive(open);
             if (caret != null) caret.sprite = open ? caretOpen : caretClosed;
             if (open) OnPopupOpened();
