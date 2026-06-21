@@ -149,11 +149,14 @@ remaining backlog.
   feed that tooltip system (or a mod-built equivalent) the row's `(objectID,
   variation)`. Requested 2026-06-21. Scope/feasibility (which tooltip API is
   reachable + spoiler-gating for undiscovered rows) to be measured before design.
-- **Iter-23 (bug) -- rebound toggle key ignored; F1 always opens.** `ItemChecklistMod.Update`
-  polls BOTH the rebindable Rewired action (`GetButtonDown(ToggleActionName)`) AND a raw
-  `Input.GetKeyDown(KeyCode.F1)` fallback, so F1 stays hardcoded as an opener even after the
-  player rebinds the key in settings. Fix: drop the raw-F1 fallback (or gate it as
-  diagnostic-only) so only the bound action toggles the window. Requested 2026-06-21.
+- **Iter-23 -- rebound toggle key ignored; F1 always opens. DONE** (see
+  `docs/iteration-history.md`). `ItemChecklistMod.Update` polled BOTH the rebindable
+  Rewired action (`GetButtonDown(ToggleActionName)`) AND a raw
+  `Input.GetKeyDown(KeyCode.F1)` in an OR, so F1 stayed a hardcoded opener even after
+  the player rebound the key in settings. Fix: dropped the raw-F1 fallback (it was never
+  gated to diagnostic-only) so only the bound action toggles — the Rewired path already
+  covers the default F1 binding. Pure behavioural C# (one OR-term removed); no prefab/art
+  touch.
 - **Iter-24 (tentative) -- scrollable filter pane.** The Filter popup auto-sizes its
   height from the row count (`PopupWidget`/`FilterWidget`); with all sections expanded
   (Discovery/Category/Rarity/Craftable/Possession -- the Category list grew by "Pets"

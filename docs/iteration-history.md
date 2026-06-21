@@ -6,7 +6,7 @@ canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
 As of 2026-06-21: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, and Iter-16.2 are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, and Iter-23 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -748,3 +748,25 @@ ghost rows. **Not separately stressed:** the Phase-3 pool-leak multi-open (the c
 is additive — no row-pool/render touch). The generated loc assets under
 `Localization/Generated/` are gitignored build artifacts (regenerated from the yaml
 each build), so only the `localization.yaml` line is committed.
+
+**Iter-23 (rebound toggle key ignored — F1 always opens) — DONE (2026-06-21,
+branch `iter-23`).** A one-term hotkey-poll fix. `ItemChecklistMod.Update` toggled the
+window on `rewiredFired || rawFired`, where `rewiredFired =
+rewiredPlayer.GetButtonDown(ToggleActionName)` is the **rebindable** Rewired action
+(registered by CoreLib `ControlMappingModule.AddKeyboardBind`, default F1, remappable in
+the game's input settings) and `rawFired = Input.GetKeyDown(KeyCode.F1)` was a raw,
+hardcoded F1 read. A code comment called the raw read a "diagnostic fallback", but it was
+never actually gated to diagnostic-only — so it sat as a co-equal OR term and kept F1
+opening the window **even after the player rebound the toggle** (the new key worked via
+`rewiredFired`, but old F1 lived on via `rawFired`, so the rebind appeared not to take).
+Fix: dropped the `rawFired` term entirely — the Rewired path already covers the default
+F1 binding (the registered keybind's default *is* F1), so a fresh install is unaffected
+while a rebind now fully takes. Net: removed two locals + one OR operand, leaving
+`if (rewiredPlayer != null && rewiredPlayer.GetButtonDown(ToggleActionName))`. Pure
+behavioural C# (no prefab/art touch); `using UnityEngine` stays (Debug/Time/Object), no
+dead import. Build-verified (clean Editor compile, 0 `error CS`), sandbox-verified
+in-game (1.2.1.4, mod.io build: `Successfully compiled ItemChecklist safetyCheck=True`,
+0 `CompileFailed`; `[ItemChecklist] Hotkey — opening/closing UI` logs fire), and
+behaviourally confirmed by the user (default F1 opens; after rebinding the toggle the
+new key opens and F1 no longer does). The branch was rebased onto an intervening main
+doc commit (`f350ea6`) before the ff-merge — linear history, no squash.
