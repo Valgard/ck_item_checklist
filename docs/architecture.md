@@ -1135,3 +1135,84 @@ construction. It gates on the **same** discovered flag that drives `???`-vs-name
 > variation-keyed-discovery case — a family discovered only at a non-0 variation
 > would still render `???` because the row checks `IsDiscovered(objectId, 0)` — is a
 > separate concern deferred to **Iter-17** (per-variation tracking).
+
+## Pet-Skin Collection (Iter-16.1)
+
+A design-level summary of the per-skin pet collection feature. The deep CK data
+model is verified in the `reference_ck_pet_critter_discovery_model` memory; the
+build narrative is the Iter-16.1 entry in `docs/iteration-history.md`. This
+section captures only the architecture-shaping facts (one skin = one
+collectible, riding a mod-owned ledger).
+
+### Why pets were already in the catalog
+
+The bake excludes `NonObtainable` / `Creature` / `Critter` / `PlayerType`. The
+relevant `ObjectType` enum values are `PlaceablePrefab = 800`, `Critter = 801`,
+**`Pet = 802`**, `Creature = 900`, `PlayerType = 6000` — so **`Pet` (802) is
+not on the exclusion list** and pets were always in the catalog (the roadmap's
+"relax the Creature filter" premise was wrong — the third such mis-guess after
+the Iter-21 waypoint case). The real gap was per-skin tracking, not the bake.
+
+### The CK pet model (skin = orthogonal aux data)
+
+CK force-zeroes pet discovery to variation 0 (`SaveManager.SetObjectAsDiscovered`
+zeroes `variation` for `PetCD` objects), so CK records a pet only at
+`(objectID, 0)` and tracks **no per-skin discovery**. The skin is orthogonal aux
+data: `PetSkinCD.skinIndex`, an `[InventoryAuxDataComponent]` in the world-global
+`InventoryAuxDataSystem`, assigned randomly on hatch (`rng.NextInt(maxSkins)`).
+All skins of a pet share one ObjectID and render as gradient recolors of the one
+base icon. The real skin count is
+`Manager.ui.petInfosTable.GetPetSkinInfo(id).skins.Count` (more reliable than
+`PetCD.maxSkins`). CK ships no native skin-collection system → the feature is
+mod-owned.
+
+Reading `skinIndex` is **sandbox-safe**:
+`InventoryHandler.TryGetExtraInventoryData<PetSkinCD>` covers carried and
+in-chest pets; the active summoned pet is reached via the player's
+`PetOwnerCD.PetEntity` → `PetCD.inventoryAuxDataIndex` → the same lookup (fixing
+the Iter-20-deferred active-pet undercount, since a summoned pet is a live entity
+outside the possession scan's `ContainedObjectsBuffer`).
+
+### Catalog keying — Bake Loop 3
+
+`ItemCatalog.Bake` Loop 3 emits one `Entry` per `(petObjectID, skinIndex)`, with
+`skinIndex` stored in the entry's **`Variation`** slot and `IsPetSkin: true`. The
+per-skin names are unique, so these rows bypass Loop 1's name-conflict pass. (See
+the three-loop overview in § ItemCatalog Two-Loop Bake — Loop 3 is the pet axis.)
+
+### Pet collection ledger (not CK `DiscoveredState`)
+
+Pet rows route through a mod-owned `PetCollection` ledger instead of CK's
+skin-blind `DiscoveredState`:
+
+| Class | Responsibility |
+|---|---|
+| `PetCollection` | Persistent **ever-owned** ledger of collected `(objectID, skinIndex)` keys (`IsCollected`). A skin stays collected after the pet leaves inventory — collection is "ever owned," not "currently owned." |
+| `PetCollectionStore` | Per-character-GUID persistence to `petskins-<guid>.txt` via `API.ConfigFilesystem` (hand-rolled ASCII, sandbox-safe), saved on the `SaveManager.WriteCharacter` hook — the same Iter-20 mechanism. |
+
+The `ItemChecklistMod.OwnedCount(objectId, variation)` chokepoint branches:
+pet-skin rows resolve via `PetCollection.IsCollected` + `PossessionView.CountSkin`
+(per-skin live count); normal rows keep the `DiscoveredState` + `Count` path.
+
+### Decoupled name vs. detail display
+
+`ItemRow.Bind` decouples two booleans that are one-and-the-same for normal items:
+
+- **`nameKnown`** — the *species* is discovered (CK's variation-0 discovery flag).
+- **`showDetails`** — *this skin* is collected (the `PetCollection` ledger).
+
+A known-but-uncollected skin shows the species **name** but the unknown icon and
+`—`; a normal item sets both bools equal to its discovered flag (zero behaviour
+change for non-pet rows).
+
+### Why a surgical material-swap, not the SlotUIBase path (B3)
+
+Item Browser renders item icons through CK's native `SlotUIBase` /
+`ItemSlotsUIContainer`, which deliver the gradient recolor
+(`Manager.ui.ApplyAnyIconGradientMap`) **and** hover tooltips for free.
+ItemChecklist is a raw-`SpriteRenderer` column list (not a slot grid), so it
+cannot reuse `SlotUIBase` wholesale — the gradient is applied by a **surgical
+per-skin material swap** instead (see `ui/PetSkinIcon.cs` and
+`docs/gotchas.md § Gradient-recolor shader`). The trade-off is logged as Iter-22:
+porting the list onto `SlotUIBase` would deliver row-hover tooltips and the
+gradient together.
