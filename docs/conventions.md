@@ -35,6 +35,22 @@ as early, separate commits on each branch.
 **Force-push:** after a rebase of a pushed feature branch, force-push with
 `--force-with-lease`.
 
+**New `.cs` → commit the source first, the `.cs.meta` in a follow-up `chore`.**
+Unity writes a new script's `.cs.meta` GUID carrier only on the next import after
+the `.cs` is added (see `docs/gotchas.md § Generated .meta trails its .cs by one
+build`), so it does not exist yet when the source is first authored. Commit the
+`.cs` first; once a build has run and the `.cs.meta` appears, add it in a follow-up
+`chore` commit (a single new file together with the source is also fine if the meta
+already exists by commit time).
+
+**Hand-editing an `.asmdef` `precompiledReferences` is the correct way to add a
+game-DLL reference — not a package-manager violation.** Unity `.asmdef`s have no
+package manager, so adding a DLL (e.g. `"ScriptableData.dll"` for
+`GradientMapDataBlock`, Iter-16.1; `"PugSprite.dll"` for `SpriteObject`, Iter-9) to
+`precompiledReferences` by hand is the sanctioned method — it does **not** breach
+the global "use the package manager for dependencies" rule, which targets package
+ecosystems (npm/uv/cargo), not Unity asmdefs.
+
 ### Committing around Unity prefab reserialization
 
 Unity rewrites a whole `.prefab` on every Editor save — GameObject blocks get
@@ -268,6 +284,7 @@ unity/ItemChecklist/
     ItemCategory.cs               category taxonomy (ObjectType -> bucket) (Iter-10)
     FilterWidget.cs               sectioned multi-select filter dropdown (Iter-10, renamed Iter-14.2)
     FilterCheckboxButton.cs       filter checkbox row button (Iter-10, renamed Iter-14.2)
+    PetSkinIcon.cs                gradient skin-icon material (Amplify/UISpriteColorReplace) (Iter-16.1)
   possession/                     possession scan/ledger/persist package (Iter-20)
     PossessionScanner.cs          live ECS scan: carried + clustered-base storage
     PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes
@@ -275,6 +292,8 @@ unity/ItemChecklist/
     PossessionView.cs             immutable per-refresh snapshot (Count(objectId))
     PossessionConfig.cs           AnchorRadius + tuning
     PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues)
+    PetCollection.cs              persistent ever-owned per-(objectID,skinIndex) ledger (Iter-16.1)
+    PetCollectionStore.cs         per-GUID persistence — petskins-<guid>.txt (Iter-16.1)
   Localization/
     Generated/                    build-generated .asset TextDataBlocks (gitignored)
   Prefabs/
