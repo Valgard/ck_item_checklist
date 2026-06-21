@@ -154,6 +154,7 @@
     "Rewired_Windows.dll",
     "Rewired_Windows_Functions.dll",
     "ScriptableData.Addressables.dll",
+    "ScriptableData.dll",
     "Sentry.dll",
     "Sentry.Microsoft.Bcl.AsyncInterfaces.dll",
     "Sentry.System.Buffers.dll",

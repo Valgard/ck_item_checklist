@@ -42,33 +42,37 @@ namespace ItemChecklist.UI
             return s_coinSprite;
         }
 
-        public void Bind(int objectId, Sprite iconSprite, string name, bool isDiscovered,
-            Color rarityColor, Rarity rarity, int level, int sellValue,
-            int possessionCount)
+        // Iter-16.1: name and detail visibility are DECOUPLED. For normal items both
+        // equal "discovered". For pet skins they differ: `nameKnown` = the pet SPECIES
+        // is discovered (CK var-0), `showDetails` = THIS skin is collected (mod ledger)
+        // — so a known species' uncollected skin shows the name but the unknown icon + —.
+        public void Bind(int objectId, Sprite iconSprite, string name, bool nameKnown,
+            bool showDetails, Color rarityColor, Rarity rarity, int level, int sellValue,
+            int possessionCount, bool isPetSkin, int skinIndex)
         {
-            if (isDiscovered)
-            {
-                // Real item icon: never tinted (reset, since the pool recycles rows).
-                if (icon != null) { icon.sprite = iconSprite; icon.enabled = true; icon.color = Color.white; }
-                if (label != null) label.Render(name);
-            }
-            else
-            {
-                // Undiscovered: show the "unknown object" sprite in the icon slot (Iter-12),
-                // tinted by rarity to match the name tint + rarity border (Common/Poor = default).
-                if (icon != null) { icon.sprite = unknownIcon; icon.enabled = unknownIcon != null; icon.color = rarityColor; }
-                if (label != null) label.Render("???");
-            }
+            if (label != null) label.Render(nameKnown ? name : "???");
 
-            // Position + size the icon like CK/IB: NATIVE scale (the 1.25u slot fits the
-            // detail icons), positioned by the game's per-item iconOffset — relative to the
-            // slot, since Icon is a child of IconSlot (CK: icon.localPosition = iconOffset).
-            // Reset both each bind (the viewport pool recycles rows).
             if (icon != null)
             {
+                if (showDetails)
+                {
+                    // Real icon. Pet skins recolor the base sprite via a gradient map;
+                    // everything else is a plain sprite (keyword reset for the pool).
+                    if (isPetSkin) PetSkinIcon.Apply(icon, objectId, skinIndex, iconSprite);
+                    else { PetSkinIcon.Disable(icon); icon.sprite = iconSprite; icon.color = Color.white; }
+                    icon.enabled = icon.sprite != null;
+                }
+                else
+                {
+                    // Undiscovered/uncollected: the "unknown object" sprite, rarity-tinted.
+                    PetSkinIcon.Disable(icon);
+                    icon.sprite = unknownIcon; icon.enabled = unknownIcon != null; icon.color = rarityColor;
+                }
+
+                // NATIVE scale; per-item iconOffset only for a real non-pet icon (pets +
+                // the "?" placeholder stay centred). Reset each bind (the pool recycles).
                 icon.transform.localScale = Vector3.one;
-                // iconOffset only for the real item icon; the "?" placeholder stays centred.
-                if (isDiscovered)
+                if (showDetails && !isPetSkin)
                 {
                     var info = PugDatabase.GetObjectInfo((ObjectID)objectId, 0);
                     icon.transform.localPosition = info != null ? info.iconOffset : Vector3.zero;
@@ -88,8 +92,8 @@ namespace ItemChecklist.UI
             }
             if (checkFill != null)
             {
-                checkFill.enabled = isDiscovered;
-                if (isDiscovered)
+                checkFill.enabled = showDetails;
+                if (showDetails)
                     checkFill.color = owned ? OwnedTint : Color.white;
             }
 
@@ -110,13 +114,13 @@ namespace ItemChecklist.UI
             // Level 0 and unsellable (sellValue < 0) render "—".
             const string Dash = "—";
             if (levelText != null)
-                levelText.Render(isDiscovered && level > 0 ? ItemChecklist.Loc.F("ItemChecklist-General/Level", level) : Dash);
+                levelText.Render(showDetails && level > 0 ? ItemChecklist.Loc.F("ItemChecklist-General/Level", level) : Dash);
             if (valueText != null)
-                valueText.Render(isDiscovered && sellValue > 0 ? sellValue.ToString() : Dash);
+                valueText.Render(showDetails && sellValue > 0 ? sellValue.ToString() : Dash);
 
             if (coinIcon != null)
             {
-                bool showCoin = isDiscovered && sellValue > 0;
+                bool showCoin = showDetails && sellValue > 0;
                 if (showCoin && coinIcon.sprite == null)
                     coinIcon.sprite = CoinSprite();
                 coinIcon.enabled = showCoin && coinIcon.sprite != null;
@@ -127,7 +131,7 @@ namespace ItemChecklist.UI
             // columns (no live/remembered marker — the player only cares about the
             // count, not whether the source chunk is currently loaded).
             if (possessionText != null)
-                possessionText.Render(isDiscovered ? possessionCount.ToString() : Dash);
+                possessionText.Render(showDetails ? possessionCount.ToString() : Dash);
         }
     }
 }
