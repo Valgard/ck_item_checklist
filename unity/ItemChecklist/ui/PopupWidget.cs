@@ -153,8 +153,46 @@ namespace ItemChecklist.UI
         protected override void LateUpdate()
         {
             if (!_open) { _armed = false; return; }
+            if (_scrollActive) HandleWheel();
             if (!_armed) { _armed = true; return; }
-            if (Input.GetMouseButtonDown(0)) SetOpen(false);
+            // Gap-A: close only on a click genuinely OUTSIDE the popup. The old code closed on
+            // ANY mouse-down, so an inside click (checkbox, and — from Iter-24 on — a section
+            // header or the scrollbar handle) wrongly closed the popup. A bounds check against
+            // the panel rect fixes all three.
+            if (Input.GetMouseButtonDown(0) && !PointerOverPanel()) SetOpen(false);
+        }
+
+        // Mouse-wheel scroll, but only while the cursor is over THIS popup (gap-F: the main
+        // list must not also scroll). One notch = WheelStep (= rowSpacing → one row).
+        private void HandleWheel()
+        {
+            float d = Input.mouseScrollDelta.y;
+            if (d == 0f || !PointerOverPanel()) return;
+            _scrollOffset = Mathf.Clamp(_scrollOffset - d * WheelStep, 0f, _contentH - _viewportH);
+            ApplyScroll();
+        }
+
+        /// <summary>Push the current scroll offset to the rows + handle (shared by wheel + handle drag).</summary>
+        protected void ApplyScroll()
+        {
+            if (rowContainer != null)
+                rowContainer.localPosition = new Vector3(
+                    rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
+            if (scrollHandle != null) scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
+        }
+
+        /// <summary>True when the UI cursor lies within the popup panel's world rect. The UI
+        /// camera is orthographic, so world X/Y is z-independent — no depth calibration needed.
+        /// (Manager.camera property access is sandbox-safe by the same precedent as Manager.ui.)</summary>
+        protected bool PointerOverPanel()
+        {
+            if (_panel == null || popupPanel == null || !popupPanel.activeInHierarchy) return false;
+            var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
+            if (cam == null) return false;
+            Vector3 c = cam.ScreenToWorldPoint(Input.mousePosition);
+            Vector3 p = popupPanel.transform.position;
+            return Mathf.Abs(c.x - p.x) <= _panel.size.x * 0.5f
+                && Mathf.Abs(c.y - p.y) <= _panel.size.y * 0.5f;
         }
     }
 }
