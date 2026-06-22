@@ -163,6 +163,12 @@ remaining backlog.
   in Iter-16.1) it can exceed the viewport. Make the popup pane scrollable (clip +
   scroll its `RowContainer`, mirroring the main list's `UIScrollWindow`/SpriteMask
   pattern) instead of overflowing. Requested 2026-06-21.
+- **Iter-25 (tentative) -- small-font umlaut rendering.** The pixel "small font"
+  renders German umlauts (ä/ö/ü) oddly -- the diacritic glyphs look malformed /
+  misplaced. Investigate the small-font glyph set (`PugFont`/`PugText style.fontFace`
+  + the I2 font asset) and how `ä/ö/ü` are composed at small sizes; fix the glyphs or
+  switch the affected labels to a font face that renders them cleanly. Requested
+  2026-06-22.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
