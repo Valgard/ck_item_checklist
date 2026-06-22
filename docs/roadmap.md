@@ -157,12 +157,19 @@ remaining backlog.
   gated to diagnostic-only) so only the bound action toggles — the Rewired path already
   covers the default F1 binding. Pure behavioural C# (one OR-term removed); no prefab/art
   touch.
-- **Iter-24 (tentative) -- scrollable filter pane.** The Filter popup auto-sizes its
-  height from the row count (`PopupWidget`/`FilterWidget`); with all sections expanded
-  (Discovery/Category/Rarity/Craftable/Possession -- the Category list grew by "Pets"
-  in Iter-16.1) it can exceed the viewport. Make the popup pane scrollable (clip +
-  scroll its `RowContainer`, mirroring the main list's `UIScrollWindow`/SpriteMask
-  pattern) instead of overflowing. Requested 2026-06-21.
+- **Iter-24 -- scrollable + collapsible filter popup. DONE** (see
+  `docs/iteration-history.md`). Re-scoped from scroll-only into a two-layer **A+C**
+  design. **(A) Scroll:** popup capped to `MaxVisibleRows` (default 6) and scrolled by
+  **manual translate** (not CK's `UIScrollWindow` — its Awake self-disable + no
+  virtualization needed), with a popup `SpriteMask` (band 56..63, above the window
+  mask) + a hand-rolled draggable scrollbar. All base-wired in `PopupWidget` /
+  `Dropdown` skeleton, **runtime-discovered** (no fragile cross-ref); Sort made
+  scroll-ready too. gap-A (bounds-checked click-outside via `Manager.camera`), gap-F
+  (Harmony prefix on `UIScrollWindow.UpdateScroll` so the wheel doesn't leak to the
+  main list). Filter x-offset relocated from child overrides to the window instance.
+  **(C) Collapse:** clickable `SectionHeaderButton` headers, multi-open, default
+  all-open, `static` closed-set keyed on the **stable loc term** (survives language
+  change); carets shift with the scrollbar. Requested 2026-06-21, done 2026-06-22.
 - **Iter-25 (tentative) -- small-font umlaut rendering.** The pixel "small font"
   renders German umlauts (ä/ö/ü) oddly -- the diacritic glyphs look malformed /
   misplaced. Investigate the small-font glyph set (`PugFont`/`PugText style.fontFace`

@@ -6,7 +6,7 @@ canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
 As of 2026-06-21: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, and Iter-23 are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-23, and Iter-24 are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -770,3 +770,74 @@ in-game (1.2.1.4, mod.io build: `Successfully compiled ItemChecklist safetyCheck
 behaviourally confirmed by the user (default F1 opens; after rebinding the toggle the
 new key opens and F1 no longer does). The branch was rebased onto an intervening main
 doc commit (`f350ea6`) before the ff-merge — linear history, no squash.
+
+**Iter-24 (scrollable + collapsible filter popup) — DONE (2026-06-22, branch
+`iter-24`).** The Filter popup rendered every section expanded at once and, after
+Pets (Iter-16.1) + Critters (Iter-16.2) grew the Category list to ~29 rows, overflowed
+the viewport. Brainstorming re-scoped the roadmap's scroll-only framing into a **two-layer
+A+C design**: **(A) scroll** the popup, capped to a few rows; **(C) collapse** sections to
+shorten it. Both layers live in the shared `PopupWidget` base / `Dropdown` skeleton so any
+variant inherits them; collapse is Filter-specific (Sort has no sections). Design spec
+retained at `docs/specs/2026-06-21-iter-24-scrollable-filter-popup-design.md`.
+
+**Scroll (A) — manual translate ("Weg 2"), NOT CK's `UIScrollWindow`.** Two reasons the
+main-list machinery was rejected: (1) `UIScrollWindow.Awake` permanently self-disables if
+its serialized `scrollable` doesn't resolve to an `IScrollable` on the same GO — and the
+`Dropdown` skeleton is deliberately component-less (Iter-18), so a skeleton `UIScrollWindow`
+would self-disable; (2) the popup has ≤~29 *real* row GOs (no virtualization needed). So
+`PopupWidget` caps the panel (`MaxVisibleRows` × `rowSpacing`; **base default 6 rows**,
+per-variant overridable), clips with a popup-local `SpriteMask`, and scrolls by translating
+`rowContainer`. The mask GO **and** the hand-rolled scrollbar (track + draggable
+`PopupScrollHandle`) live in the `Dropdown` skeleton and are **runtime-discovered**
+(`GetComponentInChildren`) — no serialized cross-prefab refs (the Iter-13 runtime-wire rule;
+a first attempt used a stripped-stub `scrollMask` ref and was replaced). Sort inherits the
+chrome but never wires it; **Sort was made scroll-ready** anyway (its `RowTemplate` baked to
+`maskInteraction=1` + the band), so it auto-scrolls if it ever exceeds 6 modes.
+
+**Hard-won scroll points (each caught in-game, none by the Editor compile):**
+- **Sorting band 56..63, above the window mask (40..55).** The popup rows are lifted into a
+  band the window `ContentsMask` does *not* cover (else it would clip the popup's top, which
+  sits above the list region), with their own popup mask clipping them. PugText `orderInLayer`
+  is freely editable (the footer-at-50 precedent), so labels were pulled from 9999 into the
+  band. **Separator regression:** the row-BG at the mask's *back* order (56) fell on the range
+  boundary → invisible; fix = lower `m_BackSortingOrder` to 55 so 56 is comfortably inside.
+- **`maskInteraction=1` + no active mask = invisible.** So the mask stays active whenever the
+  popup is open (sized to the cap; clips only on overflow, shows everything when it fits) —
+  *not* gated on `_scrollActive`. Only the scrollbar/handle is overflow-gated.
+- **Two `rowContainer` positioning modes.** `AutoSizePopup` moves the Popup GO itself to
+  top-align the capped BG, so the rows (its children) need `RowTopY = viewportH/2 −
+  rowSpacing/2` in that moved frame — not the centred formula (which stays for the no-cap case).
+- **gap-A (click-outside).** The old `LateUpdate` closed on *any* mouse-down, so an inside
+  click (checkbox, and now section-header / handle-drag) wrongly closed the popup. Fixed with
+  a bounds check via `Manager.camera.uiCamera.ScreenToWorldPoint(Input.mousePosition)` (the UI
+  camera is orthographic → world X/Y is z-independent; sandbox-safe, verified). Same helper
+  powers wheel ownership.
+- **gap-F (wheel ownership).** CK's `UIScrollWindow.UpdateScroll` reads the wheel
+  independently, so wheeling over the popup also scrolled the main list. A Harmony **prefix on
+  `UIScrollWindow.UpdateScroll`** returns false while an open popup owns the wheel
+  (`PopupWidget.OpenPopupCapturesWheel()`, computed fresh per-frame). Harmony runs in trusted
+  `0Harmony.dll` → sandbox-safe; only the main list is affected (the popup uses no UIScrollWindow).
+- **x-alignment relocate.** The Filter variant shifted its `Display` −0.35 (a window-layout
+  decision wrongly living on a child) but not the popup → 0.35 misalignment, exposed once the
+  row backgrounds rendered. Cleaned up properly: both child x-overrides removed (Filter now
+  structurally == Sort), the offset moved to the **window instance position** (−0.35), where
+  layout belongs.
+
+**Collapse (C).** Section headers became clickable (`SectionHeaderButton : ClickButton`,
+3D collider + caret glyph on the `headerTemplate`). A **`static HashSet<string>` closed-set**
+keyed on the **stable loc term** (Task 5 de-resolved `Member.section` from `Loc.T(...)` to the
+raw term, rendered via `Loc.T` in `FilterWidget`) — so collapse survives a language change.
+**Multi-open, default all-open.** `RebuildList` always renders a section's header (binding its
+toggle + caret state) but skips the member rows of collapsed sections; `AutoSizePopup` then
+operates on the reduced visible count, so collapsing enough deactivates the scrollbar. The
+section carets shift X dynamically (a post-`AutoSizePopup` pass): clear of the scrollbar when
+it shows (`2.65`), at the panel edge when it hides (`2.9`).
+
+**Verified in-game (1.2.1.4, fake-ID 9999997):** clean sandbox compile (`safetyCheck=True`,
+0 `CompileFailed`) across all 12 commits, each build+in-game-gated. Filter clips to 6 rows with
+separators, scrolls via wheel + draggable handle, click-outside-only closes, wheel doesn't leak
+to the main list, sections collapse/expand independently (default open, caret tracks the
+scrollbar), Sort unchanged. Caught + logged during the iter: **Iter-25** (small-font umlaut
+rendering looks malformed). The corrected process lesson, surfaced by the user mid-iter:
+**do low-risk edits first** (lock in certain progress; isolate the uncertain edit last and
+alone) — not the risky one first.
