@@ -137,7 +137,7 @@ namespace ItemChecklist.UI
                         var ht = _headerPool[headerIdx];
                         ht.transform.parent.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
                         if (!ht.transform.parent.gameObject.activeSelf) ht.transform.parent.gameObject.SetActive(true);
-                        ht.RenderNoWrap(lastSection);   // colour set on the headerTemplate PugText style in the prefab (gray)
+                        ht.RenderNoWrap(ItemChecklist.Loc.T(lastSection));   // colour set on the headerTemplate PugText style in the prefab (gray)
                         headerIdx++; pos++;
                     }
                 }

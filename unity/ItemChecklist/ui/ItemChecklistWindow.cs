@@ -95,19 +95,19 @@ namespace ItemChecklist.UI
                     // Clear-all pseudo-row (empty section → no header rendered).
                     ("", Loc.T("ItemChecklist-Filters/ClearAll"), () => false, () => filter.ClearAll()),
 
-                    (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Discovered"),   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
-                    (Loc.T("ItemChecklist-Filters/SecDiscovery"), Loc.T("ItemChecklist-Filters/Undiscovered"), () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
+                    ("ItemChecklist-Filters/SecDiscovery", Loc.T("ItemChecklist-Filters/Discovered"),   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
+                    ("ItemChecklist-Filters/SecDiscovery", Loc.T("ItemChecklist-Filters/Undiscovered"), () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
 
                     // Iter-20: possession dimension, placed right under Discovery.
-                    (Loc.T("ItemChecklist-Filters/SecPossession"), Loc.T("ItemChecklist-Filters/Owned"),    () => model.OwnedSelected(true),  () => model.ToggleOwned(true)),
-                    (Loc.T("ItemChecklist-Filters/SecPossession"), Loc.T("ItemChecklist-Filters/NotOwned"), () => model.OwnedSelected(false), () => model.ToggleOwned(false)),
+                    ("ItemChecklist-Filters/SecPossession", Loc.T("ItemChecklist-Filters/Owned"),    () => model.OwnedSelected(true),  () => model.ToggleOwned(true)),
+                    ("ItemChecklist-Filters/SecPossession", Loc.T("ItemChecklist-Filters/NotOwned"), () => model.OwnedSelected(false), () => model.ToggleOwned(false)),
                 };
                 foreach (var r in RarityFilterTiers())
-                    members.Add((Loc.T("ItemChecklist-Filters/SecRarity"), RarityLabel(r), () => model.RaritySelected(r), () => model.ToggleRarity(r)));
+                    members.Add(("ItemChecklist-Filters/SecRarity", RarityLabel(r), () => model.RaritySelected(r), () => model.ToggleRarity(r)));
                 foreach (var c in ItemCategories.All)
-                    members.Add((Loc.T("ItemChecklist-Filters/SecCategory"), CategoryLabel(c), () => model.CategorySelected(c), () => model.ToggleCategory(c)));
-                members.Add((Loc.T("ItemChecklist-Filters/SecCraftable"), Loc.T("ItemChecklist-Filters/Craftable"),     () => model.CraftSelected(true),  () => model.ToggleCraft(true)));
-                members.Add((Loc.T("ItemChecklist-Filters/SecCraftable"), Loc.T("ItemChecklist-Filters/NotCraftable"), () => model.CraftSelected(false), () => model.ToggleCraft(false)));
+                    members.Add(("ItemChecklist-Filters/SecCategory", CategoryLabel(c), () => model.CategorySelected(c), () => model.ToggleCategory(c)));
+                members.Add(("ItemChecklist-Filters/SecCraftable", Loc.T("ItemChecklist-Filters/Craftable"),     () => model.CraftSelected(true),  () => model.ToggleCraft(true)));
+                members.Add(("ItemChecklist-Filters/SecCraftable", Loc.T("ItemChecklist-Filters/NotCraftable"), () => model.CraftSelected(false), () => model.ToggleCraft(false)));
 
                 filter.Configure(members, () => model.ActiveFilterCount, () => model.ClearAllFilters());
             }
