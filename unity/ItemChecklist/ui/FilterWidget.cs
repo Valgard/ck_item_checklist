@@ -51,6 +51,22 @@ namespace ItemChecklist.UI
         // Reflect external changes (e.g. re-bake) whenever the popup opens.
         protected override void OnPopupOpened() => RebuildList();
 
+        // Iter-24 collapse: closed-set keyed on the stable section TERM (Task 5), so it survives
+        // a language change. Empty = all sections open (the default). static = session-stable
+        // (mirrors the Sort-mode / filter-dimension state), resets on game restart.
+        private static readonly System.Collections.Generic.HashSet<string> _closedSections
+            = new System.Collections.Generic.HashSet<string>();
+
+        public static bool IsSectionOpen(string term) => !_closedSections.Contains(term);
+
+        /// <summary>Toggle a section's collapsed state + re-lay out (members shown/hidden).</summary>
+        public void ToggleSection(string term)
+        {
+            if (term == null) return;
+            if (!_closedSections.Remove(term)) _closedSections.Add(term);
+            RebuildList();
+        }
+
         /// <summary>(Re)build the member table from the model + a label provider,
         /// then lay out the popup. Called from WireControls.</summary>
         public void Configure(IList<(string section, string label, Func<bool> isOn, Action toggle)> members,
@@ -135,12 +151,23 @@ namespace ItemChecklist.UI
                     if (headerIdx < _headerPool.Count && _headerPool[headerIdx] != null)
                     {
                         var ht = _headerPool[headerIdx];
-                        ht.transform.parent.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
-                        if (!ht.transform.parent.gameObject.activeSelf) ht.transform.parent.gameObject.SetActive(true);
+                        var headerGo = ht.transform.parent.gameObject;
+                        headerGo.transform.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
+                        if (!headerGo.activeSelf) headerGo.SetActive(true);
                         ht.RenderNoWrap(ItemChecklist.Loc.T(lastSection));   // colour set on the headerTemplate PugText style in the prefab (gray)
+                        // Iter-24 collapse: bind the click toggle + reflect the caret state.
+                        var hb = headerGo.GetComponent<SectionHeaderButton>();
+                        if (hb != null)
+                        {
+                            hb.Bind(lastSection, this);
+                            if (hb.caret != null) hb.caret.sprite = IsSectionOpen(lastSection) ? caretOpen : caretClosed;
+                        }
                         headerIdx++; pos++;
                     }
                 }
+
+                // Collapsed section: the header is shown, but its member rows are skipped.
+                if (!action && !IsSectionOpen(_members[m].section)) continue;
 
                 FilterCheckboxButton btn;
                 if (action)
