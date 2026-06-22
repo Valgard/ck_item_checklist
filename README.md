@@ -20,7 +20,10 @@ Discovery is tracked **per world × per player**.
   never reveal possession.
 - **Sort** by name, rarity, level or value (ascending/descending).
 - **Faceted filter** — discovery, category, rarity and craftability
-  (multi-select; OR within a dimension, AND across dimensions).
+  (multi-select; OR within a dimension, AND across dimensions). The filter popup
+  is **scrollable** (mouse wheel + draggable scrollbar) and its sections are
+  **collapsible** — click a section header to fold it; sections fold
+  independently and all start open.
 - **Name search** — matches the localized name in your game's language;
   undiscovered matches stay `???`.
 - **Per-row Level and Value** columns (sell value in Ancient Coins).

@@ -86,8 +86,11 @@ early-returns `OpenModUI` before `OnPlayerInventoryOpen`, so opening the
 checklist does not trip its own postfix.
 
 **Cursor/WASD-block/Escape handling:** all handled by CoreLib and CK's
-`isAnyInventoryShowing` postfix chain — zero patches for those. Iter-4 adds
-exactly one Harmony postfix (the mutual-exclusion patch above).
+`isAnyInventoryShowing` postfix chain — zero patches for those. *Iter-4's own*
+contribution to the patch set is one Harmony postfix (the mutual-exclusion patch
+above) — this is not a running total. The mod now ships ~12 top-level Harmony
+patch/hook files across later iters (Iter-9 suppression patches, the Iter-24
+`MainListWheelSuppressPatch`, the discovery/save hooks, …).
 
 ### Pattern Matrix (10 surveyed CK UI mods)
 
@@ -781,6 +784,90 @@ slot offset of the first laid-out row. Captured ONCE as the abstract
 `rowContainer` centring, so the two cannot drift (the one-row-offset trap, the R3
 hazard). It is invisible to the Editor compile — wrong values surface only in-game
 as a mis-positioned or clipped popup.
+
+---
+
+### Popup Scroll & Collapse (Iter-24)
+
+Once Pets (Iter-16.1) + Critters (Iter-16.2) grew the Category list to ~29 rows,
+the auto-sized Filter popup overflowed the viewport. Iter-24 adds two layers, both
+in the shared `PopupWidget` base / `Dropdown` skeleton so any variant inherits
+them: **scroll** (cap + clip + translate) and, Filter-specific, **collapse**
+(clickable section headers).
+
+**Scroll by manual translate ("Weg 2"), NOT CK's `UIScrollWindow`.** Two reasons
+the main-list machinery is wrong here:
+
+1. `UIScrollWindow.Awake` permanently self-disables (`enabled = false`) if its
+   serialized `scrollable` does not resolve to an `IScrollable` on the *same*
+   GameObject at load (see § Awake Logic). The `Dropdown` skeleton is deliberately
+   component-less (Iter-18), so a skeleton `UIScrollWindow` would self-disable.
+2. `UIScrollWindow` exists to virtualize ~10,910 catalog rows; the popup has ≤~29
+   *real* row GameObjects — virtualization is overkill.
+
+Instead `PopupWidget` caps the panel to `MaxVisibleRows × rowSpacing` (serialized
+field; **base default 6 rows**, per-variant overridable — and absent from legacy
+prefab YAML, so the "no cap" sentinel is deliberately `MaxVisibleRows <= 0`, which
+deserializes to the safe value, see `gotchas.md § Serialized-field zero-default
+sentinel`), clips with a popup-local `SpriteMask`, and translates
+`rowContainer.localPosition.y` within `[0, contentH − cap]` by mouse wheel + a
+hand-rolled draggable handle (`PopupScrollHandle`). The mask GameObject **and** the
+scrollbar subtree (track + `PopupScrollHandle`) live in the `Dropdown` skeleton and
+are inherited by both variants as inactive GOs; the base **runtime-discovers** their
+references (`popupPanel.GetComponentInChildren<SpriteMask>(true)` /
+`GetComponentInChildren<PopupScrollHandle>(true)`) rather than carrying serialized
+cross-prefab refs (the Iter-13 runtime-wire rule — a first draft used a stripped-stub
+`scrollMask` ref and was replaced). Sort inherits the chrome but never wires it;
+its `RowTemplate` was nevertheless baked scroll-ready (`maskInteraction=1` + the
+band), so it auto-scrolls if it ever exceeds 6 modes.
+
+**The popup SpriteMask sorting band — 56..63, ABOVE the window mask 40..55.** The
+window's `ContentsMask` covers only the list area (custom range **40..55**). The
+popup's rows sit *above* the list's top edge, so if they shared 40..55 the window
+mask would clip the popup's upper rows. The popup mask therefore uses a band cleanly
+**above** 55 — **56..63** — which the window mask never touches; only the popup mask
+clips the popup rows. PugText `orderInLayer` is freely settable in prefab YAML (the
+footer-at-50 precedent, `gotchas.md § All PugText sits on the GUI sorting layer`), so
+the popup labels were pulled from the default 9999 into the band. **Two clipping
+requirements per renderer** (both must hold or a sprite is unclipped/invisible):
+(1) `maskInteraction = VisibleInsideMask` (`m_MaskInteraction: 1` on a SpriteRenderer;
+`style: maskInteraction` on a PugText) — the default `0`/None ignores all masks;
+(2) the renderer's sorting order lies inside the mask's custom range (here 56..63).
+The row-template prefabs carry both; clones inherit them, so setting the templates
+suffices.
+
+**Orthographic UI-camera cursor read — one mechanic, two problems.**
+`Manager.camera.uiCamera.ScreenToWorldPoint(Input.mousePosition)` gives the cursor in
+world space; the uiCamera is orthographic, so world X/Y are z-independent (no z
+calibration). Comparing against the panel's world rect
+(`popupPanel.position ± panel.size/2`) yields "cursor over popup," which serves BOTH
+**click-outside-to-close** (gap-A — the old `LateUpdate` closed on any mouse-down, so
+an inside click on a checkbox / section header / handle wrongly closed the popup) AND
+**wheel-ownership** (scroll only when the cursor is over the popup). `Manager.camera`
+is sandbox-safe (verified in-game).
+
+**Wheel-ownership — Harmony prefix on `UIScrollWindow.UpdateScroll` (gap-F).** CK's
+`UIScrollWindow.UpdateScroll` (from its `LateUpdate`) reads the wheel via
+`Manager.input.GetScrollValue()` and scrolls when the cursor is inside the window.
+Since the popup overlays the list, wheeling over the popup would scroll both. Fix: a
+Harmony **prefix** on `UIScrollWindow.UpdateScroll` (`MainListWheelSuppressPatch.cs`)
+that returns false (skips the stock scroll for that frame) while an open popup owns
+the wheel (`PopupWidget.OpenPopupCapturesWheel()` — a static check reading the live
+cursor via the orthographic read above). The condition is computed fresh inside the
+prefix, so there is no LateUpdate-ordering staleness; only the main list is affected
+(the popup uses no `UIScrollWindow`). Harmony runs in trusted `0Harmony.dll` →
+sandbox-safe.
+
+**Collapse (Filter-specific).** Section headers became clickable
+(`SectionHeaderButton : ClickButton`, a 3D collider + caret glyph on the
+`headerTemplate`). A `static HashSet<string>` closed-set keyed on the **stable loc
+term** (not the resolved label, see `conventions.md § Stable section key`) records
+which sections are collapsed — language-change-safe. Multiple sections open at once,
+all open by default. `RebuildList` always renders a section's header (binding its
+toggle + caret state) but skips the member rows of collapsed sections; `AutoSizePopup`
+then operates on the reduced visible count, so collapsing enough rows deactivates the
+scrollbar entirely. Section carets shift X in a post-`AutoSizePopup` pass — clear of
+the scrollbar when it shows, at the panel edge when it hides.
 
 ---
 

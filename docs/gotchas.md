@@ -111,6 +111,17 @@ then the aborted Iter-3.5b lessons that led to it.
   still in `"Default"`, the mask clips nothing for that renderer. Prefab-edit
   ALL renderers to `"GUI"` before installing the mask.
 
+### Back-order boundary makes the lowest renderer invisible (Iter-24)
+
+A renderer whose `m_SortingOrder` equals the mask's `m_BackSortingOrder` (the
+band's lower bound) is **not reliably captured** by the mask → it renders invisible.
+Iter-24 symptom: with the popup mask back-order at **56**, the row-background
+sprites at order 56 vanished while labels/checkboxes at 57–60 showed — the
+backgrounds fell exactly on the boundary. Rule: set the mask's `m_BackSortingOrder`
+strictly **below** the lowest renderer order you want clipped (the fix lowered it to
+55, putting the order-56 backgrounds comfortably inside the band). See
+`architecture.md § Popup Scroll & Collapse` for the popup mask band (56..63).
+
 ### Aborted Iter-3.5b lessons
 
 The Iter-3.5b iteration was aborted after pre-flight discovered the
@@ -508,6 +519,29 @@ row clipping at runtime.
 
 Verify row visuals only by building and running the game, not by inspecting the
 row prefab in isolation in the Editor.
+
+#### Corollary (Iter-24): `VisibleInsideMask` + no active mask = invisible → keep the popup mask active while open
+
+The same rule bit the scrollable Filter popup. Row templates are statically
+`VisibleInsideMask` (`m_MaskInteraction: 1`), so gating the popup's `SpriteMask` on a
+scroll-active flag would make a short/collapsed popup's rows vanish whenever no
+overflow exists (no active mask + `VisibleInsideMask` = invisible). Fix: keep the
+mask **active whenever the popup is open** — it is a child of the popup panel and
+follows the popup's active state; sized to the cap, it clips only on overflow and
+shows everything when content fits. The scroll-active gate then governs only the
+scrollbar/handle + wheel-ownership, NOT the mask. See `architecture.md § Popup
+Scroll & Collapse`.
+
+### Serialized-field zero-default sentinel: make "off" coincide with 0 (Iter-24)
+
+A newly-added `public` serialized field is **absent** from existing prefab YAML, so
+Unity deserializes it to `0` (its C# field initializer does **not** survive — the
+serialized value, here the implicit `0`, wins). Choose the "off / no-op" sentinel to
+coincide with `0`. Iter-24's `MaxVisibleRows` uses `<= 0` to mean "no cap": a legacy
+prefab with no `MaxVisibleRows` line deserializes to `0` → the neutral, behaviour-
+preserving state. A non-zero "off" value (e.g. `float.MaxValue` for "unbounded")
+would make those same legacy prefabs deserialize to `0` → an *active broken* state
+(here: a zero-height cap clipping everything), not a neutral one.
 
 ### grep-by-GUID is unreliable for verifying which sprite a SpriteRenderer uses
 

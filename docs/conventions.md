@@ -283,6 +283,7 @@ unity/ItemChecklist/
   InventoryShortCutsButtonSuppressPatch.cs  Harmony patch — hide inventory shortcuts button (Iter-9)
   ShortCutsWindowSuppressPatch.cs Harmony patch — suppress help panel (Iter-9)
   PauseSuppressWhileChecklistOpenPatch.cs  Harmony patch — block ESC->pause race (Iter-9)
+  MainListWheelSuppressPatch.cs   Harmony prefix on UIScrollWindow.UpdateScroll — give wheel to an open popup (Iter-24)
   WorldState.cs                   shared IsInPlayableWorld predicate (HUD + F1 guard) (Iter-11.6)
   ItemChecklist.asmdef            runtime assembly definition
   ui/
@@ -293,7 +294,8 @@ unity/ItemChecklist/
     ItemListViewModel.cs          order/filter/search view model (Iter-7/8)
     SortMode.cs                   sort-mode enum + comparators (Iter-7)
     DropdownWidget.cs             reusable dropdown (sort/filter) (Iter-7/8)
-    PopupWidget.cs                abstract popup base shared by DropdownWidget/FilterWidget (Iter-14.2)
+    PopupWidget.cs                abstract popup base shared by DropdownWidget/FilterWidget (Iter-14.2; scroll + collapse Iter-24)
+    PopupScrollHandle.cs          draggable scrollbar handle for the popup scroll (Iter-24)
     IPopupToggle.cs               toggle-owner seam shared by dropdown + filter toggles (Iter-13)
     ClickButton.cs                abstract base for click controls (sealed prologue + OnClick) (Iter-14.2)
     PugTextExtensions.cs          PugText.RenderNoWrap helper — single home of maxWidth=0f (Iter-14.2)
@@ -305,6 +307,7 @@ unity/ItemChecklist/
     ItemCategory.cs               category taxonomy (ObjectType -> bucket) (Iter-10)
     FilterWidget.cs               sectioned multi-select filter dropdown (Iter-10, renamed Iter-14.2)
     FilterCheckboxButton.cs       filter checkbox row button (Iter-10, renamed Iter-14.2)
+    SectionHeaderButton.cs        clickable filter section header — collapse/expand (Iter-24)
     PetSkinIcon.cs                gradient skin-icon material (Amplify/UISpriteColorReplace) (Iter-16.1)
   possession/                     possession scan/ledger/persist package (Iter-20)
     PossessionScanner.cs          live ECS scan: carried + clustered-base storage
@@ -465,6 +468,49 @@ pile carrying *substantial structure* is the anti-pattern to avoid — push that
 structure into a variant instead. Realised in Iter-18 as the `Sort.prefab` /
 `Filter.prefab` sibling variants of `Dropdown.prefab` (see `docs/architecture.md
 § Shared Dropdown chrome`).
+
+**Base-wire a shared mechanism; runtime-discover the inherited skeleton chrome it
+drives.** When a feature spans a C# base class and the skeleton/variant chrome it
+operates on (Iter-24 popup scroll + collapse), split it so each piece lives where it
+belongs and nothing relies on a fragile serialized cross-prefab ref:
+
+- **Mechanism (C#)** → the `abstract` base (`PopupWidget`: cap, translate, wheel,
+  handle math, scroll-active gate). It is dormant until a per-variant prefab value
+  activates it (the `0`-sentinel cap, below), so every variant inherits it for free
+  and behaviour-neutrally.
+- **Chrome GameObjects** (the popup `SpriteMask`, the scrollbar subtree) → the base
+  **skeleton** prefab; both variants inherit them as inactive GOs.
+- **References to those inherited GOs** → **runtime-discovered** in the base
+  (`popupPanel.GetComponentInChildren<SpriteMask>(true)` /
+  `<PopupScrollHandle>(true)`), **not** serialized cross-prefab refs. This is the
+  Iter-13 runtime-wire rule (extracting chrome nulls a stripped-stub cross-ref); an
+  Iter-24 first draft used a serialized `scrollMask` stub and was replaced by the
+  `GetComponentInChildren` discovery.
+- **A tunable value** (the row cap) → a base C# default that a serialized prefab
+  field can still override per variant without touching code — but pick its
+  zero-default to mean "off" (see `docs/gotchas.md § Serialized-field zero-default
+  sentinel`).
+- **What stays per-variant prefab data:** the row-template `maskInteraction = 1` +
+  band orders. Templates differ per variant (Sort = option rows, Filter =
+  checkbox/header/action rows) and cannot move onto the component-less skeleton.
+
+**Stable section/state key = the loc TERM, not the resolved label.** A persistent UI
+state set keyed over sections (Iter-24's collapse closed-set) must key on the loc
+**term** (`"ItemChecklist-Filters/SecDiscovery"`), not the localized display string —
+a language change re-bakes strings, so a label-keyed set silently loses/mismatches its
+entries. Pass the term through and resolve it with `Loc.T(term)` only at render time; a
+`static HashSet<string>` on the term is language-change-safe (and needs less code than
+a parallel `SectionId` enum). Iter-24 de-resolved `Member.section` from `Loc.T(...)`
+back to the raw term for exactly this.
+
+**A layout offset belongs on the window instance position, not duplicated as child
+overrides.** A layout decision ("Filter cluster flush to the scrollbar") is a
+window-level position → put it on the prefab *instance* in the window, not as
+per-child x-overrides inside the variant. Iter-18 offset only the `Display` child and
+forgot the `Popup` child — a desync that surfaced only when the popup gained a visible
+body (Iter-24). Clean fix: zero the child x-overrides (the variant becomes
+structurally identical to Sort) and move the **instance** position in the window by
+the same amount.
 
 **Verify every serialized ref against the expected component, not the GO name.**
 After each prefab save, check every widget serialized field against the expected
