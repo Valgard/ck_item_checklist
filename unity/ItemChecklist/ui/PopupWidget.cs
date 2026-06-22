@@ -66,6 +66,30 @@ namespace ItemChecklist.UI
                 var sm = popupPanel.GetComponentInChildren<SpriteMask>(includeInactive: true);
                 if (sm != null) scrollMask = sm.gameObject;
             }
+            // Same runtime-wire for the scrollbar handle (inherited skeleton child); also bind its owner.
+            if (scrollHandle == null && popupPanel != null)
+            {
+                var h = popupPanel.GetComponentInChildren<PopupScrollHandle>(includeInactive: true);
+                if (h != null) { scrollHandle = h; h.owner = this; }
+            }
+        }
+
+        /// <summary>Handle drag: set the scroll offset from the thumb's normalized track position.</summary>
+        public void SetScrollFromHandle(float fraction01)   // 0 = top … 1 = bottom
+        {
+            if (!_scrollActive) return;
+            _scrollOffset = Mathf.Clamp01(fraction01) * (_contentH - _viewportH);
+            ApplyScroll();
+        }
+
+        /// <summary>Cursor's normalized position along a vertical track (0 = top, 1 = bottom),
+        /// via the orthographic UI camera (z-independent world X/Y).</summary>
+        public float CursorFractionInTrack(Transform track, float trackLength)
+        {
+            var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
+            if (cam == null || trackLength <= 0f || track == null) return 0f;
+            Vector3 local = track.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
+            return Mathf.Clamp01((trackLength * 0.5f - local.y) / trackLength);
         }
 
         /// <summary>Fit the panel to the laid-out row stack, capped at MaxPopupHeight
