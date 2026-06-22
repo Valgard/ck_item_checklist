@@ -59,6 +59,10 @@ namespace ItemChecklist.UI
 
         public static bool IsSectionOpen(string term) => !_closedSections.Contains(term);
 
+        // Section-caret X: clear of the scrollbar when it shows, at the panel edge when it hides.
+        private const float CaretXWithScrollbar = 2.65f;
+        private const float CaretXFullWidth = 2.9f;
+
         /// <summary>Toggle a section's collapsed state + re-lay out (members shown/hidden).</summary>
         public void ToggleSection(string term)
         {
@@ -206,6 +210,20 @@ namespace ItemChecklist.UI
             }
 
             AutoSizePopup(pos);
+
+            // Iter-24: shift the section carets right to the panel edge when no scrollbar is
+            // shown (content fits), and keep them clear of it when it is. _scrollActive is valid
+            // only after AutoSizePopup, so this runs as a post-pass over the placed headers.
+            float caretX = _scrollActive ? CaretXWithScrollbar : CaretXFullWidth;
+            for (int i = 0; i < headerIdx; i++)
+            {
+                var hb = _headerPool[i]?.transform.parent.GetComponent<SectionHeaderButton>();
+                if (hb != null && hb.caret != null)
+                {
+                    var t = hb.caret.transform;
+                    t.localPosition = new Vector3(caretX, t.localPosition.y, t.localPosition.z);
+                }
+            }
         }
 
         public void OnMemberClicked(int memberId)
