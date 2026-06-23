@@ -106,7 +106,7 @@ Iter-3.5b lessons: `docs/gotchas.md § SpriteMask Clipping`.
 
 ## Iter-Roadmap (live)
 
-As of 2026-06-21: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1 (per-skin pet collection), Iter-16.2 (critter collection), Iter-23 (rebound-toggle-key fix), and Iter-24 (scrollable + collapsible filter popup) are DONE on main. Full per-iteration narrative:
+As of 2026-06-23: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1 (per-skin pet collection), Iter-16.2 (critter collection), Iter-23 (rebound-toggle-key fix), Iter-24 (scrollable + collapsible filter popup), and Iter-25 (thinTiny accented-glyph injection — 85 mod-authored glyphs make the chrome labels render umlauts/accents natively) are DONE on main. Full per-iteration narrative:
 
 @docs/iteration-history.md
 

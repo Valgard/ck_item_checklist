@@ -841,3 +841,48 @@ scrollbar), Sort unchanged. Caught + logged during the iter: **Iter-25** (small-
 rendering looks malformed). The corrected process lesson, surfaced by the user mid-iter:
 **do low-risk edits first** (lock in certain progress; isolate the uncertain edit last and
 alone) — not the risky one first.
+
+**Iter-25 (small-font umlaut rendering) — DONE (2026-06-23, branch `iter-25`).**
+**Re-scoped twice by measurement.** The roadmap framed it as "the small font renders
+ä/ö/ü malformed; fix the glyphs or switch font face". Diagnosis (a long evidence chain,
+each step a build) inverted and then dissolved that framing:
+
+**Root cause.** The chrome labels (Sort/Filter dropdowns, header, footer) render in
+`fontFace = thinTiny` (`16777344`); item rows use `thinSmall` (`16777232`) and were always
+fine — so the user's correction flipped the initial guess. Each `FontFace` maps to a
+separate `PugFont`/atlas in the `rrs*` family (`thinTiny→rrs5` 256×40 **114 glyphs**,
+`thinSmall→rrsthin8` 257×144 331, …). **`rrs5` is CK's reduced digits-only face** —
+ASCII + a few symbols + ~19 Eastern-European letters, but **no German umlauts** (the
+2 visible orphans at index 97/98 turned out to be unmapped `Ç`/`ç` images). For a missing
+`ö`, `PugFont.GetGlyphData` runs its fallback chain (`button → thinTiny → chinese →
+japanese → korean`) and finds it in the **chinese** font — rendered in CJK metric, hence
+"deformed", no `?`, no warning. (Empirically confirmed via the `iter-25 FALLBACK` probe.)
+CK itself never uses `thinTiny` for prose — only damage/score numbers.
+
+**Mechanism (proven incrementally, each a build + in-game test).** A runtime glyph
+override: `Manager.text.thinTiny.codePoints[c] = idx` + extend `glyphData` + set
+`glyphData[idx].volatileSprite`. The first `GetGlyphData` branch wins before any fallback.
+Proven first with `codePoints['ö'] = X-glyph index` ("Gewöhnlich"→"GewXhnlich"). Sandbox
+allows it (`safetyCheck=True`). Non-ASCII char literals are encoding-unsafe in the Roslyn
+sandbox (de-DE/InvariantCulture history) → use `(char)246`, not `'ö'`.
+
+**Glyph pipeline.** The user hand-drew a **full accented set** in Pixaki
+(`sources/thinTiny_full.pixaki`), as a 4-layer doc mirroring the iter-25 debug overlay
+(Background / charDims / Rects / Atlas + a thinSmall reference layer). Extraction
+(`sources/glyph-templates/pixaki_to_glyphs.py`, a reproducibility tool): **Atlas layer =
+the sprite**, **Rects layer = the advance width** (the user drew exact glyph rects — full
+`charDims` height 10, glyph-specific width), **thinSmall arrangement = the char** (per
+codepoint cell). **85 new glyphs** (drawn + missing from thinTiny): full Western-European
++ partial Eastern-European/Cyrillic/typography. Shipped as a single-sprite bundle sheet
+(`Art/thinTiny_glyphs.png`, `textureType:8 spriteMode:1` — the ModBuilder sprite-meta
+trap); the runtime cuts per-glyph sprites with `Sprite.Create(sheet.texture, …)`.
+
+**The final bug — sprite convention.** First in-game attempt rendered the glyphs shifted
+**up-right**. Cause: a naive `pivot = (0,0)`. CK's `PugFont.InitCodePoints` uses a
+**centered** pivot plus an outline-padding `rect2` (`y+1, h-1, x-1, w+2`). Replicating
+that convention *exactly* fixed it — the project's standing lesson: mirror CK's working
+internals, don't approximate. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox
+compile, `inserted 85 accented glyphs into thinTiny`, "Gewöhnlich"/"Ungewöhnlich"/"Legendär"
+render correct umlauts at thinTiny size. **The `.pixaki` format was reverse-engineered**
+along the way (`docs/research/pixaki-format.md`). Font architecture: the
+`reference-ck-pugfont-architecture` memory.

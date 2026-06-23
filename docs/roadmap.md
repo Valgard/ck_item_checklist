@@ -170,12 +170,20 @@ remaining backlog.
   **(C) Collapse:** clickable `SectionHeaderButton` headers, multi-open, default
   all-open, `static` closed-set keyed on the **stable loc term** (survives language
   change); carets shift with the scrollbar. Requested 2026-06-21, done 2026-06-22.
-- **Iter-25 (tentative) -- small-font umlaut rendering.** The pixel "small font"
-  renders German umlauts (ä/ö/ü) oddly -- the diacritic glyphs look malformed /
-  misplaced. Investigate the small-font glyph set (`PugFont`/`PugText style.fontFace`
-  + the I2 font asset) and how `ä/ö/ü` are composed at small sizes; fix the glyphs or
-  switch the affected labels to a font face that renders them cleanly. Requested
-  2026-06-22.
+- **Iter-25 -- small-font umlaut rendering. DONE** (see `docs/iteration-history.md`).
+  **Re-scoped from "umlauts" to "thinTiny lacks accented glyphs".** The chrome labels
+  render in `thinTiny` (= the `rrs5` atlas), CK's reduced **digits-only** face (114
+  glyphs, no accents); CK's `PugFont.GetGlyphData` falls a missing `ö` back to the
+  **chinese** font (CJK metric) → deformed. Fix: a runtime patch
+  (`ThinTinyGlyphPatch.InsertOnce`, at the `OnOccupied` anchor) inserts **85
+  mod-authored accented glyphs** into `thinTiny` — new `glyphData` entries +
+  `codePoints`, `volatileSprite` cut via `Sprite.Create` from a bundle sheet
+  (`Art/thinTiny_glyphs.png`), replicating `PugFont.InitCodePoints`' `rect2`+centered-pivot
+  convention exactly. Glyphs hand-drawn in Pixaki (`sources/thinTiny_full.pixaki`),
+  extracted 3-layer (Atlas=sprite, Rects=advance width, thinSmall arrangement=char).
+  Covers full Western-European + partial Eastern-European/Cyrillic/typography. thinTiny
+  is digits-only in CK, so the global insert is harmless. Full font architecture in the
+  `reference-ck-pugfont-architecture` memory + `docs/research/pixaki-format.md`.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
