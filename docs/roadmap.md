@@ -78,6 +78,28 @@ remaining backlog.
   at 3500-3504, German `Glimmkäfer`); ground truth (player had them in chests + they
   ARE bug-net-catchable) confirmed all 25 are discovery-trackable, no ghost rows.
   Catalog 10885 -> 10910.
+- **Iter-16.3 (tentative) -- cattle (farm livestock) collection.** Farm animals
+  (`CattleCD` + `ObjectCategoryTag.Cattle`) are a third creature family beside
+  Pets/Critters and currently get **no** checklist row: their `ObjectType` is
+  `Creature` (900), which `ItemCatalog.Bake` explicitly skips
+  (`ItemCatalog.cs:191`, alongside `NonObtainable`/`PlayerType`). Confirmed
+  in-game by the player (has Muhline/Bummbock/Bummelkugler = Moolin/Bambuck/
+  Strolly Poly, internal `Cow`/`Goat`/`RolyPoly`, ObjectIDs **1300/1302/1303**;
+  babies 1304/1305/1306). Likely an Iter-7.1/16.2-style bake relaxation
+  (`Creature` + a `CattleCD` guard, mirroring the `Critter` icon-guard) so the
+  three species flow through the existing discovery/possession/rendering
+  machinery; a new `Cattle` / `Nutztiere` filter category. **Open design
+  question (decide first, à la Iter-16.1 pets):** one row per *species* vs. one
+  per *individual/variant* -- caged cattle are stored as the **same** ObjectID
+  with non-zero `auxDataIndex` carrying per-animal state (`NameCD`/
+  `MealsEatenCD`/`BreedToggleCD`), the pet-skin aux-data pattern, so there is no
+  per-variant ObjectID to key on; a per-species row is the natural default.
+  **Verify first** (the standing lesson -- creature typing has been wrong 3x):
+  confirm the `Creature` ObjectType against the actual game prefab (it lives in
+  the per-prefab authoring asset, not the decompile) and that 1300/1302/1303 are
+  the only base cattle. Babies and the `CattleFeedTray` (1301) / `CattleCage` (8)
+  items are separate questions. Requested 2026-06-23. See the
+  `reference_ck_cattle_objecttype` memory.
 - **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
   family to its `variation == 0` entry (the `od.variation != 0` guard in
   `ItemCatalog.Bake`), so colour/skin/state
