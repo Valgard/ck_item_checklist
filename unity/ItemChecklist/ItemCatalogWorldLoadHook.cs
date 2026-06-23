@@ -61,6 +61,11 @@ namespace ItemChecklist
             // (localization singletons, database bank) before Bake() runs.
             yield return new WaitUntil(() => Manager.main != null && Manager.main.player != null);
 
+            // iter-25: insert the mod-authored accented glyphs into thinTiny so the chrome
+            // labels render German/Western-European umlauts natively, instead of the deformed
+            // chinese-font fallback. Runs once; Manager.text is ready at this anchor.
+            ThinTinyGlyphPatch.InsertOnce();
+
             try
             {
                 ItemChecklistMod.Catalog.Bake();
