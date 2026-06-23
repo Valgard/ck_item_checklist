@@ -44,5 +44,8 @@ unity/ItemChecklist/Editor/CLIPublishHelper.cs.meta
 unity/ItemChecklist/Editor/LocalizationGenerator.cs
 unity/ItemChecklist/Editor/LocalizationGenerator.cs.meta
 
-# Iter-25: extracted CK font atlases (Pugstorm game assets — reference only, do not commit)
-sources/glyph-templates/
+# Iter-25: glyph-template tooling is tracked; extracted CK atlases + derived data
+# (glyph_metrics.json, grids/, *.png) stay gitignored (Pugstorm game assets)
+sources/glyph-templates/*
+!sources/glyph-templates/*.py
+!sources/glyph-templates/README.md
