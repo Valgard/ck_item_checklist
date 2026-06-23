@@ -100,6 +100,33 @@ remaining backlog.
   the only base cattle. Babies and the `CattleFeedTray` (1301) / `CattleCage` (8)
   items are separate questions. Requested 2026-06-23. See the
   `reference_ck_cattle_objecttype` memory.
+- **Iter-16.4 (tentative) -- discovery filter/count ignores pet skins.** The
+  per-skin pet rows (Iter-16.1) render their collected state correctly
+  (`ItemChecklistContent.cs:197-201` routes pet-skin rows through
+  `PetCollection.IsCollected`), but the **Discovery filter dimension** does not:
+  `ItemListViewModel.Recompute` computes `isDisc` from the **raw**
+  `state.IsDiscovered(e.ObjectId, e.Variation)` (`ItemListViewModel.cs:122`). CK
+  force-zeroes pet variation in `SetObjectAsDiscovered`, so `DiscoveredState` never
+  holds `(petId, skinIndex > 0)` -- every collected pet-skin row tests as
+  **undiscovered**. Reported symptom (2026-06-23): filtering by "Discovered"
+  (Entdeckt) hides collected skins; the same line drives `DiscoveredInView`
+  ("· N shown") so it under-counts too. **Same root, two more manifestations to
+  confirm:** filtering by "Undiscovered" *shows* collected skins, and the global
+  `N / M` counter (`ItemChecklistWindow.cs:212` + `ItemChecklistHud.cs:73`) reads
+  `DiscoveredState.Count`, which counts each pet **species** once while `M` (the
+  catalog) counts every **skin** row -- so 100% is unreachable via skins.
+  **Fix shape -- the Iter-21 chokepoint pattern.** Iter-21 funnelled both
+  possession read-sites through one `ItemChecklistMod.OwnedCount` that already
+  knows the pet-skin routing; this needs its discovery twin -- a single
+  `ItemChecklistMod.IsDiscovered/IsCollected(objectId, variation)` that, for
+  `IsPetSkinEntry` rows, returns `PetCollection.IsCollected` (and otherwise
+  `DiscoveredState.IsDiscovered`), consumed by the ViewModel filter + the
+  in-view count; the `N / M` numerator needs a "collected catalog rows" tally
+  rather than `DiscoveredState.Count`. The inline pet-skin branch already in
+  `ItemChecklistContent.cs:199-205` should route through the same chokepoint so
+  the three sites cannot drift (the Iter-21 lesson). Likely pure behavioural C#,
+  no prefab/art touch. **Critters (Iter-16.2)** flow through normal CK discovery
+  and are unaffected -- this is pet-skin-specific. Requested 2026-06-23.
 - **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
   family to its `variation == 0` entry (the `od.variation != 0` guard in
   `ItemCatalog.Bake`), so colour/skin/state
