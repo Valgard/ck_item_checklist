@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PugMod;
 using UnityEngine;
 
@@ -19,6 +20,15 @@ namespace ItemChecklist.UI
         public PugText possessionText;    // Iter-20: right-aligned "owned" count column
 
         public const float RowHeight = 1.5f; // world units (~24px at 16 PPU)
+
+        // Iter-22: the row's current identity, captured each Bind so the hover
+        // virtuals (called by UIMouse on the selected row) describe THIS item.
+        private int _objectId;
+        private int _ckVariation;     // CK object variation (pets → 0, not skinIndex)
+        private bool _nameKnown;      // tooltip allowed iff the row shows a real name
+        private TooltipSlot _tooltip; // shared helper (one per window), injected by Content
+
+        public void SetTooltipHelper(TooltipSlot helper) => _tooltip = helper;
 
         // Ancient Coin icon, resolved once from the game database and shared by
         // every row (the coin shown beside sell values).
@@ -132,6 +142,43 @@ namespace ItemChecklist.UI
             // count, not whether the source chunk is currently loaded).
             if (possessionText != null)
                 possessionText.Render(showDetails ? possessionCount.ToString() : Dash);
+
+            // Iter-22: remember identity for the hover virtuals. Pets sit at CK
+            // variation 0 — the `skinIndex` param is a skin selector, not a CK variation.
+            _objectId = objectId;
+            _ckVariation = isPetSkin ? 0 : skinIndex;
+            _nameKnown = nameKnown;
+        }
+
+        // Iter-22 — native CK tooltip. UIMouse selects this row (when its collider
+        // is hit) and calls these. Gate on _nameKnown so undiscovered rows leak
+        // nothing (belt-and-braces: Task 3 also disables the collider when !_nameKnown).
+        public override ContainedObjectsBuffer GetContainedObject()
+        {
+            if (!_nameKnown || _tooltip == null) return default;
+            _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
+            return _tooltip.GetSlotObjectPublic();
+        }
+
+        public override TextAndFormatFields GetHoverTitle()
+        {
+            if (!_nameKnown || _tooltip == null) return null;
+            _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
+            return _tooltip.TitleFor();
+        }
+
+        public override List<TextAndFormatFields> GetHoverDescription()
+        {
+            if (!_nameKnown || _tooltip == null) return null;
+            _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
+            return _tooltip.DescriptionFor();
+        }
+
+        public override List<TextAndFormatFields> GetHoverStats(bool previewReinforced)
+        {
+            if (!_nameKnown || _tooltip == null) return null;
+            _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
+            return _tooltip.StatsFor();
         }
     }
 }

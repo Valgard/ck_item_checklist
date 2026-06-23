@@ -45,6 +45,7 @@ namespace ItemChecklist.UI
         private int _count;            // reported entry count (catalog.Count)
         private int _lastFirstIndex = -1;
         private bool _iter22SpikeDone;   // ITER-22 SPIKE (temporary; removed in Task 3)
+        private TooltipSlot _tooltipHelper;   // Iter-22: one shared hover-data helper
 
         // Iter-6: the label's prefab default colour, used for Common/Poor names
         // (GetSlotBorderRarityColor returns this for them). Captured once from
@@ -120,29 +121,29 @@ namespace ItemChecklist.UI
             if (_pool.Count > 0 && _pool[0] != null)
                 PetSkinIcon.CaptureBase(_pool[0].icon);
 
-            // --- ITER-22 SPIKE (temporary; removed in Task 3) ---
-            // De-risk the SlotUIBase helper before building on it: confirm a
-            // code-instantiated TooltipSlot returns non-empty title/desc/stats for a
-            // known item without NRE on base.world / serialized fields.
-            if (!_iter22SpikeDone && _pool.Count > 0)
+            // Iter-22: one shared hover-data helper, injected into every pooled row.
+            if (_tooltipHelper == null)
+            {
+                var go = new GameObject("TooltipHelper");
+                go.transform.SetParent(transform, false);
+                _tooltipHelper = go.AddComponent<TooltipSlot>();
+            }
+            foreach (var row in _pool)
+                if (row != null) row.SetTooltipHelper(_tooltipHelper);
+
+            // --- ITER-22 SPIKE v2 (temporary; removed in Task 3) ---
+            // Exercise a real row's overrides (not hover-driven yet — no collider until
+            // Task 3): simulate a discovered Copper Sword row and read its four virtuals.
+            if (!_iter22SpikeDone && _pool.Count > 0 && _pool[0] != null)
             {
                 _iter22SpikeDone = true;
-                var probe = new GameObject("Iter22TooltipProbe").AddComponent<TooltipSlot>();
-                probe.transform.SetParent(transform, false);
-                // Two items: a coin (no stats expected) and a sword (stats expected),
-                // to tell "GetHoverStats systematically null" apart from "this item has none".
-                probe.SetObject(ObjectID.AncientCoin, 0);
-                var coinTitle = probe.TitleFor();
-                var coinDesc = probe.DescriptionFor();
-                var coinStats = probe.StatsFor();
-                probe.SetObject(ObjectID.CopperSword, 0);
-                var swordTitle = probe.TitleFor();
-                var swordDesc = probe.DescriptionFor();
-                var swordStats = probe.StatsFor();
-                Debug.Log($"[ItemChecklist] ITER-22 SPIKE coin title='{coinTitle?.text}' " +
-                          $"descLines={(coinDesc?.Count ?? -1)} statLines={(coinStats?.Count ?? -1)} | " +
-                          $"sword title='{swordTitle?.text}' descLines={(swordDesc?.Count ?? -1)} " +
-                          $"statLines={(swordStats?.Count ?? -1)}");
+                var r = _pool[0];
+                r.Bind((int)ObjectID.CopperSword, null, "Copper Sword", true, true,
+                       Color.white, Rarity.Common, 0, 0, 0, false, 0);
+                Debug.Log($"[ItemChecklist] ITER-22 SPIKE2 title='{r.GetHoverTitle()?.text}' " +
+                          $"descLines={(r.GetHoverDescription()?.Count ?? -1)} " +
+                          $"statLines={(r.GetHoverStats(false)?.Count ?? -1)} " +
+                          $"obj={r.GetContainedObject().objectData.objectID}");
             }
         }
 
