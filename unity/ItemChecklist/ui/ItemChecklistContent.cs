@@ -44,6 +44,7 @@ namespace ItemChecklist.UI
         private UIScrollWindow _scrollWindow;
         private int _count;            // reported entry count (catalog.Count)
         private int _lastFirstIndex = -1;
+        private bool _iter22SpikeDone;   // ITER-22 SPIKE (temporary; removed in Task 3)
 
         // Iter-6: the label's prefab default colour, used for Common/Poor names
         // (GetSlotBorderRarityColor returns this for them). Captured once from
@@ -118,6 +119,31 @@ namespace ItemChecklist.UI
             // recolor) so non-pet rows can be restored exactly.
             if (_pool.Count > 0 && _pool[0] != null)
                 PetSkinIcon.CaptureBase(_pool[0].icon);
+
+            // --- ITER-22 SPIKE (temporary; removed in Task 3) ---
+            // De-risk the SlotUIBase helper before building on it: confirm a
+            // code-instantiated TooltipSlot returns non-empty title/desc/stats for a
+            // known item without NRE on base.world / serialized fields.
+            if (!_iter22SpikeDone && _pool.Count > 0)
+            {
+                _iter22SpikeDone = true;
+                var probe = new GameObject("Iter22TooltipProbe").AddComponent<TooltipSlot>();
+                probe.transform.SetParent(transform, false);
+                // Two items: a coin (no stats expected) and a sword (stats expected),
+                // to tell "GetHoverStats systematically null" apart from "this item has none".
+                probe.SetObject(ObjectID.AncientCoin, 0);
+                var coinTitle = probe.TitleFor();
+                var coinDesc = probe.DescriptionFor();
+                var coinStats = probe.StatsFor();
+                probe.SetObject(ObjectID.CopperSword, 0);
+                var swordTitle = probe.TitleFor();
+                var swordDesc = probe.DescriptionFor();
+                var swordStats = probe.StatsFor();
+                Debug.Log($"[ItemChecklist] ITER-22 SPIKE coin title='{coinTitle?.text}' " +
+                          $"descLines={(coinDesc?.Count ?? -1)} statLines={(coinStats?.Count ?? -1)} | " +
+                          $"sword title='{swordTitle?.text}' descLines={(swordDesc?.Count ?? -1)} " +
+                          $"statLines={(swordStats?.Count ?? -1)}");
+            }
         }
 
         private int ComputePoolSize()
