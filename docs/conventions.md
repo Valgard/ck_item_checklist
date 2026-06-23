@@ -284,6 +284,7 @@ unity/ItemChecklist/
   ShortCutsWindowSuppressPatch.cs Harmony patch — suppress help panel (Iter-9)
   PauseSuppressWhileChecklistOpenPatch.cs  Harmony patch — block ESC->pause race (Iter-9)
   MainListWheelSuppressPatch.cs   Harmony prefix on UIScrollWindow.UpdateScroll — give wheel to an open popup (Iter-24)
+  ThinTinyGlyphPatch.cs           Harmony-anchored runtime accented-glyph insert into thinTiny (Iter-25)
   WorldState.cs                   shared IsInPlayableWorld predicate (HUD + F1 guard) (Iter-11.6)
   ItemChecklist.asmdef            runtime assembly definition
   ui/
@@ -328,6 +329,7 @@ unity/ItemChecklist/
     Sort.prefab                   sort dropdown — variant of Dropdown.prefab (+ DropdownWidget, in-Display AscDesc) (Iter-18)
     Filter.prefab                 faceted filter — variant of Dropdown.prefab (renamed from FacetedFilter.prefab, Iter-18)
   Art/UI/                         tracked pixel-art sheet ui_checklist.png + mask_sprite.png (Iter-12)
+  Art/thinTiny_glyphs.png         bundle sprite sheet (textureType:8 spriteMode:1) — runtime accented glyphs (Iter-25)
   Editor/
     ItemChecklist.Editor.asmdef   editor-only assembly for the CLI helpers
     CLIBuildHelper.cs             -> core_keeper/utils/ (shared symlink, gitignored)
@@ -351,6 +353,12 @@ deliberately outside the `unity/ItemChecklist/` tree so `ModBuilder` does not
 pack it into the AssetBundle. `LocalizationGenerator` reads it and writes the
 per-language `.asset` TextDataBlocks into `unity/ItemChecklist/Localization/
 Generated/` (the `.envrc:LOC_OUT` path) at build time.
+
+The glyph-sheet reproducibility tooling also lives outside `unity/`:
+`sources/glyph-templates/*.py` (tracked extraction/debug tools that regenerate
+`Art/thinTiny_glyphs.png` from `sources/thinTiny_full.pixaki`, Iter-25). The
+intermediate atlases and `glyph_metrics.json` they emit are gitignored — only
+the `.py` tools and the `.pixaki` master are tracked.
 
 **Naming patterns:**
 

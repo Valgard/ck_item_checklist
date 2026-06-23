@@ -1062,3 +1062,37 @@ Conventions`. Iter-16.1 added two cwd/log traps on top of those:
   is covered in `docs/conventions.md § Worktree Conventions`: build via
   `direnv exec "$WT" bash -c '…'`, which walks the real `source_up` chain
   (worktree → mod → parent).
+
+## Font / Glyphs (Iter-25)
+
+- **Missing thinTiny glyph = silent CJK fallback, not "?".** A char absent from
+  `thinTiny.codePoints` does NOT crash or print `?` — `PugFont.GetGlyphData`
+  resolves it from the chinese font (CJK metric) → deformed, **no log warning**
+  (the glyph IS found, just from the wrong face). This is exactly the "silent,
+  no log" class this file captures. See `docs/architecture.md § Runtime Glyph
+  Injection`.
+- **`Sprite.Create` pivot trap.** A naive `pivot=(0,0)` renders the glyph but
+  shifts it **up-right** (the iteration's final bug). Must replicate
+  `PugFont.InitCodePoints` exactly: outline-padded source rect
+  `rect2 = Rect(x, y+1, w, h-1)` then
+  `if (rect2.width + rect2.x + 2 < tex.width) { rect2.x -= 1; rect2.width += 2; }`,
+  plus a **centered** pivot
+  `Vector2((int)(rect2.width/2)/rect2.width, (int)(rect2.height/2)/rect2.height)`.
+  `gd.rect.width` = the advance width (un-padded — a different value from the
+  padded source rect).
+- **Non-ASCII char literals are encoding-unsafe in the Roslyn sandbox.** A direct
+  `'ö'` literal silently fails to match the `codePoints` key (the
+  de-DE/InvariantCulture history); the Edit/Write tooling also normalizes typed
+  escapes into the literal byte. Address non-ASCII chars as integer code points:
+  `(char)246` for ö, `(char)196` Ä, `(char)214` Ö, `(char)220` Ü, `(char)223` ß,
+  `(char)228` ä, `(char)252` ü — pure-ASCII source, un-mangleable. Cross-ref the
+  de-DE/InvariantCulture loader memory (`project-corekeeper-roslyn-locale-bug`).
+- **ModBuilder packs UNREFERENCED assets.** `Art/thinTiny_glyphs.png` is
+  referenced by NO prefab — only loaded at runtime via
+  `AssetBundle.LoadAsset<Sprite>(...)`. It is **still packed** into the
+  AssetBundle. Verification subtlety: it does NOT appear in `ModManifest.json`
+  (which lists only Scripts + bundle files) and is NOT a loose file in the
+  install dir (it's binary *inside* the bundle); it DOES appear in
+  `<Mod>_Windows.assetbundle.manifest` and in `AssetBundle.GetAllAssetNames()`.
+  So a runtime-only sprite sheet is a valid pattern — no dummy prefab reference
+  needed.

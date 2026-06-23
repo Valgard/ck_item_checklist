@@ -1306,3 +1306,66 @@ per-skin material swap** instead (see `ui/PetSkinIcon.cs` and
 `docs/gotchas.md § Gradient-recolor shader`). The trade-off is logged as Iter-22:
 porting the list onto `SlotUIBase` would deliver row-hover tooltips and the
 gradient together.
+
+## Runtime Glyph Injection (Iter-25)
+
+The chrome labels (Sort/Filter/header) render in `thinTiny`, CK's reduced
+**digits-only** face — so accented characters never had a real glyph. Iter-25
+inserts 85 mod-authored accented glyphs into the live `thinTiny` PugFont at
+runtime.
+
+### The rrs* font family
+
+`PugText.style.fontFace` is an enum `TextManager.FontFace`; each face is a
+separate `PugFont` ScriptableObject with its own atlas in the `rrs*` family,
+resolved by `Manager.text.GetFont(fontFace)`:
+
+| FontFace | Atlas | Size | Glyphs |
+|---|---|---|---|
+| `thinTiny` | `rrs5` | 256×40 | 114 — CK's reduced **digits-only** face (no accents) |
+| `thinSmall` | `rrsthin8` | — | 331 |
+
+A char absent from a face's `codePoints` is **not** an error: `PugFont.GetGlyphData`
+runs a fallback chain (button → thinTiny → chinese → japanese → korean → `?`),
+so a missing `ö` resolves from the **chinese** font (CJK metric) and renders
+deformed with no log warning. See `docs/gotchas.md § Font / Glyphs`.
+
+### `ThinTinyGlyphPatch.InsertOnce()`
+
+Idempotent (`_done` guard — runs once per session). Steps:
+
+- Load the sheet via `AssetBundle.LoadAsset<Sprite>("Assets/ItemChecklist/Art/thinTiny_glyphs.png")`
+  (a runtime-only bundle asset — referenced by no prefab; see
+  `docs/gotchas.md § Font / Glyphs`).
+- Clone the face's `glyphData[]` array and append 85 entries.
+- Per glyph `i` at `baseIdx + i`:
+  - `codePoints[(char)code] = baseIdx + i` (the first `GetGlyphData` branch
+    wins before fallback).
+  - `gd.volatileSprite = Sprite.Create(tex, rect2, pivot, 16f, 0, SpriteMeshType.FullRect)`.
+  - `gd.rect = RectInt(x, y, w, h)` — the **un-padded** rect, where `w` = the
+    **advance width**.
+
+The `rect2`/centered-pivot construction must replicate `PugFont.InitCodePoints`
+**exactly** — outline-padded source rect (`y+1`, `h-1`, then `x-1`/`w+2`
+guarded) plus a centered pivot — or glyphs shift up-right. This is the
+load-bearing detail; the full trap is in `docs/gotchas.md § Font / Glyphs`.
+
+### Anchor
+
+`InsertOnce` runs when `Manager.text` is ready, called from
+`ItemCatalogWorldLoadHook.BakeWhenReady()` after the player-ready `WaitUntil`
+and **before** `Catalog.Bake()` — the `OnOccupied` anchor.
+
+### The 3-layer Pixaki glyph pipeline
+
+A second art pipeline distinct from the `ui_checklist` UI sheet. The master is
+`sources/thinTiny_full.pixaki` (a 4-layer doc: Background / charDims / Rects /
+Atlas, plus a thinSmall reference). Extraction convention:
+
+- **Atlas layer = sprite** (the glyph pixels).
+- **Rects layer = advance width**.
+- **thinSmall arrangement = char / codepoint cell**.
+
+85 glyphs = full Western-European + partial Eastern-European/Cyrillic/typography.
+See `docs/research/pixaki-format.md` and the
+`reference-ck-pugfont-architecture` memory.

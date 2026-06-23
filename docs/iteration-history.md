@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-21: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-23, and Iter-24 are DONE on main. Iter-3.8
+As of 2026-06-23: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-23, Iter-24, and Iter-25 (thinTiny accented-glyph injection) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
