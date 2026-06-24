@@ -54,10 +54,12 @@ namespace ItemChecklist
             public readonly int SellValue;      // 0 = unsellable/legendary; >0 = computed sell value
             public readonly bool IsCraftable;   // ObjectInfo.requiredObjectsToCraft non-empty
             public readonly bool IsPetSkin;     // Iter-16.1: pet-skin row — Variation carries skinIndex, collected via PetCollection
+            public readonly bool IsCattle;      // Iter-16.3: cattle species row (drives the Cattle category + collection routing)
 
             public Entry(int objectId, int variation, string displayName, Sprite icon,
                 string modOrigin, Rarity rarity, ObjectType objectType,
-                int level, int sellValue, bool isCraftable, bool isPetSkin = false)
+                int level, int sellValue, bool isCraftable, bool isPetSkin = false,
+                bool isCattle = false)
             {
                 ObjectId = objectId;
                 Variation = variation;
@@ -70,6 +72,7 @@ namespace ItemChecklist
                 SellValue = sellValue;
                 IsCraftable = isCraftable;
                 IsPetSkin = isPetSkin;
+                IsCattle = isCattle;
             }
         }
 
@@ -93,6 +96,12 @@ namespace ItemChecklist
         // instead of CK's skin-blind DiscoveredState (OwnedCount uses this).
         public bool IsPetSkinEntry(int objectId, int variation)
             => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
+
+        // Iter-16.3: cattle rows route discovery/possession through CattleCollection
+        // (CK has no CanBeDiscoveredCD on cattle → no native discovery) + drive the
+        // Cattle filter category.
+        public bool IsCattleEntry(int objectId, int variation)
+            => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
 
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
@@ -138,6 +147,10 @@ namespace ItemChecklist
                     Debug.LogWarning("[ItemChecklist] ItemCatalog.Bake called before PugDatabase ready — skipping");
                     return;
                 }
+
+                // Iter-16.3: identify the cattle subset of ObjectType.Creature and the
+                // structural baby→adult fold (BreedStateCD.babyType), before Loop 1.
+                CattleRegistry.Build();
 
                 // Pre-resolve mod-id → display-name once so the per-entry loop
                 // is a single Dictionary lookup.
@@ -188,7 +201,14 @@ namespace ItemChecklist
                     // Critter / PlayerType — but **not** NonUsable. (Critter is relaxed
                     // back in just below for the catchable subset — see Iter-16.2.)
                     if (info.objectType == ObjectType.NonObtainable) continue;
-                    if (info.objectType == ObjectType.Creature)      continue;
+                    // Iter-16.3: admit the cattle subset of Creature (the CattleCD-marked
+                    // farm livestock), mirroring the Iter-16.2 Critter relaxation. Babies
+                    // (CattleRegistry: any id that is some adult's BreedStateCD.babyType)
+                    // are folded into their adult species — skip their own row. Verified
+                    // in-game (1.2.1.4): 6 adults + 6 babies, all with icons.
+                    if (info.objectType == ObjectType.Creature
+                        && !PugDatabase.HasComponent<CattleCD>(od)) continue;
+                    if (CattleRegistry.IsBaby((int)od.objectID)) continue;
                     if (info.objectType == ObjectType.PlayerType)    continue;
 
                     // Iter-16.2: catchable critters are the EXCEPTION to the IB mirror
@@ -366,7 +386,8 @@ namespace ItemChecklist
                     string modOrigin = ResolveModOrigin(od, modIdToName);
                     list.Add(new Entry((int)od.objectID, od.variation, finalName, iconCache[key],
                         modOrigin, rarityCache[key], objectTypeCache[key],
-                        levelCache[key], sellValueCache[key], craftableCache[key]));
+                        levelCache[key], sellValueCache[key], craftableCache[key],
+                        isPetSkin: false, isCattle: CattleRegistry.IsCattle((int)od.objectID)));
                 }
 
                 // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
