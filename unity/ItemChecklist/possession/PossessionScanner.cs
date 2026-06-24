@@ -124,6 +124,20 @@ namespace ItemChecklist.Possession
 
                 long key = PossessionLedger.Key(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.z));
 
+                // Iter-16.3: a live cattle animal is a Creature ECS entity (not
+                // PlaceablePrefab), so it fails the furniture gate below. Near a clustered
+                // base anchor it is "in my pen" → count it, credited to the ADULT species
+                // (a baby calf ticks the adult). Wild animals roam far from any anchor →
+                // excluded by the WithinAnchor gate above. The owned count is spoiler-gated
+                // on discovery (ItemChecklistMod.OwnedCount), so a cattle discovered only at
+                // a non-0 variation (the variation-aware case deferred to Iter-17) shows no
+                // count regardless. Verified in-game (1.2.1.4): penned within-anchor, wild not.
+                if (em.HasComponent<CattleCD>(e))
+                {
+                    AddOne(Tile(scan, key), CattleRegistry.AdultOf(id));
+                    continue;
+                }
+
                 // Locked chests + boss statues: count the placed OBJECT as owned, but
                 // NOT its contents. A locked chest is placeable furniture the player
                 // owns, yet its loot is unknown until opened; a boss statue is typed
@@ -207,6 +221,16 @@ namespace ItemChecklist.Possession
                 var item = buf[j];
                 if (item.objectID == ObjectID.None) continue;
                 int id = (int)item.objectID;
+
+                // Iter-16.3: a caged animal in storage is the cattle ObjectID + auxData
+                // (verified in-game: a caged RolyPoly appears as objectID 1303). Credit the
+                // ADULT species (folding a caged baby); non-stackable → 1 per slot.
+                if (PugDatabase.HasComponent<CattleCD>(item.objectID))
+                {
+                    int adult = CattleRegistry.AdultOf(id);
+                    totals[adult] = (totals.TryGetValue(adult, out var cc) ? cc : 0) + 1;
+                    continue;
+                }
 
                 // Iter-16.1: a pet item carries its skin in PetSkinCD aux data. Tally
                 // per-(objectId, skinIndex) so each skin's owned count is separate.

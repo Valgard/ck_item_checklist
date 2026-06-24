@@ -97,12 +97,6 @@ namespace ItemChecklist
         public bool IsPetSkinEntry(int objectId, int variation)
             => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
-        // Iter-16.3: cattle rows route discovery/possession through CattleCollection
-        // (CK has no CanBeDiscoveredCD on cattle → no native discovery) + drive the
-        // Cattle filter category.
-        public bool IsCattleEntry(int objectId, int variation)
-            => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
-
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
         /// <list type="bullet">
