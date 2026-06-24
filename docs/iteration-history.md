@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-23: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-23, Iter-24, and Iter-25 (thinTiny accented-glyph injection) are DONE on main. Iter-3.8
+As of 2026-06-24: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, and Iter-25 (thinTiny accented-glyph injection) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -886,3 +886,79 @@ compile, `inserted 85 accented glyphs into thinTiny`, "Gewöhnlich"/"Ungewöhnli
 render correct umlauts at thinTiny size. **The `.pixaki` format was reverse-engineered**
 along the way (`docs/research/pixaki-format.md`). Font architecture: the
 `reference-ck-pugfont-architecture` memory.
+
+**Iter-22 (row-hover tooltips) — DONE (2026-06-24, branch `iter-22`).** Hovering a
+checklist row now shows CK's native item tooltip (name / description / stats) plus a
+slot-hover highlight. Design spec: `docs/specs/2026-06-23-iter-22-row-hover-tooltips-design.md`.
+
+**Feasibility (measured up front).** CK's tooltip is **selection-driven, not
+entity-driven**: `UIMouse.UpdateHoverText` reads `Manager.ui.currentSelectedUIElement`
+and calls its virtual `UIelement.GetHoverTitle/GetHoverDescription/GetHoverStats/
+GetContainedObject`; it needs **no live ECS entity**, only a selected `UIelement` that
+returns a `ContainedObjectsBuffer` carrying an arbitrary `ObjectDataCD(objectID,
+variation)`. `UIMouse` re-derives the selection every frame from a 3D `Physics.Raycast`
+against `UILayerMask` — which is the *engine* of the chosen approach, not an obstacle.
+Working precedent: ItemBrowser's `ItemBrowserSlot : SlotUIBase` does exactly this for
+catalog items not in any inventory. A throwaway **spike** (committed, then removed in a
+later task) de-risked the one unknown — a code-instantiated `SlotUIBase` helper
+(Awake overridden to skip its `animator` NRE) returns non-empty title/desc/stats: a coin
+gave title+desc (no stats, correct), a Copper Sword gave `statLines=2`. No prefab-helper
+fallback needed.
+
+**Architecture.** Each `ItemRow` (already a `UIelement`) carries a 3D `BoxCollider` so
+`UIMouse` hover-selects it (the collider sits on the row root, where the `UIelement`
+lives, so `UIMouse`'s `GetComponent<UIelement>()` resolves to it) and overrides the four
+hover virtuals, delegating to **one shared `TooltipSlot : SlotUIBase`** (owned + injected
+by `ItemChecklistContent`) fed the row's `(objectId, ckVariation)`. **Pet rule:** the
+`skinIndex` Bind param is a skin selector, not a CK variation — pets sit at CK variation
+0, so the helper uses `ckVariation = isPetSkin ? 0 : skinIndex` (else CK finds the wrong
+object). Verified in-game on `Eulux (Skin 3)`: a known species with an uncollected skin
+shows the species tooltip.
+
+**Spoiler model (settled with the user mid-iter).** Discovered rows show the full
+tooltip. Undiscovered (`???`) rows **highlight** on hover (the highlight reveals nothing)
+but show only a **minimal `??? - not yet discovered` placeholder** (title + a one-line
+hint), never the real item — two new ASCII-safe loc terms (en/de; the yaml's no-em-dash
+rule applies, so `-` not `—`). `_nameKnown` therefore gates only the *tooltip content*,
+not the collider/highlight.
+
+**Highlight — prefab, not runtime (a deliberate pivot via user feedback).** First built
+runtime (collider + a background-colour tint); the tint looked like "a weird frame", and
+the user wanted the inventory-slot look. CK slots highlight via `SlotUIBase.hoverBorder`
+showing `craftingUITheme.slotHoverSprite`. The user then chose to author the highlight in
+the **prefab** for full Editor control, and to keep their own sprite (no runtime sprite
+swap). Final split: the user authored a `HoverHighlight` SpriteRenderer child + the
+`BoxCollider` in the Editor (wired to new `highlight`/`hoverCollider` serialized fields);
+**code only toggles visibility**. One prefab-wiring bug caught before the build by
+verification: the highlight's Sorting Layer was **Default** instead of **GUI** (so it
+would render behind the row content / out of the mask's 40..55 band) — corrected to GUI.
+The highlight is driven **per-frame in `LateUpdate`** (`highlight = selected &&
+PointerInViewport`), not the `OnSelected`/`OnDeselected` one-shots, so it clears the
+instant the cursor leaves the row.
+
+**Two hard-won hover bugs (both from in-game screenshots, neither by the compile):**
+- **Popup "leak" — a non-issue.** Suspected that the full-width row collider under an open
+  Sort/Filter popup would leak a tooltip; built a `PopupWidget.PointerOverOpenPopup` guard
+  — then in-game proved there is **no leak** (the popup's own elements take the selection),
+  so the guard was reverted entirely.
+- **Hover outside the list — the real bug.** Row colliders are full-row and extend **past
+  the window `ContentsMask`** (the +4 buffer rows + the bottom row clipped by the mask);
+  a SpriteMask clips the *sprite*, not the *collider*, so a cursor in the header/footer/
+  margin still hover-selected the clipped row behind it. Fix:
+  `ItemChecklistContent.PointerInViewport()` — a static cursor-vs-ContentsMask world-bounds
+  check (mirrors `PopupWidget.PointerOverPanel`); the four overrides + the `LateUpdate`
+  highlight gate on it.
+
+**Editor convenience.** The per-row `ContentMask` (an authoring aid) is force-disabled at
+runtime in `EnsurePool`, so it can be left enabled in the prefab without affecting the
+game.
+
+**Process note.** Realised inline (not subagent-driven) per the mod's standing rule that
+the in-game calibration loop needs the live CrossOver window + build lock; the design
+went through several user-driven pivots (runtime→prefab highlight, highlight-on-`???`,
+minimal `???` tooltip, viewport gate) caught by in-game screenshots. Verified in-game
+(1.2.1.4, fake-ID 9999997) across all commits: `safetyCheck=True`, 0 `CompileFailed`,
+0 NRE; discovered + `???` tooltips, highlight on all rows, pet-skin tooltips, no
+outside-list hover, no popup leak. **Not separately stress-tested:** the recycled-row
+rebind under rapid scroll and the search-focus interplay (both ride existing machinery
+and were exercised incidentally during testing).

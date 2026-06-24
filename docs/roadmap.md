@@ -192,12 +192,18 @@ remaining backlog.
   touch. The variation-keyed-discovery question (a family discovered only at a
   non-0 variation would still show `???`) was raised during diagnosis and
   **deferred to Iter-17** -- the gate is correct regardless of that.
-- **Iter-22 (tentative) -- row-hover tooltips.** On hovering a checklist row, show
-  the item tooltip like CK's normal inventory slots do (name, description, stats).
-  CK renders slot tooltips via its own tooltip UI on hover; a row would need to
-  feed that tooltip system (or a mod-built equivalent) the row's `(objectID,
-  variation)`. Requested 2026-06-21. Scope/feasibility (which tooltip API is
-  reachable + spoiler-gating for undiscovered rows) to be measured before design.
+- **Iter-22 -- row-hover tooltips. DONE** (see `docs/iteration-history.md`).
+  Hovering a row shows CK's native item tooltip + a slot-hover highlight. The
+  tooltip is **selection-driven, not entity-driven**: each `ItemRow` (already a
+  `UIelement`) gets a 3D collider so CK's `UIMouse` hover-selects it, and overrides
+  the four `UIelement` hover virtuals, delegating to one shared `TooltipSlot :
+  SlotUIBase` fed an arbitrary `(objectID, ckVariation)` — the Item Browser recipe.
+  Spoiler model: discovered rows show the full tooltip; undiscovered (`???`) rows
+  highlight but show only a minimal `??? - not yet discovered` placeholder (never
+  the real item). Highlight is a prefab-authored SpriteRenderer driven per-frame in
+  `LateUpdate`. Hover is gated on a viewport bounds check
+  (`ItemChecklistContent.PointerInViewport`) so the full-width row colliders, which
+  extend past the window mask, don't hover a clipped row from the header/footer.
 - **Iter-23 -- rebound toggle key ignored; F1 always opens. DONE** (see
   `docs/iteration-history.md`). `ItemChecklistMod.Update` polled BOTH the rebindable
   Rewired action (`GetButtonDown(ToggleActionName)`) AND a raw
