@@ -6,54 +6,6 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
-## [Unreleased]
-
-### Added
-
-- **Row-hover tooltips.** Hovering a checklist row now shows Core Keeper's native
-  item tooltip (name / description / stats) plus an inventory-slot hover highlight.
-  Spoiler-safe: a discovered row shows the full tooltip, while an undiscovered
-  (`???`) row only highlights and shows a short "not yet discovered" placeholder —
-  never the real item.
-- **Correct accented text in the small UI font.** The dropdown, header and footer
-  labels now render German umlauts and other accents correctly at the small chrome
-  font size (some accented characters previously fell back to a mismatched font and
-  looked deformed).
-
-### Fixed
-
-- The **Discovered / Undiscovered** filter and the `N / M` discovery counter (window
-  footer and HUD) now account for per-skin pet collection, so collected pet skins are
-  shown under "Discovered" and count toward 100%.
-
-## [0.10.0] - 2026-06-22
-
-### Added
-
-- **Possession tracking.** Each row now shows how many of that item you currently
-  **own** — your carried inventory (including equipped gear) plus the contents of
-  storage and display furniture around your base. The checkbox and tick tint
-  **blue** when you own at least one, and a new **"in / not in possession"** filter
-  lets you list owned vs. missing items. Possession is spoiler-safe: an
-  undiscovered (`???`) row never reveals an owned count. Ownership is remembered per
-  character, so you can check it even when away from base.
-- **Per-skin pet collection.** Every pet **skin** is tracked as its own collectible
-  with its own row and a recoloured icon, instead of one row per pet species. A pet
-  skin counts as collected once you have ever owned it, and the currently-summoned
-  pet is counted too. Pets sort into a new **Pets** filter category.
-- **Critter collection.** Net-catchable critters (beetles, larvae, and the five
-  fireflies / glowbugs) now appear in the checklist and tick on pickup, in a new
-  **Critters** filter category.
-- **Scrollable, collapsible filter popup.** The faceted-filter popup now scrolls
-  (mouse wheel + a draggable scrollbar) instead of overflowing the screen once the
-  category list grew, and each filter section can be collapsed or expanded by
-  clicking its header — sections fold independently and all start open.
-
-### Changed
-
-- The catalog now totals **~10,910 entries** (was ~10,800), reflecting the added
-  materials, critters and per-skin pet rows.
-
 ## [0.9.1] - 2026-06-07
 
 ### Fixed

@@ -50,8 +50,8 @@ alongside it.
 ## Known Limitations
 
 - **No per-variation tracking** (one exception). Each item family is tracked once;
-  colour / state variants do not get their own row. The exception, since v0.10.0,
-  is **pet skins** — each pet skin is a separate collectible with its own row.
+  colour / state variants do not get their own row. The exception is **pet skins**
+  — each pet skin is a separate collectible with its own row.
 - **Cooked-food Rare/Epic tiers** are included but not yet verified against live
   cooking events — unreachable tiers, if any, simply stay greyed out.
 
