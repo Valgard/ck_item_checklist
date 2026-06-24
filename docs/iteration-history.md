@@ -6,7 +6,7 @@ canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
 As of 2026-06-24: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, and Iter-25 (thinTiny accented-glyph injection) are DONE on main. Iter-3.8
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), and Iter-16.4 (discovery-filter/counter pet-skin fix) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -962,3 +962,41 @@ minimal `???` tooltip, viewport gate) caught by in-game screenshots. Verified in
 outside-list hover, no popup leak. **Not separately stress-tested:** the recycled-row
 rebind under rapid scroll and the search-focus interplay (both ride existing machinery
 and were exercised incidentally during testing).
+
+**Iter-16.4 (discovery filter/count ignores pet skins) — DONE (2026-06-24, branch
+`iter-16-4`).** A coherence fix completing the Iter-16.1 per-skin work: the per-skin pet
+rows rendered their collected **tick** correctly (`ItemRow.showDetails`), but three
+**aggregate** sites still recomputed discovery from the raw, skin-blind `DiscoveredState`
+— CK force-zeroes pet variation in `SaveManager.SetObjectAsDiscovered`, so a collected
+`(petId, skinIndex > 0)` never lands in `DiscoveredState`. Symptoms (user-reported
+2026-06-23): the **Discovered** filter HID collected skins (and **Undiscovered** showed
+them); `DiscoveredInView` ("· N shown") under-counted; and the `N / M` counter used
+`DiscoveredState.Count` (each species once) against a catalog `M` that counts every skin
+row, so **100% was unreachable**.
+
+**Fix = the Iter-21 chokepoint pattern's discovery twin.** Iter-21 funnelled both
+possession read-sites through one `ItemChecklistMod.OwnedCount`; this adds the discovery
+counterpart:
+- `ItemChecklistMod.IsCollected(objectId, variation)` — pet-skin rows → `PetCollection`,
+  else `DiscoveredState`. This **is** the `ItemRow.showDetails` flag (the checkbox tick),
+  so the filter / in-view count / numerator can never drift from the per-row tick.
+- `ItemChecklistMod.CollectedCatalogCount()` — the `N` numerator, tallied over the catalog
+  through `IsCollected` (replaces `DiscoveredState.Count`).
+- Routed through them: `ItemListViewModel.Recompute` (Discovery filter + `DiscoveredInView`),
+  the window footer (`FormatTitle`), the HUD (`ItemChecklistHud.Refresh`), and the
+  `ItemChecklistContent` `showDetails` branch — one source of truth for all four.
+- Because collecting a new skin fires **no** `DiscoveredState.Changed` (CK has no per-skin
+  discovery event), the always-on HUD is nudged after the 3s possession scan when the
+  collected tally changes (change-gated so `PugText.Render` doesn't churn); the modal
+  window self-heals on its own (it rescans + `RenderStatus` on every open).
+
+**Behaviour-identical for non-pet rows** by construction (`IsCollected == IsDiscovered`
+there), so the ~10,885 normal/critter rows are untouched — only pet skins change. The
+now-dead injected `DiscoveredState` field + ctor-param on `ItemListViewModel` were removed
+(both `new ItemListViewModel(...)` sites updated). Pure behavioural C# (+84/−21 across 7
+files); no prefab/art touch. Verified in-game (1.2.1.4, fake-ID 9999997): clean Editor
+build (0 `error CS`, 0 `files:[]`), `Successfully compiled ItemChecklist safetyCheck=True`,
+0 `CompileFailed`, 0 NRE, `ItemCatalog baked: 10910 items`; the user confirmed all six
+behaviours — Discovered now shows collected skins, Undiscovered hides them, `N / M` (footer
++ HUD) counts skins toward 100%, "· N shown" counts skins, normal items/critters unchanged,
+and the HUD updates live on collecting a skin.
