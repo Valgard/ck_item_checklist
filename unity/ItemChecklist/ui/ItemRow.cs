@@ -164,10 +164,9 @@ namespace ItemChecklist.UI
             // Iter-22: every row is hover-selectable (collider always enabled) so the
             // highlight appears on all rows. The TOOLTIP is gated on discovery in the
             // four hover overrides instead — ??? rows highlight but show no tooltip
-            // (spoiler-safe, since the highlight reveals nothing). Reset the highlight
-            // off on each recycle.
+            // (spoiler-safe, since the highlight reveals nothing). The highlight itself
+            // is driven per-frame in LateUpdate, not here.
             if (hoverCollider != null) hoverCollider.enabled = true;
-            if (highlight != null) highlight.enabled = false;
         }
 
         // Iter-22 — native CK tooltip. UIMouse selects this row (collider always on)
@@ -175,6 +174,7 @@ namespace ItemChecklist.UI
         // the highlight still appears (spoiler-safe, it reveals nothing).
         public override ContainedObjectsBuffer GetContainedObject()
         {
+            if (!ItemChecklistContent.PointerInViewport()) return default;
             if (!_nameKnown || _tooltip == null) return default;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.GetSlotObjectPublic();
@@ -182,6 +182,7 @@ namespace ItemChecklist.UI
 
         public override TextAndFormatFields GetHoverTitle()
         {
+            if (!ItemChecklistContent.PointerInViewport()) return null;
             // Undiscovered: a minimal placeholder title only — no description/stats/icon
             // (those overrides stay gated), so the row hovers + shows "??? - not yet
             // discovered" without leaking the item. Resolve our term ourselves (CK's
@@ -199,6 +200,7 @@ namespace ItemChecklist.UI
 
         public override List<TextAndFormatFields> GetHoverDescription()
         {
+            if (!ItemChecklistContent.PointerInViewport()) return null;
             // Undiscovered: a small hint line under the placeholder title (still no real
             // item info). Resolved via our term, passed dontLocalize.
             if (!_nameKnown)
@@ -217,24 +219,25 @@ namespace ItemChecklist.UI
 
         public override List<TextAndFormatFields> GetHoverStats(bool previewReinforced)
         {
+            if (!ItemChecklistContent.PointerInViewport()) return null;
             if (!_nameKnown || _tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.StatsFor();
         }
 
-        // Iter-22: CK calls these when this row becomes / stops being the selected
-        // UIelement. The highlight shows for EVERY row (discovered or not) — only the
-        // tooltip is discovery-gated (in the hover overrides above).
-        public override void OnSelected()
+        // Iter-22: drive the highlight per-frame from selection state — NOT from the
+        // OnSelected/OnDeselected one-shots — so it stays correct in every case,
+        // including when the cursor moves onto an open popup over an already-selected
+        // row (whose full-width collider would otherwise leak the highlight behind the
+        // popup). Shows for EVERY selected row (discovered or not); the tooltip is the
+        // only discovery-gated part (in the hover overrides above).
+        protected override void LateUpdate()
         {
-            base.OnSelected();
-            if (highlight != null) highlight.enabled = true;
-        }
-
-        public override void OnDeselected(bool playEffect = true)
-        {
-            base.OnDeselected(playEffect);
-            if (highlight != null) highlight.enabled = false;
+            base.LateUpdate();
+            if (highlight == null) return;
+            bool show = Manager.ui.currentSelectedUIElement == this
+                        && ItemChecklistContent.PointerInViewport();
+            if (highlight.enabled != show) highlight.enabled = show;
         }
     }
 }

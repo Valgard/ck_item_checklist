@@ -45,6 +45,10 @@ namespace ItemChecklist.UI
         private int _count;            // reported entry count (catalog.Count)
         private int _lastFirstIndex = -1;
         private TooltipSlot _tooltipHelper;   // Iter-22: one shared hover-data helper
+        // Iter-22: the window viewport (ContentsMask) for the row-hover bounds check —
+        // row colliders extend past the mask, so a cursor in the header/footer/margin
+        // must not hover a clipped row. One window → static.
+        private static Transform s_viewportMask;
 
         // Iter-6: the label's prefab default colour, used for Common/Poor names
         // (GetSlotBorderRarityColor returns this for them). Captured once from
@@ -91,7 +95,25 @@ namespace ItemChecklist.UI
             {
                 _maskTopLocalY = mask.localPosition.y + mask.localScale.y / 2f;
                 _fallbackWindowHeight = mask.localScale.y;
+                s_viewportMask = mask;
             }
+        }
+
+        /// <summary>Iter-22: true when the cursor is within the visible list viewport
+        /// (the ContentsMask world bounds). Row colliders extend past the mask (the +4
+        /// buffer rows and the bottom row clipped by the mask), so the row-hover
+        /// overrides + highlight gate on this — a cursor in the header/footer/margin must
+        /// not hover a clipped row. Mirrors PopupWidget.PointerOverPanel.</summary>
+        public static bool PointerInViewport()
+        {
+            if (s_viewportMask == null) return false;
+            var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
+            if (cam == null) return false;
+            Vector3 c = cam.ScreenToWorldPoint(Input.mousePosition);
+            Vector3 p = s_viewportMask.position;
+            Vector3 s = s_viewportMask.lossyScale;
+            return Mathf.Abs(c.x - p.x) <= s.x * 0.5f
+                && Mathf.Abs(c.y - p.y) <= s.y * 0.5f;
         }
 
         /// <summary>
