@@ -128,7 +128,7 @@ namespace ItemChecklist.UI
 
                 if (s_discovery.Count > 0 && !s_discovery.Contains(isDisc)) continue;
                 if (s_rarity.Count   > 0 && !s_rarity.Contains(e.Rarity))   continue;
-                if (s_category.Count > 0 && !s_category.Contains(ItemCategories.Of(e.ObjectType))) continue;
+                if (s_category.Count > 0 && !s_category.Contains(ItemCategories.Of(e.ObjectType, e.IsCattle))) continue;
                 if (s_craft.Count    > 0 && !s_craft.Contains(e.IsCraftable)) continue;
                 if (s_owned.Count    > 0 && !s_owned.Contains(ItemChecklistMod.OwnedCount(e.ObjectId, e.Variation) >= 1)) continue;
                 if (needle.Length > 0)

@@ -3,7 +3,7 @@ namespace ItemChecklist.UI
     public enum ItemCategory
     {
         Weapons, ArmorAccessories, Tools, Food, Placeables,
-        Materials, Valuables, KeyItems, Instruments, Pets, Critters, Other
+        Materials, Valuables, KeyItems, Instruments, Pets, Critters, Cattle, Other
     }
 
     public static class ItemCategories
@@ -14,11 +14,16 @@ namespace ItemChecklist.UI
             ItemCategory.Weapons, ItemCategory.ArmorAccessories, ItemCategory.Tools,
             ItemCategory.Food, ItemCategory.Placeables, ItemCategory.Materials,
             ItemCategory.Valuables, ItemCategory.KeyItems, ItemCategory.Instruments,
-            ItemCategory.Pets, ItemCategory.Critters, ItemCategory.Other
+            ItemCategory.Pets, ItemCategory.Critters, ItemCategory.Cattle, ItemCategory.Other
         };
 
-        public static ItemCategory Of(ObjectType t)
+        // Iter-16.3: cattle are ObjectType.Creature (which falls to the default → Other),
+        // so the Cattle bucket is keyed on the explicit Entry.IsCattle flag — the single
+        // point that already knows (CattleCD), passed in by the caller. This stays correct
+        // even if a future non-cattle Creature is ever admitted to the catalog.
+        public static ItemCategory Of(ObjectType t, bool isCattle = false)
         {
+            if (isCattle) return ItemCategory.Cattle;
             switch (t)
             {
                 case ObjectType.MeleeWeapon:

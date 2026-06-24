@@ -66,6 +66,7 @@ ItemChecklist-Categories:
   Instruments:      { en: "Instruments",         de: "Instrumente" }
   Pets:             { en: "Pets",                 de: "Haustiere" }
   Critters:         { en: "Critters",            de: "Krabbeltiere" }
+  Cattle:           { en: "Cattle",               de: "Nutztiere" }
   Other:            { en: "Other",               de: "Sonstiges" }
 ControlMapper:
   ItemChecklist-ToggleChecklistPC:
