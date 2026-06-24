@@ -52,6 +52,10 @@ alongside it.
 - **No per-variation tracking** (one exception). Each item family is tracked once;
   colour / state variants do not get their own row. The exception is **pet skins**
   — each pet skin is a separate collectible with its own row.
+- **Cattle colour variants.** Farm animals (cattle) are tracked one row per species.
+  The game records discovery per colour variant, so a cattle you own but have only
+  ever seen in a non-default colour can still show as `???` until a future update adds
+  per-colour rows. Owning any cattle of a *discovered* species shows its count as usual.
 - **Cooked-food Rare/Epic tiers** are included but not yet verified against live
   cooking events — unreachable tiers, if any, simply stay greyed out.
 

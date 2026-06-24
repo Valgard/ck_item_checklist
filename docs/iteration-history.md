@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-24: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), and Iter-16.4 (discovery-filter/counter pet-skin fix) are DONE on main. Iter-3.8
+As of 2026-06-25: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), and Iter-16.3 (cattle collection) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -1000,3 +1000,77 @@ build (0 `error CS`, 0 `files:[]`), `Successfully compiled ItemChecklist safetyC
 behaviours — Discovered now shows collected skins, Undiscovered hides them, `N / M` (footer
 + HUD) counts skins toward 100%, "· N shown" counts skins, normal items/critters unchanged,
 and the HUD updates live on collecting a skin.
+
+**Iter-16.3 (cattle / farm-livestock collection) — DONE (2026-06-25, branch
+`iter-16-3`).** The third creature family after pets (16.1) and critters (16.2): farm
+livestock now gets a checklist row. The iteration **re-scoped twice** — once from the
+roadmap's premise, once from its own spec — both times because in-game measurement beat
+the decompile/decision-on-paper. Final shape: cattle behave like **critters** (admitted
+to the catalog + a new category, flowing through CK's native discovery), with one
+species row per animal and babies folded in. Design spec (the now-superseded ledger
+design): `docs/specs/2026-06-24-iter-16-3-cattle-collection-design.md`.
+
+**The CK cattle model (measured, not guessed).** Three in-game verification gates were
+run up front via throwaway bake/scan probes (committed-then-reverted; the
+commit-before-build discipline was forced by a build that silently reverts *uncommitted*
+worktree edits):
+- **Gate (a) — roster + structural baby-fold.** The marker is the empty
+  `struct CattleCD` (assigned by `CattleConverter`), so `PugDatabase.HasComponent
+  <CattleCD>` self-determines the set: **6 adults** (Cow=1300/Goat=1302/RolyPoly=1303/
+  Turtle=1307/Dodo=1309/Camel=1311) + **6 babies** (1304/05/06/08/10/12) — correcting the
+  roadmap's "only 1300/1302/1303". The adult→baby link is **structural**:
+  `BreedStateCD.babyType` is statically authored on the adult (`BreedStateAuthoring`), so
+  a baby is any `CattleCD` id that is some adult's `babyType` — `CattleRegistry` builds
+  that fold at bake, **no name parsing**. Babies are folded into the adult (skip their
+  row). Catalog **10910 → 10916** (+6 species).
+- **Gate (b) — discovery.** `CanBeDiscoveredCD` is **absent** on every cattle prefab → no
+  *proximity* discovery. This drove the spec toward a mod-owned ever-owned ledger. **But
+  the probe later proved CK DOES discover cattle** via the inventory-pickup path
+  (`DetectUndiscoveredObjectsInInventory` → `SetObjectAsDiscovered`) — **per
+  `(objectID, variation)`**, where the variation is the animal's **colour variant**. The
+  live hook logged `SetObjectAsDiscovered(Cow=1300, var=2)` and `(Goat=1302, var=0/1)`;
+  the bake probe showed `1300@var0=False, 1302@var0=True, 1303@var0=True`. So a species
+  discovered only at a non-0 variation (a colour the player owns) reads as undiscovered
+  on its var-0 catalog row — the Iter-21 **H1 / Iter-17 variation-keyed-discovery** case,
+  here triggered by cattle colour variants.
+- **Gate (c) — possession spatial test.** A live cattle is a `Creature` ECS entity with
+  `ObjectDataCD`+`LocalTransform`; the Iter-20 scan sees it but the furniture gate drops
+  it. The probe confirmed: penned Cow/Goat/RolyPoly near the base → `withinAnchor=True`;
+  a wild RolyPoly at (205,−107) → `withinAnchor=False`. A caged animal appears in a
+  container buffer as the **animal's** ObjectID (`CAGED id=1303`), confirming the
+  "same ID + auxData" model.
+
+**The ledger was built, then deliberately removed.** Acting on gate (b)'s
+`canBeDiscovered=False`, the iteration first built a `CattleCollection` ever-owned ledger
+(mirroring `PetCollection`) so a penned/owned cattle counts as collected. This worked
+in-game (the owned Cow showed its name), **but it masked the variation-keyed-discovery
+symptom rather than fixing it** — and it surfaced a one-frame coherence bug: routing
+`showDetails` through the ledger while leaving `nameKnown` on raw var-0 discovery made an
+owned-but-var≠0-discovered Cow render `???` *with* details + an owned count (the Iter-21
+spoiler-leak). After weighing it with the user against the **pet parallel** (a sub-variant
+collectible axis the catalog collapses — pets solved it per-skin in 16.1), the call was:
+the proper fix is **per-variation splitting (Iter-17)**, which for cattle can use CK's
+**native** per-variation discovery directly (unlike pets, which had none and needed the
+ledger). So the ledger + all cattle-specific collected routing was **reverted**, leaving:
+
+**Final design (option A — cattle = critter-like).** Cattle flow through CK's native
+`(objectID, var0)` discovery exactly like critters/normal items. Goat/RolyPoly
+(var-0-discovered) show their names + owned counts; the Cow (discovered only at var 2)
+shows a **coherent `???`** — no name, no details, no count (owned-count spoiler-gated on
+discovery as usual). The only cattle-specific code is: the bake relaxation + baby-fold
+(`CattleRegistry`), the `Cattle`/`Nutztiere` filter category (keyed on `Entry.IsCattle`
+since cattle are `Creature`-typed and fall to `Other` otherwise), and a `PossessionScanner`
+`CattleCD` branch (live penned cattle near a clustered anchor + caged cattle in buffers,
+both credited to the adult; wild excluded by the anchor gate). No ledger, no persistence,
+no chokepoint routing. Level/Value `—` (no `LevelCD`/sell value), free via existing logic.
+
+**Deferred to Iter-17 (now with a concrete instance).** Per-variation/colour-variant
+tracking — one row per cattle colour, using the native per-variation discovery the gate-b
+probe revealed. The shipped Iter-16.3 limitation: a cattle you own but have only
+discovered at a non-0 variation shows `???` until then. This is the honest interim, not a
+bug. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox compile
+(`safetyCheck=True`, 0 `CompileFailed`, 0 NRE), `ItemCatalog baked: 10916 items`, the
+`Nutztiere` category shows the 6 species (no baby rows), and the user confirmed the
+coherent display (named+counted vs. `???`). The standing lesson reinforced a fourth time:
+**measure CK creature mechanics in-game; the decompile and the on-paper decision were both
+overturned by what the probe logged.**

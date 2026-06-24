@@ -78,28 +78,20 @@ remaining backlog.
   at 3500-3504, German `Glimmkäfer`); ground truth (player had them in chests + they
   ARE bug-net-catchable) confirmed all 25 are discovery-trackable, no ghost rows.
   Catalog 10885 -> 10910.
-- **Iter-16.3 (tentative) -- cattle (farm livestock) collection.** Farm animals
-  (`CattleCD` + `ObjectCategoryTag.Cattle`) are a third creature family beside
-  Pets/Critters and currently get **no** checklist row: their `ObjectType` is
-  `Creature` (900), which `ItemCatalog.Bake` explicitly skips
-  (`ItemCatalog.cs:191`, alongside `NonObtainable`/`PlayerType`). Confirmed
-  in-game by the player (has Muhline/Bummbock/Bummelkugler = Moolin/Bambuck/
-  Strolly Poly, internal `Cow`/`Goat`/`RolyPoly`, ObjectIDs **1300/1302/1303**;
-  babies 1304/1305/1306). Likely an Iter-7.1/16.2-style bake relaxation
-  (`Creature` + a `CattleCD` guard, mirroring the `Critter` icon-guard) so the
-  three species flow through the existing discovery/possession/rendering
-  machinery; a new `Cattle` / `Nutztiere` filter category. **Open design
-  question (decide first, à la Iter-16.1 pets):** one row per *species* vs. one
-  per *individual/variant* -- caged cattle are stored as the **same** ObjectID
-  with non-zero `auxDataIndex` carrying per-animal state (`NameCD`/
-  `MealsEatenCD`/`BreedToggleCD`), the pet-skin aux-data pattern, so there is no
-  per-variant ObjectID to key on; a per-species row is the natural default.
-  **Verify first** (the standing lesson -- creature typing has been wrong 3x):
-  confirm the `Creature` ObjectType against the actual game prefab (it lives in
-  the per-prefab authoring asset, not the decompile) and that 1300/1302/1303 are
-  the only base cattle. Babies and the `CattleFeedTray` (1301) / `CattleCage` (8)
-  items are separate questions. Requested 2026-06-23. See the
-  `reference_ck_cattle_objecttype` memory.
+- **Iter-16.3 -- cattle (farm livestock) collection. DONE** (see
+  `docs/iteration-history.md`). Cattle = a third creature family, shipped **critter-like**
+  (option A): admitted to the catalog via a `HasComponent<CattleCD>` bake relaxation +
+  a `Cattle`/`Nutztiere` category, flowing through CK's native `(objectID, var0)`
+  discovery; a `PossessionScanner` `CattleCD` branch counts penned (live, near-anchor) +
+  caged cattle, credited to the adult. **Roster corrected by measurement:** 6 adults
+  (Cow/Goat/RolyPoly/Turtle/Dodo/Camel) + 6 babies — not the roadmap's "1300/1302/1303".
+  Babies are **folded** into the adult via a structural `BreedStateCD.babyType` map
+  (`CattleRegistry`, no name parsing). Catalog 10910 → **10916**. The "row per species vs
+  variant" question resolved to **per species**; an ever-owned ledger was built then
+  **deliberately removed** once a probe showed CK *does* discover cattle, **per colour
+  variation** — so per-variant tracking is the proper fix, deferred to **Iter-17** (see
+  there). Shipped limitation: a cattle owned but only discovered at a non-0 variation
+  shows `???` until Iter-17. Requested 2026-06-23, done 2026-06-25.
 - **Iter-16.4 -- discovery filter/count ignores pet skins. DONE** (see
   `docs/iteration-history.md`). Built exactly to the planned fix shape: the Iter-21
   chokepoint pattern's discovery twin. `ItemChecklistMod.IsCollected(objectId,
@@ -119,6 +111,14 @@ remaining backlog.
   and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
   variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
   for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
+  **Concrete instance from Iter-16.3 (cattle):** cattle come in **colour variants**
+  stored in the `variation` field, and CK discovers them per `(objectID, variation)`
+  (verified in-game: `SetObjectAsDiscovered(Cow=1300, var=2)` for a colour the player
+  owns). So a cattle owned but only discovered at a non-0 variation reads as `???` on
+  its var-0 species row — the symptom Iter-16.3 ships with. **The cattle fix needs no
+  ledger** (unlike pet skins, which had no native per-skin discovery): split cattle per
+  colour variant and use CK's **native** per-variation discovery directly. This is the
+  same problem class as the Iter-16.1 pet-skin split, with a native signal available.
 - **Iter-19 -- search-field word-wrap crash. DONE** (see
   `docs/iteration-history.md`). `SearchBar` overrides `Awake` to force
   `pugText.maxWidth = 0` after `base.Awake()`, removing the search field's PugText

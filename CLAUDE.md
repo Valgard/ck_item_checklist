@@ -108,7 +108,7 @@ Iter-3.5b lessons: `docs/gotchas.md § SpriteMask Clipping`.
 
 ## Iter-Roadmap (live)
 
-As of 2026-06-24: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1 (per-skin pet collection), Iter-16.2 (critter collection), Iter-22 (row-hover tooltips — native CK tooltip via SlotUIBase helper + slot-hover highlight, spoiler-gated), Iter-23 (rebound-toggle-key fix), Iter-24 (scrollable + collapsible filter popup), Iter-25 (thinTiny accented-glyph injection — 85 mod-authored glyphs make the chrome labels render umlauts/accents natively), and Iter-16.4 (discovery filter + N/M counter route pet skins through the Iter-21-style IsCollected chokepoint) are DONE on main. Full per-iteration narrative:
+As of 2026-06-25: Iter-3.5 through Iter-12 (incl. the Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1 (per-skin pet collection), Iter-16.2 (critter collection), Iter-22 (row-hover tooltips — native CK tooltip via SlotUIBase helper + slot-hover highlight, spoiler-gated), Iter-23 (rebound-toggle-key fix), Iter-24 (scrollable + collapsible filter popup), Iter-25 (thinTiny accented-glyph injection — 85 mod-authored glyphs make the chrome labels render umlauts/accents natively), Iter-16.4 (discovery filter + N/M counter route pet skins through the Iter-21-style IsCollected chokepoint), and Iter-16.3 (cattle collection — critter-like: CattleCD bake relaxation + structural BreedStateCD.babyType baby-fold + Cattle/Nutztiere category + penned/caged possession counts; native discovery, per-colour-variation tracking deferred to Iter-17) are DONE on main. Full per-iteration narrative:
 
 @docs/iteration-history.md
 

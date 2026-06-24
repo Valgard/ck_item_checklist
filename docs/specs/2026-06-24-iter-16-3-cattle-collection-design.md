@@ -214,3 +214,19 @@ Creature typing has been wrong 3× — each of these is *measured*, not assumed:
   ledger fallback (§ 4) so the feature ships regardless of gate (b)'s outcome.
 - **Possession spatial proxy** inherits Iter-20's foreign-clustered-base edge;
   accepted, unchanged.
+
+## Outcome (2026-06-25) — this design was superseded mid-implementation
+
+The shipped Iter-16.3 differs from § 4 above. In-game verification (gate b) first
+read `CanBeDiscoveredCD` as absent → the **ledger path** here was built. But a later
+discovery probe proved CK **does** discover cattle, via the inventory-pickup path and
+**per `(objectID, variation)`** — the variation being the animal's **colour variant**.
+That makes the ever-owned ledger a *mask* over the variation-keyed-discovery limitation
+rather than a fix. The ledger (`CattleCollection` + store + chokepoint routing) was
+therefore **deliberately removed**, and cattle now ship **critter-like**: catalog
+admission + `Cattle`/`Nutztiere` category + a possession scan branch (penned + caged,
+adult-folded), flowing through CK's **native** `(objectID, var0)` discovery. Per-colour
+tracking — the proper fix, needing **no** ledger (native per-variation discovery exists,
+unlike pets) — is deferred to **Iter-17**. The structural baby-fold (§ 1, via
+`BreedStateCD.babyType`) and the 6-adult/6-baby roster were confirmed exactly. Full
+narrative: `docs/iteration-history.md § Iter-16.3`.
