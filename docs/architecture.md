@@ -213,7 +213,7 @@ public interface IScrollable
 
 ## Viewport Virtualization (Iter-3.8)
 
-The catalog grows to ~10,910 entries. The pre-Iter-3.8 design instantiated one
+The catalog grows to ~10,916 entries. The pre-Iter-3.8 design instantiated one
 `ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
 window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
 GameObjects recycled as the user scrolls, so the GameObject count is bounded
@@ -225,7 +225,7 @@ cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
 of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
 `num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
 scrolls by translating the whole pool under the clip mask, recycling nothing.
-That is fine for ≤250 recipes but unusable for ~10,910 entries. No CK class
+That is fine for ≤250 recipes but unusable for ~10,916 entries. No CK class
 recycles rows by index, so ItemChecklist implements its own on top of the
 `IScrollable` contract.
 
@@ -425,11 +425,11 @@ for i1 in ingredients:
             emit CatalogEntry(tier_objectId, variation=var)
 ```
 
-**Resulting catalog size:** ~10,910 entries (~1240 standard + ~9480
+**Resulting catalog size:** ~10,916 entries (~1240 standard + ~9480
 cooked-food permutations: 3160 pairs × 3 tiers).
 
 **Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
-on this machine for the full ~10,910-entry bake). Bake time is independent
+on this machine for the full ~10,916-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
@@ -802,7 +802,7 @@ the main-list machinery is wrong here:
    serialized `scrollable` does not resolve to an `IScrollable` on the *same*
    GameObject at load (see § Awake Logic). The `Dropdown` skeleton is deliberately
    component-less (Iter-18), so a skeleton `UIScrollWindow` would self-disable.
-2. `UIScrollWindow` exists to virtualize ~10,910 catalog rows; the popup has ≤~29
+2. `UIScrollWindow` exists to virtualize ~10,916 catalog rows; the popup has ≤~29
    *real* row GameObjects — virtualization is overkill.
 
 Instead `PopupWidget` caps the panel to `MaxVisibleRows × rowSpacing` (serialized
@@ -1442,6 +1442,61 @@ raw-`SpriteRenderer` rows and drove CK's native tooltip from one shared
 `TooltipSlot : SlotUIBase` helper the rows delegate to (see § Row-Hover Tooltips
 (Iter-22)) — so the gradient material-swap and the tooltips coexist, neither
 needing the full slot-grid port.
+
+## Cattle Collection (Iter-16.3)
+
+Farm livestock (cattle) is the third creature family after pets (Iter-16.1) and
+critters (Iter-16.2), admitted **critter-like**: a catalog bake relaxation + a
+filter category, flowing through CK's native discovery with **no ledger**. The
+marker is the empty `struct CattleCD` (assigned by `CattleConverter` to every
+`: Cattle` prefab), so `PugDatabase.HasComponent<CattleCD>(od)` self-determines the
+set — no hardcoded ObjectIDs.
+
+**`CattleRegistry` + structural baby-fold.** `ItemCatalog.Bake` calls
+`CattleRegistry.Build()` before Loop 1; it builds the cattle id set and a
+baby→adult map. The baby→adult link is **structural, not name-based**: an adult
+carries `BreedStateCD` (statically authored, `BreedStateAuthoring.babyType` →
+`BreedStateConverter`) whose `ObjectID babyType` points at its baby; a baby carries
+no `BreedStateCD`. So a cattle id is a **baby ⇔ it is some adult's `babyType`** —
+read at bake via `PugDatabase.TryGetComponent<BreedStateCD>` (same
+`Pug.ECS.Components.dll` already referenced; no new asmdef). Loop 1's `Creature`
+exclusion is relaxed to keep the `CattleCD` subset (`if (Creature &&
+!HasComponent<CattleCD>) continue;`, the Iter-16.2 pattern), then baby ids are
+skipped (`CattleRegistry.IsBaby`). Result: **6 adult species rows**
+(Cow/Goat/RolyPoly/Turtle/Dodo/Camel), babies folded. `CattleRegistry.AdultOf(id)`
+returns the adult for a baby (id unchanged otherwise) and credits a caged/penned
+baby's possession to its adult row.
+
+**Category routing.** Cattle are `ObjectType.Creature`, which `ItemCategories.Of`
+maps to `Other`; so the catalog `Entry` carries an explicit `IsCattle` flag (set at
+bake from `HasComponent<CattleCD>`) and `ItemCategories.Of(ObjectType, bool isCattle)`
+short-circuits to the new `Cattle`/`Nutztiere` category before the switch (see
+`docs/conventions.md § A Creature-typed family categorizes via an Entry flag`). One
+`localization.yaml` term; the `Cattle.asset` is build-generated.
+
+**Possession.** A live penned animal is a `Creature` ECS entity the Iter-20 scan
+already enumerates (it has `ObjectDataCD` + `LocalTransform`) but the furniture gate
+drops (not `PlaceablePrefab`). `PossessionScanner` adds a `CattleCD` branch: a live
+cattle within a clustered base anchor counts toward the **adult** species
+(`AdultOf`); a caged animal in a container buffer — which appears as the **animal's
+own ObjectID** (`CAGED id=1303`, not `CattleCage`) + auxData — folds to the adult in
+`AddBuffer`. Wild animals roam far from any anchor → excluded by the existing
+`WithinAnchor` gate. Owned counts stay spoiler-gated on discovery
+(`ItemChecklistMod.OwnedCount`), as for every item.
+
+**Discovery is per-`(objectID, variation)` — the Iter-17 seam.** Cattle have **no**
+`CanBeDiscoveredCD` (no proximity discovery), but CK **does** discover them via the
+inventory-pickup path (`DetectUndiscoveredObjectsInInventory` →
+`SetObjectAsDiscovered`), keyed per **`(objectID, variation)`** where the variation is
+the animal's **colour variant** (measured in-game: `SetObjectAsDiscovered(Cow=1300,
+var=2)`; bake membership `1300@var0=False, 1302@var0=True`). The catalog collapses to
+one var-0 row per species, so a species discovered only at a non-0 colour reads as
+`???` on its row — the deferred Iter-17 variation-keyed-discovery case (see
+`docs/gotchas.md § Cattle colour variants`). An ever-owned ledger
+(`CattleCollection`) was built then **removed** during the iteration: it merely masked
+this symptom, and the proper fix (per-colour rows using CK's native per-variation
+discovery — no ledger, unlike pets) belongs to Iter-17. Full narrative:
+`docs/iteration-history.md § Iter-16.3`.
 
 ## Runtime Glyph Injection (Iter-25)
 

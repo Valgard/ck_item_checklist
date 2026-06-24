@@ -1161,3 +1161,27 @@ rule in `§ PugFont.Render crashes` under Localisation (Iter-11).)
   `<Mod>_Windows.assetbundle.manifest` and in `AssetBundle.GetAllAssetNames()`.
   So a runtime-only sprite sheet is a valid pattern — no dummy prefab reference
   needed.
+
+## Cattle (Iter-16.3)
+
+### Cattle colour variants — an owned cattle can read `???` (variation-keyed discovery)
+
+The catalog collapses each family to its `variation == 0` row, but CK tracks
+**discovery per `(objectID, variation)`** — and for cattle the variation is the
+animal's **colour variant**. So a species the player owns can render `???` on its
+var-0 row when it was only ever discovered at a non-0 colour. Measured in-game
+(Iter-16.3): the live `SaveManager.SetObjectAsDiscovered` hook logged
+`(Cow=1300, var=2)`, and the bake-time membership check read `1300@var0=False,
+1302@var0=True, 1303@var0=True` — so the Cow (owned, only seen in colour 2) showed
+`???` while the var-0-discovered Goat/RolyPoly showed their names.
+
+This is the deferred **Iter-17** variation-keyed-discovery case (the Iter-21 "H1"),
+not a bug in Iter-16.3 — cattle ship one row per species and read CK's native var-0
+discovery like any item. **Do not "fix" it with an ever-owned ledger** (that path
+was built and removed in Iter-16.3 — it *masks* the symptom by routing collection
+through ownership instead of discovery, and produces an incoherent `???`-with-owned-
+count state unless the row name is *also* routed through the same flag). The real
+fix is per-colour rows using CK's **native** per-variation discovery (cattle, unlike
+pet skins, have a native per-variation signal, so no ledger is needed) — Iter-17.
+See `docs/architecture.md § Cattle Collection (Iter-16.3)` and the
+`reference_ck_cattle_objecttype` memory.

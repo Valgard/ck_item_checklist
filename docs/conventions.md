@@ -205,7 +205,7 @@ debug scaffold *in front of* the reviewed core — then remove it via
 reviewed version.
 
 Iter-3.8 example: reaching the end of the list (~10,720 entries at Iter-3.8;
-~10,910 today) by scrolling takes
+~10,916 today) by scrolling takes
 too long to verify flush-geometry on the last row. A throwaway
 `DebugDiscoveredOnly` index-remap was added in front of the recycler
 (`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of the list
@@ -215,8 +215,34 @@ was already committed, so a `git restore` of the modified `.cs` removed the
 scaffold cleanly without touching reviewed code. (The same remap can later
 seed the real Iter-8 discovered-only filter.)
 
-Rule: scaffolds never get committed onto a story commit. Add them to the
-working tree, use them, then `git restore` before the iter's ff-merge.
+Rule: scaffolds never get committed onto a *story* commit. In the **main
+checkout**, add them to the working tree, use them, then `git restore` before
+the iter's ff-merge. **Building from a worktree is the exception** — see the next
+section: the worktree build reverts uncommitted edits, so a worktree scaffold
+must be *committed* and then dropped with `git reset --hard`, not `git restore`d.
+
+### Worktree builds silently revert uncommitted tracked edits — commit first
+
+`utils/build.sh` run from a `.worktrees/<branch>` checkout **resets uncommitted
+edits to tracked `.cs` files**: a throwaway probe edited into the working tree
+but **not committed** is gone after the build (every `.cs` back to git-clean),
+even though the build reports `safetyCheck=True`. Reproduced twice in Iter-16.3 —
+a bake/scan probe vanished mid-build, so the installed source compiled *without*
+it and `Player.log` showed no probe output despite a clean build. Neither
+`link.sh` nor `install-macos.sh` runs a `git` reset, so the mechanism was never
+pinned down; the behaviour is reliable enough that the rule is simply:
+
+- **Commit before you build** — whether the change is a feature *or* a throwaway
+  probe. A committed change survives the build; an uncommitted tracked edit does
+  not. (The main-tree `git restore` scaffold flow above held in Iter-3.8/Iter-8,
+  but commit-before-build is the robust rule everywhere; treat the worktree as
+  the case where it is *mandatory*.)
+- **Fix build/sandbox failures with `git commit --amend`** (clean history), not a
+  correction commit.
+- **Drop a committed throwaway** with `git reset --hard <base>` (or drop the lone
+  probe commit) — not `git restore` (there is nothing uncommitted left to
+  restore). Net effect on the merged branch is identical (the probe never reaches
+  a story commit); only the path differs from the main-tree flow above.
 
 ### Temp-`Debug.Log` measurement technique
 
@@ -282,6 +308,18 @@ edge case worth checking: a *collected skin of an already-discovered species*
 common path is also a cheap correctness argument (no regression possible where the code
 is unchanged), and it pairs with the size-delta trip-wire above: a stable common path
 plus a measured edge-case delta is a strong, low-effort verification.
+
+### A `Creature`-typed family categorizes via an `Entry` flag, not its `ObjectType`
+
+`ItemCategories.Of(ObjectType)` cannot bucket a `Creature`-typed family — every
+`ObjectType.Creature` falls through to `Other`. When a creature family is admitted to
+the catalog (Iter-16.3 cattle), carry an explicit `Entry` flag set at bake from the
+discriminating component (`Entry.IsCattle` ← `HasComponent<CattleCD>`) and short-circuit
+on it **before** the `ObjectType` switch (`ItemCategories.Of(ObjectType, bool isCattle)`).
+Keep the decision at the one point that already knows (the marker component), so it stays
+correct even if a future non-cattle `Creature` is ever admitted — do **not** map
+`ObjectType.Creature → Cattle` inside the switch. (Pets/critters need no such flag: `Pet`
+and `Critter` are their own `ObjectType` values that the switch maps directly.)
 
 ## File Layout
 
