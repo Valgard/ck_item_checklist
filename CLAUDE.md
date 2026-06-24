@@ -139,6 +139,9 @@ Backlog of planned iterations (Iter-12 onward):
   `docs/conventions.md § Worktree Conventions`.
 - **The visual-calibration / in-game loop runs inline, not via subagents** — it needs
   the live CrossOver window and the build lock.
+- **In-game-calibration iters run INLINE (`executing-plans`), not subagent-driven** —
+  the shared SDK build lock + the live CrossOver hover-verification loop cannot be
+  delegated to a subagent (Iter-22 confirmed).
 - **For CK-UI "how does CK do X?" questions, read the working reference mod (Item
   Browser) before decompile guessing.** Decompile agents repeatedly guessed wrong on
   CK-UI internals; the ground truth came from IB source. The gradient shader name

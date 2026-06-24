@@ -1225,6 +1225,99 @@ construction. It gates on the **same** discovered flag that drives `???`-vs-name
 > would still render `???` because the row checks `IsDiscovered(objectId, 0)` — is a
 > separate concern deferred to **Iter-17** (per-variation tracking).
 
+## Row-Hover Tooltips (Iter-22)
+
+Hovering a checklist row shows CK's native item tooltip (name / description /
+stats) plus an inventory-slot hover highlight, for an arbitrary catalog item that
+exists in no live inventory.
+
+### CK's tooltip is selection-driven, not entity-driven
+
+`UIMouse.UpdateHoverText` (`Pug.Other.dll` ~356342) reads
+`Manager.ui.currentSelectedUIElement` and calls its four hover virtuals on the
+selected `UIelement`:
+
+- `GetHoverTitle()` → `TextAndFormatFields`
+- `GetHoverDescription()` → `List<TextAndFormatFields>`
+- `GetHoverStats(bool)` → `List<TextAndFormatFields>`
+- `GetContainedObject()` → `ContainedObjectsBuffer`
+
+There is **no live ECS entity** anywhere in the path. To show a tooltip for an
+arbitrary item, a `UIelement` need only return a `ContainedObjectsBuffer`
+wrapping a synthetic `ObjectDataCD { objectID, variation, amount = 1,
+variationUpdateCount = 0, auxDataIndex = 0 }`. Precedent: Item Browser's
+`ItemBrowserSlot : SlotUIBase` does exactly this for catalog items not in any
+inventory.
+
+### Selection is re-derived from the raycast every frame
+
+`UIMouse.UpdateMouseUIInput()` (~355773) re-runs `Physics.RaycastNonAlloc`
+against `UILayerMask` every frame and `TrySelectNewElement` — so
+`currentSelectedUIElement` is owned by the raycast, and a manually-assigned
+selection is clobbered on the next frame. Selectability of a `UIelement`
+requires a 3D collider **on the same GameObject** (where `UIMouse`'s
+`GetComponent<UIelement>()` resolves), on the **UI layer**, passing
+`isVisibleOnScreen` (active + enabled + non-zero lossy scale). There is **no**
+`isSelectable` flag — presence of the collider on a visible UI-layer GO *is* the
+gate. (Reusable for any future CK-UI hover/selection work, e.g. Iter-17.)
+
+### ItemChecklist wiring
+
+Each `ItemRow` (already a `UIelement`) captures `_objectId` / `_ckVariation` /
+`_nameKnown` on `Bind` and overrides the four hover virtuals, delegating them to
+**one shared `TooltipSlot : SlotUIBase`** held by `ItemChecklistContent` and
+injected into each pooled row via `SetTooltipHelper`. The `TooltipSlot` is fed
+the row's `(objectId, ckVariation)` and produces the title/description/stats; the
+rows themselves carry no tooltip logic beyond forwarding.
+
+- A prefab-authored 3D `BoxCollider` sits on the **row root** (the GO the
+  `UIelement` lives on) so `UIMouse`'s raycast hover-selects the row.
+- The hover **highlight** is a prefab-authored `SpriteRenderer` driven per-frame
+  from the row's `LateUpdate` (see below) — not from the one-shot
+  `OnSelected`/`OnDeselected` callbacks.
+
+### Awake-skip helper (`TooltipSlot`)
+
+`SlotUIBase.GetHoverStats(ContainedObjectsBuffer, bool, bool)` (~327477) is an
+**instance** method, so a `SlotUIBase` instance is required. A bare
+`new GameObject().AddComponent<TooltipSlot>()` NREs in `SlotUIBase.Awake` on
+`animator.enabled` → `TooltipSlot` overrides `Awake` to an **empty body**. A
+throwaway spike confirmed that an Awake-skipped helper returns title + description
++ stats correctly **without** `base.world` or the serialized slot fields — no
+prefab instantiation of the helper is needed (a coin gave title+desc with no
+stats; a Copper Sword gave `statLines = 2`).
+
+### Tooltip is cursor-anchored, not element-anchored
+
+`UIMouse` positions the tooltip relative to the `pointer` transform (~357077),
+so the selected element's own transform position is irrelevant — the off-screen
+proxy nature of the shared `TooltipSlot` does not matter.
+
+### Spoiler model (mechanism)
+
+The tooltip is gated **inside the four overrides**, not on the collider: an
+undiscovered (`???`) row keeps its collider always enabled, so it still
+hover-**highlights** (revealing nothing), but its overrides return only a
+minimal localized `??? - not yet discovered` placeholder instead of the real
+item. `_nameKnown` therefore gates only the *tooltip content*, never the
+collider or the highlight. (The decision rationale is in `conventions.md § UI
+Code Conventions`.)
+
+### Per-frame highlight (mechanism)
+
+The highlight is driven each frame from the row's `LateUpdate`:
+
+```
+show = (Manager.ui.currentSelectedUIElement == this) && PointerInViewport();
+if (highlight.enabled != show) highlight.enabled = show;   // idempotent guard
+```
+
+Driving it per-frame (rather than from `OnSelected`/`OnDeselected`) clears the
+highlight the instant the cursor leaves the row — a one-shot deselect can be
+skipped when the cursor moves straight onto an overlay without a selection
+change. `PointerInViewport()` is the viewport gate (see `gotchas.md § Item Rows &
+Hover`).
+
 ## Pet-Skin Collection (Iter-16.1)
 
 A design-level summary of the per-skin pet collection feature. The deep CK data
@@ -1303,9 +1396,12 @@ Item Browser renders item icons through CK's native `SlotUIBase` /
 ItemChecklist is a raw-`SpriteRenderer` column list (not a slot grid), so it
 cannot reuse `SlotUIBase` wholesale — the gradient is applied by a **surgical
 per-skin material swap** instead (see `ui/PetSkinIcon.cs` and
-`docs/gotchas.md § Gradient-recolor shader`). The trade-off is logged as Iter-22:
-porting the list onto `SlotUIBase` would deliver row-hover tooltips and the
-gradient together.
+`docs/gotchas.md § Gradient-recolor shader`). Iter-22 later added row-hover
+tooltips **without** porting the list onto `SlotUIBase`: it kept the
+raw-`SpriteRenderer` rows and drove CK's native tooltip from one shared
+`TooltipSlot : SlotUIBase` helper the rows delegate to (see § Row-Hover Tooltips
+(Iter-22)) — so the gradient material-swap and the tooltips coexist, neither
+needing the full slot-grid port.
 
 ## Runtime Glyph Injection (Iter-25)
 

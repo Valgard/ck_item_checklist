@@ -400,6 +400,15 @@ the panel → invisible. Set Sorting Layer = GUI + an appropriate Order (header
 controls ~50–54). Distinct from the material trap above — they often co-occur on
 hand-authored renderers and must both be fixed.
 
+**Recurs on Editor-authored prefab children too (Iter-22).** Not just runtime
+`AddComponent`: an **Editor-authored** prefab child can also come back on Sorting
+Layer "Default". Iter-22's `HoverHighlight` SpriteRenderer (authored in the
+prefab) had `m_SortingLayerID: 0` while the row renderers are GUI — so it would
+render behind the row content and outside the GUI 40..55 mask band. Note the two
+distinct "layer" axes: the GameObject's Unity **tag-layer** (5 / "UI", which was
+correct) is separate from the sprite **sorting layer** (must be GUID
+`1241602095` / "GUI"). Setting one does not set the other — check both.
+
 ### Caret scale: white_pixel is 1×1 px @ PPU 16 → scale UP, not down (SUPERSEDED — historical lore)
 
 > **Superseded since Iter-12.** The caret no longer uses `white_pixel`: Iter-12
@@ -853,6 +862,12 @@ whole checkbox is invisible (an inactive parent also hides its fill child), even
 though sprite/material/layer/scale are all correct. Naming trap: the box GO is
 named `Checkmark`, not the tick.
 
+**Same trap class, inverse direction (Iter-22):** for a code-driven hover
+highlight, toggle the **`SpriteRenderer.enabled`**, keep the **GameObject
+active** (`m_IsActive: 1`). The `LateUpdate` flips `highlight.enabled`; if the GO
+were inactive, `LateUpdate` would never run to turn it on. `ItemRow.Bind` resets
+`highlight.enabled = false` on recycle so a pooled row carries no stuck highlight.
+
 ### "My fix doesn't show in-game" → compare mtimes before blaming caches
 When an external edit (YAML/meta written outside the Editor) doesn't appear in
 the build, the first check is **not** AssetDatabase cache or symlink theories —
@@ -1062,6 +1077,56 @@ Conventions`. Iter-16.1 added two cwd/log traps on top of those:
   is covered in `docs/conventions.md § Worktree Conventions`: build via
   `direnv exec "$WT" bash -c '…'`, which walks the real `source_up` chain
   (worktree → mod → parent).
+
+## Item Rows & Hover (Iter-22)
+
+### Full-row colliders leak hover past the visible viewport
+The row hover collider spans the **full row width** (28.15); pooled buffer rows
+(+4) and the partially-clipped bottom row extend **under** the window
+`ContentsMask` into the header / footer / side margins. A SpriteMask clips the
+**sprite**, NOT the **collider** — so a cursor sitting in the header/footer over
+empty chrome still raycast-hits a clipped row behind it and fires a phantom
+tooltip + highlight. Fix: gate **all four** hover overrides **and** the per-frame
+`LateUpdate` highlight on `ItemChecklistContent.PointerInViewport()` — a static
+cursor-world-pos vs cached `ContentsMask` world-bounds check (mirrors
+`PopupWidget.PointerOverPanel`; the orthographic UI-camera world read of
+`§ Popup Scroll & Collapse`). A SpriteMask never constrains hover; the viewport
+gate must be explicit.
+
+### The "popup leak" was a FALSE alarm — do not re-add the guard
+Concern: an open Sort/Filter popup overlaying the list lets a full-width row
+collider behind it leak a tooltip. In-game proved there is **no leak** — the
+popup's own elements (closer in the 3D raycast) take the selection, so the
+closest-collider arbitration already handles the overlap. A
+`PopupWidget.PointerOverOpenPopup` guard was built for this, then **reverted**
+entirely. Do **not** re-add it: the raycast distance ordering is the mechanism,
+and a redundant bounds guard is dead weight.
+
+### Pet-skin tooltips: `ckVariation` must be 0, not `skinIndex`
+`ItemRow.Bind`'s `skinIndex` param is a **skin selector**, not a CK variation —
+pets always sit at CK variation 0 (`SaveManager.SetObjectAsDiscovered` force-zeroes
+it; see `§ Pet Skins`). The tooltip helper must be fed
+`ckVariation = isPetSkin ? 0 : skinIndex`; passing `skinIndex` builds an
+**unresolvable** `ObjectDataCD` (CK finds the wrong object / empty tooltip).
+Verified in-game on `Eulux (Skin 3)`.
+
+### An Editor-only authoring aid must be force-disabled at runtime
+The per-row `ContentMask` SpriteMask is an **Editor authoring aid** (it previews
+the per-row clip in the prefab) but is **unwanted at runtime** — the window's
+own `ContentsMask` does the real clipping. So it can be left **enabled in the
+prefab** for Editor convenience and **force-disabled per row at runtime** in
+`EnsurePool`, right after `Instantiate`. Reusable pattern: "Editor-aid component,
+left on in the prefab, force off at runtime."
+
+### CK's tooltip localiser does NOT see mod localization terms
+Real-item tooltips localize fine because the four hover virtuals return **raw CK
+loc keys** (e.g. `Items/AncientCoin`) that CK's own localiser resolves. A
+**mod-authored** term (the `??? - not yet discovered` placeholder) is invisible
+to that localiser, so the mod must resolve its OWN term first — `Loc.T` →
+`API.Localization.GetLocalizedTerm` — and pass the **already-resolved** string
+with `dontLocalize` set, or the tooltip shows the raw term key. (The placeholder
+strings are ASCII-only — `-`, not `—` — per the no-em-dash / no-ellipsis yaml
+rule in `§ PugFont.Render crashes` under Localisation (Iter-11).)
 
 ## Font / Glyphs (Iter-25)
 

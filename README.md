@@ -18,6 +18,10 @@ Discovery is tracked **per world × per player**.
   (carried + base storage/display); the checkbox tints **blue** when owned ≥ 1,
   with an "in / not in possession" filter. Spoiler-safe: undiscovered (`???`) rows
   never reveal possession.
+- **Row-hover tooltips** — hover a row for Core Keeper's native item tooltip
+  (name / description / stats) and an inventory-slot hover highlight. Discovered
+  rows show the full tooltip; undiscovered rows highlight but show only a minimal
+  `??? - not yet discovered` — no spoilers.
 - **Sort** by name, rarity, level or value (ascending/descending).
 - **Faceted filter** — discovery, category, rarity and craftability
   (multi-select; OR within a dimension, AND across dimensions). The filter popup

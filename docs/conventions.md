@@ -229,6 +229,17 @@ discipline as the throwaway scaffold above — it never reaches a story commit.
 sandbox-banned member would `CompileFailed` the whole mod, so confirm the
 member is sandbox-safe in the decompiled DLL before adding the log.
 
+### Spike + counter-probe — a single positive case can be ambiguous
+
+A spike that proves a mechanism "works" on **one** sample can be lying by
+omission when that sample is a degenerate case. Iter-22's `GetHoverStats` spike
+on a coin (a stat-**less** item, `statLines = -1`) returned empty stats —
+indistinguishable from "the call is broken." Adding a stat-**bearing**
+counter-probe (a Copper Sword, `statLines = 2`) proved the path returns stats
+*systematically*, not by accident. Rule: when a spike's positive result could
+also be produced by a no-op, add a counter-probe whose expected output **differs**
+before claiming the mechanism works (the Iter-21-probe two-detector precedent).
+
 **Recovery:** if Core Keeper hangs on the loading screen (quit-deadlock in
 `ModManager` — symptom: `Exit blocked by ModManager` in Player.log), use:
 
@@ -310,6 +321,7 @@ unity/ItemChecklist/
     FilterCheckboxButton.cs       filter checkbox row button (Iter-10, renamed Iter-14.2)
     SectionHeaderButton.cs        clickable filter section header — collapse/expand (Iter-24)
     PetSkinIcon.cs                gradient skin-icon material (Amplify/UISpriteColorReplace) (Iter-16.1)
+    TooltipSlot.cs                shared SlotUIBase helper feeding CK native tooltips for rows (Iter-22)
   possession/                     possession scan/ledger/persist package (Iter-20)
     PossessionScanner.cs          live ECS scan: carried + clustered-base storage
     PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes
@@ -407,6 +419,33 @@ the value that triggers CK's word-wrap crash (see `docs/gotchas.md § Search Fie
 Header`). `Awake` is the right hook (not `LateUpdate`) when the correction must hold
 before the first render and nothing rewrites the value per frame.
 
+**Spoiler-gate the content, not the interaction (Iter-22).** When a hover/select
+control must stay interactive on an undiscovered (`???`) row but must not leak the
+item, gate the **payload** (the tooltip text in the four hover overrides), not the
+**collider**. Keep the collider always enabled so every row — including `???` —
+still hover-**highlights** (the highlight reveals nothing → spoiler-safe), and
+return a minimal localized placeholder (`??? - not yet discovered`) for
+undiscovered rows instead of the real item. Mechanism in `docs/architecture.md
+§ Row-Hover Tooltips`.
+
+**Drive transient hover/selection visuals per-frame in `LateUpdate`, not the
+one-shot `OnSelected`/`OnDeselected` (Iter-22).** A highlight set from
+`OnSelected` and cleared from `OnDeselected` can leave a **stuck** highlight: the
+cursor can move onto an overlay without firing a selection change, so the deselect
+is skipped. Recompute the visual every frame instead
+(`highlight = selected && PointerInViewport()`), with an idempotent
+`if (highlight.enabled != show)` guard. `UIelement.LateUpdate` is `protected
+virtual`, so it is safely overridable (call `base.LateUpdate()` as the base
+contract requires).
+
+**Match the exact CK virtual signature before overriding — grep the decompile
+first (Iter-22).** A CK override must mirror the base signature *exactly* (e.g.
+`UIelement.OnDeselected(bool playEffect = true)`, `GetHoverStats(bool)`); a
+near-miss compiles as a *new* method and the override silently never binds, or
+`CS0115` ("no suitable method found to override"). Confirm the signature against
+the decompiled DLL before writing the override — a grep is cheaper than a failed
+build. (Extends the standing "mirror CK internals, don't approximate" maxim.)
+
 ## Input / Keybind Conventions
 
 **One toggle, one mechanism — the rebindable Rewired action is the sole trigger.**
@@ -423,6 +462,26 @@ works, yet old F1 keeps opening too). Iter-23 removed exactly such a raw fallbac
 misdirect diagnosis`.
 
 ## Prefab Authoring Conventions
+
+**Runtime-`AddComponent` vs. prefab-author — by whether the component needs
+calibration (Iter-22).** An **invisible, no-calibration** component (a hover
+`BoxCollider`: no size-tuning, no sorting, no 9-slice) is fine to `AddComponent`
+at runtime — and doing so **avoids** the silent-fail traps of prefab-wiring a
+component (a `fileID 0` serialized ref, a missing `m_Script`, a renamed field key
+deserializing to null). A **visible** component that needs size / sorting-layer /
+9-slice tuning (the hover `SpriteRenderer` highlight) must be **authored in the
+prefab** for Editor control. **But consistency can override the split:** once the
+prefab is already open to author the visible part, move the invisible collider in
+too rather than split one feature across both worlds — Iter-22 ended with **both**
+the highlight and the collider prefab-authored.
+
+**A CK *runtime* asset cannot be referenced by a mod prefab (Iter-22).** A
+serialized field on a mod prefab can only point at assets **in the mod's
+AssetBundle**. A CK runtime asset — e.g.
+`Manager.ui.GetCraftingUITheme(...).slotHoverSprite` (the inventory-slot hover
+sprite) — is not in the bundle, so a prefab ref to it bundles broken / null.
+Either assign it at **runtime** from `Manager.ui` (sandbox-safe) or supply your
+**own** sprite in the bundle. Iter-22 supplied its own highlight sprite.
 
 **Abstract MonoBehaviour bases are prefab-neutral — a named exception to the
 one-MonoBehaviour-per-file / `fileID 11500000` rule.** Unity serialises inherited
