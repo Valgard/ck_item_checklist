@@ -17,7 +17,9 @@ namespace ItemChecklist.UI
     public sealed class ItemListViewModel
     {
         private readonly ItemCatalog catalog;
-        private readonly DiscoveredState state;
+        // Iter-16.4: the discovery dimension now reads ItemChecklistMod.IsCollected (the
+        // pet-skin-aware chokepoint, symmetric to the OwnedCount call below) instead of an
+        // injected DiscoveredState — so no DiscoveredState field is held here anymore.
 
         // In-memory per-session sort state (static: survives re-bake; resets on
         // process restart). Default: Name, ascending.
@@ -41,10 +43,9 @@ namespace ItemChecklist.UI
 
         public event Action OnResultsChanged;
 
-        public ItemListViewModel(ItemCatalog catalog, DiscoveredState state)
+        public ItemListViewModel(ItemCatalog catalog)
         {
             this.catalog = catalog;
-            this.state = state;
             Recompute();
         }
 
@@ -119,7 +120,11 @@ namespace ItemChecklist.UI
             for (int i = 0; i < catalog.Count; i++)
             {
                 var e = catalog.GetByIndex(i);
-                bool isDisc = state.IsDiscovered(e.ObjectId, e.Variation);
+                // Iter-16.4: route through the collected chokepoint, not raw
+                // state.IsDiscovered — CK force-zeroes pet variation, so a collected
+                // pet skin (skinIndex in e.Variation) would test as undiscovered here,
+                // hiding it from the Discovered filter and under-counting "· N shown".
+                bool isDisc = ItemChecklistMod.IsCollected(e.ObjectId, e.Variation);
 
                 if (s_discovery.Count > 0 && !s_discovery.Contains(isDisc)) continue;
                 if (s_rarity.Count   > 0 && !s_rarity.Contains(e.Rarity))   continue;

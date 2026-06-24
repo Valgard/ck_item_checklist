@@ -78,6 +78,61 @@ namespace ItemChecklist
                 : 0;
         }
 
+        // Iter-16.4: the discovery twin of OwnedCount — the single "is this catalog
+        // row complete / ticked?" predicate. Normal/critter rows: CK's DiscoveredState
+        // (one row each). Pet-skin rows: PetCollection.IsCollected — CK force-zeroes pet
+        // variation in SetObjectAsDiscovered, so DiscoveredState is blind to skins and
+        // every collected skin would otherwise test as undiscovered. This is exactly the
+        // ItemRow `showDetails` flag (the checkbox tick), routed through one place so the
+        // Discovery filter, the in-view count, and the N/M numerator cannot drift from
+        // the per-row tick (the Iter-21 chokepoint lesson). `variation` carries the
+        // skinIndex for pet entries. Safe default (false) before the snapshot loads.
+        internal static bool IsCollected(int objectId, int variation)
+        {
+            if (Catalog != null && Catalog.IsPetSkinEntry(objectId, variation))
+                return Pets != null && Pets.IsCollected(objectId, variation);
+
+            var disc = DiscoveredState.Instance;
+            return disc != null && disc.IsDiscovered(objectId, variation);
+        }
+
+        // Iter-16.4: the N/M numerator — how many catalog rows are collected. Replaces
+        // DiscoveredState.Count, which counts each pet SPECIES once (variation force-zeroed)
+        // while M = catalog.Count counts every skin row, making 100% unreachable. Counted
+        // over the catalog through IsCollected so it stays consistent with the per-row tick
+        // and the Discovery filter. O(catalog) but called only on discovery-change / bake /
+        // collection-change refreshes, never per frame.
+        internal static int CollectedCatalogCount()
+        {
+            var cat = Catalog;
+            if (cat == null) return 0;
+            int n = 0;
+            for (int i = 0; i < cat.Count; i++)
+            {
+                var e = cat.GetByIndex(i);
+                if (IsCollected(e.ObjectId, e.Variation)) n++;
+            }
+            return n;
+        }
+
+        // Iter-16.4: last collected-catalog tally pushed to the always-on HUD, so a newly
+        // collected pet skin (which fires NO DiscoveredState.Changed — CK has no per-skin
+        // discovery event) still updates the HUD counter live. The window self-heals on its
+        // own (it rescans + RenderStatus on every open); only the always-on HUD needs this
+        // nudge. -1 = "unknown" so the first scan always refreshes.
+        private static int s_lastHudCollected = -1;
+
+        // Iter-16.4: re-render the always-on HUD counter only when the collected tally
+        // actually changed — PugText.Render rebuilds glyph SpriteRenderers, so the 3s
+        // possession poll must not churn it every tick.
+        private static void RefreshHudCounterIfChanged()
+        {
+            int collected = CollectedCatalogCount();
+            if (collected == s_lastHudCollected) return;
+            s_lastHudCollected = collected;
+            ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
+        }
+
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
         private const float PossessionRefreshSeconds = 3f;
@@ -208,6 +263,9 @@ namespace ItemChecklist
                     _possessionTimer = PossessionRefreshSeconds;
                     bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
                     Possession = PossessionScanner.Scan(s_ledger, Pets, PossessionConfig.AnchorRadius, allowPrune);
+                    // A scan may have newly collected a pet skin (no DiscoveredState.Changed
+                    // fires for that — CK has no per-skin discovery event), so nudge the HUD.
+                    RefreshHudCounterIfChanged();
                 }
             }
             else

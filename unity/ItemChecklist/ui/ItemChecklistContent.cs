@@ -231,19 +231,13 @@ namespace ItemChecklist.UI
                     entry.Rarity, useDefaultColorForCommon: true, defaultColor: _defaultLabelColor);
                 // Iter-16.1: pet skins decouple name (species discovered, CK var-0) from
                 // detail/icon (this skin collected, mod ledger); normal items use the same
-                // discovered flag for both.
-                bool nameKnown, showDetails;
-                if (entry.IsPetSkin)
-                {
-                    nameKnown = state.IsDiscovered(entry.ObjectId, 0);
-                    var pets = ItemChecklistMod.Pets;
-                    showDetails = pets != null && pets.IsCollected(entry.ObjectId, entry.Variation);
-                }
-                else
-                {
-                    nameKnown = state.IsDiscovered(entry.ObjectId, entry.Variation);
-                    showDetails = nameKnown;
-                }
+                // discovered flag for both. nameKnown gates only the ???/tooltip; the
+                // "collected" detail flag (Iter-16.4) routes through the shared chokepoint
+                // so the row tick, the Discovery filter, and the N/M counter cannot drift.
+                bool nameKnown = entry.IsPetSkin
+                    ? state.IsDiscovered(entry.ObjectId, 0)
+                    : state.IsDiscovered(entry.ObjectId, entry.Variation);
+                bool showDetails = ItemChecklistMod.IsCollected(entry.ObjectId, entry.Variation);
                 int owned = ItemChecklistMod.OwnedCount(entry.ObjectId, entry.Variation);
                 row.Bind(entry.ObjectId, entry.Icon, entry.DisplayName, nameKnown, showDetails,
                     rarityColor, entry.Rarity, entry.Level, entry.SellValue,

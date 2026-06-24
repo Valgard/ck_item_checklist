@@ -70,7 +70,10 @@ namespace ItemChecklist.UI
             if (counterText == null) return;
             var catalog = ItemChecklistMod.Catalog;
             int total = (catalog == null) ? 0 : catalog.Count;
-            counterText.Render(ProgressFormat.Counter(DiscoveredState.Instance.Count, total));
+            // Iter-16.4: numerator = collected catalog rows (pet skins included), not
+            // DiscoveredState.Count which is skin-blind → never reaches 100%. Mirrors the
+            // window footer (ProgressFormat keeps the two strings identical).
+            counterText.Render(ProgressFormat.Counter(ItemChecklistMod.CollectedCatalogCount(), total));
         }
     }
 }
