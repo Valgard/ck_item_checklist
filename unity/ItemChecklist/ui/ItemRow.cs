@@ -30,6 +30,18 @@ namespace ItemChecklist.UI
 
         public void SetTooltipHelper(TooltipSlot helper) => _tooltip = helper;
 
+        // Iter-22: a 3D collider on the row root (where this UIelement lives, so CK's
+        // UIMouse GetComponent<UIelement>() resolves to it) lets UIMouse's
+        // Physics.Raycast (UILayerMask) hover-select the row. Authored in the prefab,
+        // always enabled — every row is hoverable (so the highlight shows on all rows);
+        // the tooltip, not the collider, is discovery-gated (in the hover overrides).
+        public BoxCollider hoverCollider;
+
+        // Iter-22: hover highlight — a SpriteRenderer child fully authored in the prefab
+        // (sprite + size + sorting + 9-slice + position, all Editor-owned). Code only
+        // toggles its visibility on select/deselect; it never touches the sprite.
+        public SpriteRenderer highlight;
+
         // Ancient Coin icon, resolved once from the game database and shared by
         // every row (the coin shown beside sell values).
         private static Sprite s_coinSprite;
@@ -148,11 +160,19 @@ namespace ItemChecklist.UI
             _objectId = objectId;
             _ckVariation = isPetSkin ? 0 : skinIndex;
             _nameKnown = nameKnown;
+
+            // Iter-22: every row is hover-selectable (collider always enabled) so the
+            // highlight appears on all rows. The TOOLTIP is gated on discovery in the
+            // four hover overrides instead — ??? rows highlight but show no tooltip
+            // (spoiler-safe, since the highlight reveals nothing). Reset the highlight
+            // off on each recycle.
+            if (hoverCollider != null) hoverCollider.enabled = true;
+            if (highlight != null) highlight.enabled = false;
         }
 
-        // Iter-22 — native CK tooltip. UIMouse selects this row (when its collider
-        // is hit) and calls these. Gate on _nameKnown so undiscovered rows leak
-        // nothing (belt-and-braces: Task 3 also disables the collider when !_nameKnown).
+        // Iter-22 — native CK tooltip. UIMouse selects this row (collider always on)
+        // and calls these. Gate on _nameKnown so undiscovered rows show NO tooltip —
+        // the highlight still appears (spoiler-safe, it reveals nothing).
         public override ContainedObjectsBuffer GetContainedObject()
         {
             if (!_nameKnown || _tooltip == null) return default;
@@ -162,14 +182,35 @@ namespace ItemChecklist.UI
 
         public override TextAndFormatFields GetHoverTitle()
         {
-            if (!_nameKnown || _tooltip == null) return null;
+            // Undiscovered: a minimal placeholder title only — no description/stats/icon
+            // (those overrides stay gated), so the row hovers + shows "??? - not yet
+            // discovered" without leaking the item. Resolve our term ourselves (CK's
+            // tooltip localiser doesn't see mod terms) and pass it dontLocalize.
+            if (!_nameKnown)
+                return new TextAndFormatFields
+                {
+                    text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscovered"),
+                    dontLocalize = true,
+                };
+            if (_tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.TitleFor();
         }
 
         public override List<TextAndFormatFields> GetHoverDescription()
         {
-            if (!_nameKnown || _tooltip == null) return null;
+            // Undiscovered: a small hint line under the placeholder title (still no real
+            // item info). Resolved via our term, passed dontLocalize.
+            if (!_nameKnown)
+                return new List<TextAndFormatFields>
+                {
+                    new TextAndFormatFields
+                    {
+                        text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscoveredDesc"),
+                        dontLocalize = true,
+                    },
+                };
+            if (_tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.DescriptionFor();
         }
@@ -179,6 +220,21 @@ namespace ItemChecklist.UI
             if (!_nameKnown || _tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.StatsFor();
+        }
+
+        // Iter-22: CK calls these when this row becomes / stops being the selected
+        // UIelement. The highlight shows for EVERY row (discovered or not) — only the
+        // tooltip is discovery-gated (in the hover overrides above).
+        public override void OnSelected()
+        {
+            base.OnSelected();
+            if (highlight != null) highlight.enabled = true;
+        }
+
+        public override void OnDeselected(bool playEffect = true)
+        {
+            base.OnDeselected(playEffect);
+            if (highlight != null) highlight.enabled = false;
         }
     }
 }

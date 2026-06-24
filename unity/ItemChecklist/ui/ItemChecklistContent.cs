@@ -44,7 +44,6 @@ namespace ItemChecklist.UI
         private UIScrollWindow _scrollWindow;
         private int _count;            // reported entry count (catalog.Count)
         private int _lastFirstIndex = -1;
-        private bool _iter22SpikeDone;   // ITER-22 SPIKE (temporary; removed in Task 3)
         private TooltipSlot _tooltipHelper;   // Iter-22: one shared hover-data helper
 
         // Iter-6: the label's prefab default colour, used for Common/Poor names
@@ -108,6 +107,12 @@ namespace ItemChecklist.UI
             for (int k = _pool.Count; k < target; k++)
             {
                 var go = Object.Instantiate(_rowPrefab, transform);
+                // Iter-22: the per-row ContentMask is an Editor-only authoring aid (turn
+                // it on to preview clipping while editing the prefab); force it off at
+                // runtime so it can be left enabled in the prefab without affecting the
+                // game. The window's ContentsMask does the real clipping.
+                var editorMask = go.transform.Find("ContentMask");
+                if (editorMask != null) editorMask.gameObject.SetActive(false);
                 _pool.Add(go.GetComponent<ItemRow>());
             }
             if (!_defaultLabelColorCaptured && _pool.Count > 0
@@ -130,21 +135,6 @@ namespace ItemChecklist.UI
             }
             foreach (var row in _pool)
                 if (row != null) row.SetTooltipHelper(_tooltipHelper);
-
-            // --- ITER-22 SPIKE v2 (temporary; removed in Task 3) ---
-            // Exercise a real row's overrides (not hover-driven yet — no collider until
-            // Task 3): simulate a discovered Copper Sword row and read its four virtuals.
-            if (!_iter22SpikeDone && _pool.Count > 0 && _pool[0] != null)
-            {
-                _iter22SpikeDone = true;
-                var r = _pool[0];
-                r.Bind((int)ObjectID.CopperSword, null, "Copper Sword", true, true,
-                       Color.white, Rarity.Common, 0, 0, 0, false, 0);
-                Debug.Log($"[ItemChecklist] ITER-22 SPIKE2 title='{r.GetHoverTitle()?.text}' " +
-                          $"descLines={(r.GetHoverDescription()?.Count ?? -1)} " +
-                          $"statLines={(r.GetHoverStats(false)?.Count ?? -1)} " +
-                          $"obj={r.GetContainedObject().objectData.objectID}");
-            }
         }
 
         private int ComputePoolSize()

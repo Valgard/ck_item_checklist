@@ -20,6 +20,14 @@ ItemChecklist-General:
     hint: "Pet skin row suffix. {0} = 1-based skin number."
     en: "(Skin {0})"
     de: "(Skin {0})"
+  HoverUndiscovered:
+    hint: "Hover tooltip title for an undiscovered (???) row. ASCII only (no em-dash)."
+    en: "??? - not yet discovered"
+    de: "??? - noch nicht entdeckt"
+  HoverUndiscoveredDesc:
+    hint: "Hover tooltip description line for an undiscovered (???) row. ASCII only."
+    en: "Discover this item to reveal its details."
+    de: "Entdecke dieses Item, um seine Details zu sehen."
 ItemChecklist-Sorters:
   Name:   { en: "Name",   de: "Name" }
   Rarity: { en: "Rarity", de: "Seltenheit" }
