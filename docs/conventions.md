@@ -269,6 +269,20 @@ and mis-flagged real IDs as gaps). Discipline:
 The size-delta is the trip-wire; the enumeration + live play is the resolver.
 Catalog-specific application of the global `verify-empirically` rule.
 
+### Identity-equal common path → focus in-game verification on the one edge case
+
+When a fix re-routes many call-sites through a new helper, design the helper so the
+**common path is byte-for-byte unchanged**, then verification only has to exercise the
+genuinely new branch. Iter-16.4 routed four aggregate read-sites through
+`ItemChecklistMod.IsCollected`, defined so that for non-pet rows `IsCollected ≡
+DiscoveredState.IsDiscovered` — so the ~10,885 normal/critter rows render identically and
+**only** pet-skin rows change behaviour. That collapsed the in-game test to the single
+edge case worth checking: a *collected skin of an already-discovered species*
+(`skinIndex > 0`), the exact state CK zeroes in `DiscoveredState`. An identity-equal
+common path is also a cheap correctness argument (no regression possible where the code
+is unchanged), and it pairs with the size-delta trip-wire above: a stable common path
+plus a measured edge-case delta is a strong, low-effort verification.
+
 ## File Layout
 
 Canonical layout under `unity/ItemChecklist/` (source of truth is the git

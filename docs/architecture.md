@@ -1163,10 +1163,22 @@ NOT suppress a load screen (Iter-11.6)`.
 ### Content
 Icon = `ui_slot_toggled_border` box + `ui_icon_requirement` tick (0.7 scale, a
 child `IconFill`), the discovered-row checkbox look. Text = a `PugText` rendering
-`ProgressFormat.Counter(discovered, total)` — the same shared helper the window
-footer (`FormatTitle`) uses, so the two never drift. Re-rendered on
-`DiscoveredState.Changed` and after each bake (world-load + loc-change hooks),
-never per frame (`PugText.Render` rebuilds glyph SpriteRenderers).
+`ProgressFormat.Counter(ItemChecklistMod.CollectedCatalogCount(), total)` — the same
+shared helper the window footer (`FormatTitle`) uses, so the two never drift. The
+numerator is the **collected catalog tally** (Iter-16.4), not `DiscoveredState.Count`,
+which counts each pet species once against an `M` that counts every skin row (so 100%
+was unreachable). Re-rendered on `DiscoveredState.Changed` and after each bake
+(world-load + loc-change hooks), never per frame (`PugText.Render` rebuilds glyph
+SpriteRenderers).
+
+**Pet-skin live refresh (Iter-16.4).** Collecting a new pet skin fires **no**
+`DiscoveredState.Changed` (CK has no per-skin discovery event), so the two `Changed`/bake
+triggers above would leave the always-on HUD stale until the next ordinary discovery or
+world reload. `ItemChecklistMod.RefreshHudCounterIfChanged()` runs after each throttled
+`PossessionScanner.Scan` (the moment a skin becomes collected) and re-renders the HUD —
+**change-gated** on a cached tally (`s_lastHudCollected`) so the 3 s poll doesn't churn
+`PugText.Render`. The modal window needs no such nudge: it rescans + `RenderStatus` on
+every open.
 
 ## Possession (Iter-20) + Discovery Gate (Iter-21)
 
@@ -1224,6 +1236,34 @@ construction. It gates on the **same** discovered flag that drives `???`-vs-name
 > variation-keyed-discovery case — a family discovered only at a non-0 variation
 > would still render `???` because the row checks `IsDiscovered(objectId, 0)` — is a
 > separate concern deferred to **Iter-17** (per-variation tracking).
+
+### Two symmetric chokepoints — never read raw `DiscoveredState` for an aggregate (Iter-16.4)
+
+`DiscoveredState` is **skin-blind**: CK force-zeroes pet variation in
+`SaveManager.SetObjectAsDiscovered`, so a collected `(petId, skinIndex > 0)` never
+lands in it. Any aggregate that asks "is this catalog row owned / discovered /
+collected?" by reading `DiscoveredState` directly therefore mis-handles every pet-skin
+row. The mod resolves this with **two symmetric chokepoints on `ItemChecklistMod`**,
+both pet-skin-aware:
+
+| Chokepoint | Axis | Pet-skin branch | Else |
+|---|---|---|---|
+| `OwnedCount(objectId, variation)` | possession (Iter-21) | `PetCollection.IsCollected` → `PossessionView.CountSkin` | `DiscoveredState.IsDiscovered` → `Possession.Count` |
+| `IsCollected(objectId, variation)` | discovery / "row ticked" (Iter-16.4) | `PetCollection.IsCollected` | `DiscoveredState.IsDiscovered` |
+
+`IsCollected` **is** the `ItemRow.showDetails` flag (the checkbox tick), and
+`CollectedCatalogCount()` is its catalog-wide tally (the `N` numerator). Four aggregate
+read-sites route through them so they can never drift from the per-row tick: the
+Discovery filter + `DiscoveredInView` (`ItemListViewModel.Recompute`), the window footer
+`N / M` (`ItemChecklistWindow.FormatTitle`), the HUD `N / M` (`ItemChecklistHud.Refresh`,
+which replaced `DiscoveredState.Count`), and the `ItemChecklistContent` `showDetails`
+branch.
+
+> **Standing rule:** every aggregate "discovered / collected / owned" query MUST go
+> through `IsCollected` / `OwnedCount` (or `CollectedCatalogCount` for the count), **never
+> raw `DiscoveredState`** — otherwise the skin-blindness bug reappears at the new site
+> (exactly what Iter-16.4 fixed across four sites). For non-pet rows `IsCollected ≡
+> DiscoveredState.IsDiscovered`, so the common path is unchanged.
 
 ## Row-Hover Tooltips (Iter-22)
 

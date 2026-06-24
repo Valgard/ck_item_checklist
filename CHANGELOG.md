@@ -6,6 +6,26 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [Unreleased]
+
+### Added
+
+- **Row-hover tooltips.** Hovering a checklist row now shows Core Keeper's native
+  item tooltip (name / description / stats) plus an inventory-slot hover highlight.
+  Spoiler-safe: a discovered row shows the full tooltip, while an undiscovered
+  (`???`) row only highlights and shows a short "not yet discovered" placeholder —
+  never the real item.
+- **Correct accented text in the small UI font.** The dropdown, header and footer
+  labels now render German umlauts and other accents correctly at the small chrome
+  font size (some accented characters previously fell back to a mismatched font and
+  looked deformed).
+
+### Fixed
+
+- The **Discovered / Undiscovered** filter and the `N / M` discovery counter (window
+  footer and HUD) now account for per-skin pet collection, so collected pet skins are
+  shown under "Discovered" and count toward 100%.
+
 ## [0.10.0] - 2026-06-22
 
 ### Added
