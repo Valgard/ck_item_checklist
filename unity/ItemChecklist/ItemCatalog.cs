@@ -97,21 +97,9 @@ namespace ItemChecklist
         public bool IsPetSkinEntry(int objectId, int variation)
             => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
-        // Iter-17: cattle colours are discover-to-reveal. A species with no colour
-        // discovered yet gets ONE placeholder row at this sentinel variation, whose
-        // collected-test is IsDiscoveredAnyVariation (reachable whichever colour is
-        // found first — fixes the Iter-16.3 var0-only ??? trap). CK never discovers at -1.
-        public const int CattlePlaceholderVariation = -1;
-
-        // The cattle placeholder row (species with zero discovered colours).
-        public bool IsCattlePlaceholderEntry(int objectId, int variation)
-            => variation == CattlePlaceholderVariation
-               && TryGetEntry(objectId, variation, out var e) && e.IsCattle;
-
-        // A discovered cattle COLOUR row (not the placeholder).
+        // Iter-17: a cattle colour-slot row (drives per-colour possession routing).
         public bool IsCattleEntry(int objectId, int variation)
-            => variation != CattlePlaceholderVariation
-               && TryGetEntry(objectId, variation, out var e) && e.IsCattle;
+            => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
 
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
@@ -374,16 +362,17 @@ namespace ItemChecklist
                     }
                 }
 
-                // ─── Loop 4: per-colour cattle entries (Iter-17, discover-to-reveal) ─────
-                // Cattle colours are runtime-assigned (NOT in objectsByType) and CK
-                // discovers them per (objectID, variation). Emit one row per discovered
-                // colour, seeded from CK's native discovery snapshot (persistence is CK's,
-                // no mod ledger); a species with zero discovered colours gets one ???
-                // placeholder keyed on the sentinel variation. Sweep-confirmed (D-icon):
-                // GetObjectInfo(id, v) returns the var0 ObjectInfo for every colour
-                // (sameAs0=True) — no per-colour name/icon, so the species icon + a
-                // "(Colour v)" suffix disambiguate the rows. Level/Value em-dashed (no
-                // LevelCD / sell value), as in 16.3.
+                // ─── Loop 4: per-colour cattle entries (Iter-17, pet-style fixed slots) ──
+                // Each cattle species has a FIXED colour palette (CattleRegistry.ColoursOf,
+                // read from the authored PossibleChildVariation[] list — verified {0..4},
+                // 5 colours/species, sandbox-safe). Emit one row per colour ALWAYS — exactly
+                // like pet skins (Loop 3): the ItemChecklistContent name-gate
+                // (IsDiscoveredAnyVariation for cattle) shows the species name on EVERY slot
+                // once any colour is discovered, ??? otherwise; the per-colour collected tick
+                // routes through IsDiscovered(id, colour). No placeholder, no discover-to-
+                // reveal re-bake. Sweep-confirmed (D-icon): GetObjectInfo(id, v) falls back to
+                // var0 for every colour (no per-colour icon), so the species icon + a
+                // "(Colour v)" suffix disambiguate the slots. Level/Value em-dashed (16.3).
                 var cattleEntries = new List<Entry>();
                 var cattleDisc = DiscoveredState.Instance;
                 foreach (var od in PugDatabase.objectsByType.Keys)
@@ -402,25 +391,25 @@ namespace ItemChecklist
                     string cMod = ResolveModOrigin(od, modIdToName);
                     int cid = (int)od.objectID;
 
-                    var colours = cattleDisc != null ? cattleDisc.DiscoveredVariationsOf(cid) : new List<int>();
+                    // The species' authored colour set; fall back to {0} ∪ discovered if the
+                    // PossibleChildVariation list is ever absent (defensive — all cattle have it).
+                    var colours = new List<int>(CattleRegistry.ColoursOf(cid));
                     if (colours.Count == 0)
                     {
+                        var seen = new HashSet<int> { 0 };
+                        colours.Add(0);
+                        if (cattleDisc != null)
+                            foreach (var dv in cattleDisc.DiscoveredVariationsOf(cid))
+                                if (seen.Add(dv)) colours.Add(dv);
+                        colours.Sort();
+                    }
+                    foreach (var v in colours)
+                    {
+                        string colourName = $"{cLoc} {Loc.F("ItemChecklist-General/ColorSuffix", v)}";
                         cattleEntries.Add(new Entry(
-                            cid, CattlePlaceholderVariation, cLoc, cIcon, cMod,
+                            cid, v, colourName, cIcon, cMod,
                             cInfo.rarity, ObjectType.Creature,
                             level: 0, sellValue: 0, isCraftable: false, isPetSkin: false, isCattle: true));
-                    }
-                    else
-                    {
-                        colours.Sort();
-                        foreach (var v in colours)
-                        {
-                            string colourName = $"{cLoc} {Loc.F("ItemChecklist-General/ColorSuffix", v)}";
-                            cattleEntries.Add(new Entry(
-                                cid, v, colourName, cIcon, cMod,
-                                cInfo.rarity, ObjectType.Creature,
-                                level: 0, sellValue: 0, isCraftable: false, isPetSkin: false, isCattle: true));
-                        }
                     }
                 }
 
