@@ -162,6 +162,33 @@ namespace ItemChecklist
                 // structural baby→adult fold (BreedStateCD.babyType), before Loop 1.
                 CattleRegistry.Build();
 
+                // ITER-17 BREEDING-LIST PROBE — REMOVE BEFORE SHIPPING.
+                // Test whether ObjectPropertiesCD's PossibleChildVariation[] (prop hash
+                // 239678920, the breeding-outcome set) enumerates the species colour set.
+                // Compare to the player's DISCOVERED (caught-wild) colours per species.
+                {
+                    var pDisc = DiscoveredState.Instance;
+                    foreach (var od in PugDatabase.objectsByType.Keys)
+                    {
+                        if (od.variation != 0 || !PugDatabase.HasComponent<CattleCD>(od)) continue;
+                        if (CattleRegistry.IsBaby((int)od.objectID)) continue;
+                        int id = (int)od.objectID;
+                        bool hasProps = PugDatabase.TryGetComponent<Pug.Properties.ObjectPropertiesCD>(od, out var props);
+                        var sb = new System.Text.StringBuilder();
+                        if (hasProps && props.TryGetList(239678920,
+                                out Unity.Collections.NativeArray<BreedStateCD.PossibleChildVariation> breedList,
+                                (Unity.Collections.AllocatorManager.AllocatorHandle)Unity.Collections.Allocator.Temp))
+                        {
+                            for (int i = 0; i < breedList.Length; i++)
+                                sb.Append(breedList[i].Variation).Append('@').Append(breedList[i].AccumulatedProbability.ToString("F2")).Append(' ');
+                        }
+                        else sb.Append(hasProps ? "NO-LIST" : "NO-PROPS");
+                        var disc = pDisc != null ? pDisc.DiscoveredVariationsOf(id) : new List<int>();
+                        disc.Sort();
+                        Debug.Log($"[IC-BREED] id={id} breedList=[{sb.ToString().Trim()}] discovered=[{string.Join(",", disc)}]");
+                    }
+                }
+
                 // Pre-resolve mod-id → display-name once so the per-entry loop
                 // is a single Dictionary lookup.
                 var modIdToName = new Dictionary<long, string>();
