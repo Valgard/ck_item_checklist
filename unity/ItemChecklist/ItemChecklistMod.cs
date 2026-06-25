@@ -73,6 +73,10 @@ namespace ItemChecklist
                     : 0;
 
             var disc = DiscoveredState.Instance;
+            // Iter-17: the cattle placeholder is undiscovered by construction → 0
+            // (spoiler-gated, as today). Cattle COLOUR rows get per-colour counts in Task 6.
+            if (Catalog != null && Catalog.IsCattlePlaceholderEntry(objectId, variation))
+                return 0;
             return disc != null && disc.IsDiscovered(objectId, variation)
                 ? Possession.Count(objectId)
                 : 0;
@@ -93,7 +97,13 @@ namespace ItemChecklist
                 return Pets != null && Pets.IsCollected(objectId, variation);
 
             var disc = DiscoveredState.Instance;
-            return disc != null && disc.IsDiscovered(objectId, variation);
+            if (disc == null) return false;
+            // Iter-17: the cattle placeholder (a species with no colour discovered yet)
+            // is "collected" once ANY colour is discovered — at which point the bake
+            // replaces it with the colour row(s). Reachable whichever colour comes first.
+            if (Catalog != null && Catalog.IsCattlePlaceholderEntry(objectId, variation))
+                return disc.IsDiscoveredAnyVariation(objectId);
+            return disc.IsDiscovered(objectId, variation);
         }
 
         // Iter-16.4: the N/M numerator — how many catalog rows are collected. Replaces
@@ -204,7 +214,25 @@ namespace ItemChecklist
             Debug.Log("[ItemChecklist] Init");
             Catalog = new ItemCatalog();
             ItemCatalogLocChangeHook.Subscribe();
+            // Iter-17: a newly-discovered cattle colour has no catalog row yet
+            // (discover-to-reveal) — re-bake to seed it. Subscribed once; the handler
+            // no-ops until the catalog is baked (and for any non-cattle discovery).
+            DiscoveredState.Instance.Discovered -= OnCattleColourDiscovered;
+            DiscoveredState.Instance.Discovered += OnCattleColourDiscovered;
             // Bake() is now triggered by ItemCatalogWorldLoadHook (Plan-Task 6).
+        }
+
+        // Iter-17: re-bake when a NEW cattle colour is discovered (its row does not
+        // exist yet). Gated tight — non-cattle pickups and already-known colours never
+        // re-bake. CattleRegistry.IsCattle is valid once the first bake has run.
+        private static void OnCattleColourDiscovered(int objectId, int variation)
+        {
+            if (Catalog == null) return;
+            if (!CattleRegistry.IsCattle(objectId)) return;
+            if (Catalog.TryGetIndex(objectId, variation, out _)) return;   // already have it
+            Catalog.Bake();
+            ItemChecklist.UI.ItemChecklistWindow.Instance?.RebindRows();
+            ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
         }
 
         public void ModObjectLoaded(Object obj)
