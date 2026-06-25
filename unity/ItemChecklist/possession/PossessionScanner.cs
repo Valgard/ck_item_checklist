@@ -75,6 +75,7 @@ namespace ItemChecklist.Possession
 
             var carried = new Dictionary<int, int>();
             var petSkins = new Dictionary<long, int>();   // Iter-16.1: live per-(objectId, skinIndex)
+            var cattleColours = new Dictionary<long, int>();   // Iter-17: live per-(adultId, colourVariation)
             var liveKeys = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
@@ -124,17 +125,18 @@ namespace ItemChecklist.Possession
 
                 long key = PossessionLedger.Key(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.z));
 
-                // Iter-16.3: a live cattle animal is a Creature ECS entity (not
+                // Iter-16.3/17: a live cattle animal is a Creature ECS entity (not
                 // PlaceablePrefab), so it fails the furniture gate below. Near a clustered
-                // base anchor it is "in my pen" → count it, credited to the ADULT species
-                // (a baby calf ticks the adult). Wild animals roam far from any anchor →
-                // excluded by the WithinAnchor gate above. The owned count is spoiler-gated
-                // on discovery (ItemChecklistMod.OwnedCount), so a cattle discovered only at
-                // a non-0 variation (the variation-aware case deferred to Iter-17) shows no
-                // count regardless. Verified in-game (1.2.1.4): penned within-anchor, wild not.
+                // base anchor it is "in my pen" → count it. Iter-17: credited per
+                // (ADULT species, colour variation) so each of the species' 5 colour slots
+                // shows its own owned count (a baby calf ticks the adult at its colour). Wild
+                // animals roam far from any anchor → excluded by WithinAnchor above. The count
+                // is spoiler-gated on per-colour discovery (ItemChecklistMod.OwnedCount). Live
+                // per-colour, not "remembered" — mirrors pet skins. Verified in-game (1.2.1.4).
                 if (em.HasComponent<CattleCD>(e))
                 {
-                    AddOne(Tile(scan, key), CattleRegistry.AdultOf(id));
+                    long ck = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
+                    cattleColours[ck] = (cattleColours.TryGetValue(ck, out var cc) ? cc : 0) + 1;
                     continue;
                 }
 
@@ -182,7 +184,7 @@ namespace ItemChecklist.Possession
                         pets.MarkCollected(DiscoveredState.KeyObjectId(kv.Key), DiscoveredState.KeyVariation(kv.Key));
 
             ledger.SetCarried(carried);
-            return ledger.BuildView(liveKeys, petSkins);
+            return ledger.BuildView(liveKeys, petSkins, cattleColours);
         }
 
         // Keep only stations that have ≥1 other station within ClusterRadius — a base

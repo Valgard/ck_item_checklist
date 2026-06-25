@@ -46,6 +46,11 @@ namespace ItemChecklist.Possession
         public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins)
             => BuildView(liveKeys).WithPetSkins(petSkins);
 
+        // Iter-17: + the live per-colour cattle counts (same live-only model as pet skins).
+        public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins,
+            Dictionary<long, int> cattleColours)
+            => BuildView(liveKeys).WithPetSkins(petSkins).WithCattleColours(cattleColours);
+
         public PossessionView BuildView(HashSet<long> liveKeys)
         {
             var totals = new Dictionary<int, int>(_carried);   // carried first (always live)

@@ -73,6 +73,13 @@ namespace ItemChecklist
                     : 0;
 
             var disc = DiscoveredState.Instance;
+            // Iter-17: cattle colour slots get their OWN live owned count (per
+            // (adultId, colour)), spoiler-gated on that colour being discovered — so each of
+            // the 5 slots shows how many of THAT colour are penned/caged, not the species total.
+            if (Catalog != null && Catalog.IsCattleEntry(objectId, variation))
+                return disc != null && disc.IsDiscovered(objectId, variation)
+                    ? Possession.CountColour(objectId, variation)
+                    : 0;
             return disc != null && disc.IsDiscovered(objectId, variation)
                 ? Possession.Count(objectId)
                 : 0;
