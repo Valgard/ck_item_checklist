@@ -20,6 +20,10 @@ ItemChecklist-General:
     hint: "Pet skin row suffix. {0} = 1-based skin number."
     en: "(Skin {0})"
     de: "(Skin {0})"
+  ColorSuffix:
+    hint: "Iter-17 colour-variant row suffix (cattle colours + paintable decor). {0} = CK variation index."
+    en: "(Colour {0})"
+    de: "(Farbe {0})"
   HoverUndiscovered:
     hint: "Hover tooltip title for an undiscovered (???) row. ASCII only (no em-dash)."
     en: "??? - not yet discovered"

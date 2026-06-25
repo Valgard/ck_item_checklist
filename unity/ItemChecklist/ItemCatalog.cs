@@ -97,6 +97,22 @@ namespace ItemChecklist
         public bool IsPetSkinEntry(int objectId, int variation)
             => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
+        // Iter-17: cattle colours are discover-to-reveal. A species with no colour
+        // discovered yet gets ONE placeholder row at this sentinel variation, whose
+        // collected-test is IsDiscoveredAnyVariation (reachable whichever colour is
+        // found first — fixes the Iter-16.3 var0-only ??? trap). CK never discovers at -1.
+        public const int CattlePlaceholderVariation = -1;
+
+        // The cattle placeholder row (species with zero discovered colours).
+        public bool IsCattlePlaceholderEntry(int objectId, int variation)
+            => variation == CattlePlaceholderVariation
+               && TryGetEntry(objectId, variation, out var e) && e.IsCattle;
+
+        // A discovered cattle COLOUR row (not the placeholder).
+        public bool IsCattleEntry(int objectId, int variation)
+            => variation != CattlePlaceholderVariation
+               && TryGetEntry(objectId, variation, out var e) && e.IsCattle;
+
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
         /// <list type="bullet">
@@ -195,14 +211,12 @@ namespace ItemChecklist
                     // Critter / PlayerType — but **not** NonUsable. (Critter is relaxed
                     // back in just below for the catchable subset — see Iter-16.2.)
                     if (info.objectType == ObjectType.NonObtainable) continue;
-                    // Iter-16.3: admit the cattle subset of Creature (the CattleCD-marked
-                    // farm livestock), mirroring the Iter-16.2 Critter relaxation. Babies
-                    // (CattleRegistry: any id that is some adult's BreedStateCD.babyType)
-                    // are folded into their adult species — skip their own row. Verified
-                    // in-game (1.2.1.4): 6 adults + 6 babies, all with icons.
-                    if (info.objectType == ObjectType.Creature
-                        && !PugDatabase.HasComponent<CattleCD>(od)) continue;
-                    if (CattleRegistry.IsBaby((int)od.objectID)) continue;
+                    // Iter-17: cattle (CattleCD) are emitted per-colour by Loop 4
+                    // (discover-to-reveal), so skip the whole Creature type here — exactly
+                    // as pets (Loop 3) and cooked food (Loop 2) are re-emitted. Non-cattle
+                    // Creatures were never wanted (Iter-16.3 only ever admitted cattle from
+                    // Creature; babies, being CattleCD/Creature, are skipped here too).
+                    if (info.objectType == ObjectType.Creature) continue;
                     if (info.objectType == ObjectType.PlayerType)    continue;
 
                     // Iter-16.2: catchable critters are the EXCEPTION to the IB mirror
@@ -360,6 +374,56 @@ namespace ItemChecklist
                     }
                 }
 
+                // ─── Loop 4: per-colour cattle entries (Iter-17, discover-to-reveal) ─────
+                // Cattle colours are runtime-assigned (NOT in objectsByType) and CK
+                // discovers them per (objectID, variation). Emit one row per discovered
+                // colour, seeded from CK's native discovery snapshot (persistence is CK's,
+                // no mod ledger); a species with zero discovered colours gets one ???
+                // placeholder keyed on the sentinel variation. Sweep-confirmed (D-icon):
+                // GetObjectInfo(id, v) returns the var0 ObjectInfo for every colour
+                // (sameAs0=True) — no per-colour name/icon, so the species icon + a
+                // "(Colour v)" suffix disambiguate the rows. Level/Value em-dashed (no
+                // LevelCD / sell value), as in 16.3.
+                var cattleEntries = new List<Entry>();
+                var cattleDisc = DiscoveredState.Instance;
+                foreach (var od in PugDatabase.objectsByType.Keys)
+                {
+                    if (od.variation != 0 || !PugDatabase.HasComponent<CattleCD>(od)) continue;
+                    if (CattleRegistry.IsBaby((int)od.objectID)) continue;
+                    var cInfo = PugDatabase.GetObjectInfo(od.objectID, 0);
+                    if (cInfo == null) continue;
+
+                    var (cLoc, cDont) = ResolveOne(od, localize: true);
+                    var (cRaw, _)     = ResolveOne(od, localize: false);
+                    if (cDont && !string.IsNullOrEmpty(cRaw)) cLoc = cRaw;
+                    if (string.IsNullOrEmpty(cLoc)) cLoc = PascalCaseSplitter.Split(od.objectID.ToString());
+
+                    var cIcon = cInfo.smallIcon != null ? cInfo.smallIcon : cInfo.icon;
+                    string cMod = ResolveModOrigin(od, modIdToName);
+                    int cid = (int)od.objectID;
+
+                    var colours = cattleDisc != null ? cattleDisc.DiscoveredVariationsOf(cid) : new List<int>();
+                    if (colours.Count == 0)
+                    {
+                        cattleEntries.Add(new Entry(
+                            cid, CattlePlaceholderVariation, cLoc, cIcon, cMod,
+                            cInfo.rarity, ObjectType.Creature,
+                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: false, isCattle: true));
+                    }
+                    else
+                    {
+                        colours.Sort();
+                        foreach (var v in colours)
+                        {
+                            string colourName = $"{cLoc} {Loc.F("ItemChecklist-General/ColorSuffix", v)}";
+                            cattleEntries.Add(new Entry(
+                                cid, v, colourName, cIcon, cMod,
+                                cInfo.rarity, ObjectType.Creature,
+                                level: 0, sellValue: 0, isCraftable: false, isPetSkin: false, isCattle: true));
+                        }
+                    }
+                }
+
                 // Conflict detection: count occurrences of each localized name.
                 var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
                 foreach (var locName in localizedNames.Values)
@@ -386,6 +450,8 @@ namespace ItemChecklist
 
                 // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
                 list.AddRange(petEntries);
+                // Iter-17: cattle colour + placeholder entries (suffixed/unique names).
+                list.AddRange(cattleEntries);
 
                 entries = list
                     .OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
