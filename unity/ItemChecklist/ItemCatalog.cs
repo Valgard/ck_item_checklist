@@ -174,10 +174,20 @@ namespace ItemChecklist
 
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
-                    // Phase-1 scope: one tick per item family. Skip colour/skin
-                    // variations (variation > 0). Phase-2 may revisit if per-skin
-                    // tracking becomes desirable.
-                    if (od.variation != 0) continue;
+                    // Iter-17 Bucket 1 (curated, sweep-decided): emit DB-authored
+                    // variation≠0 rows ONLY for player-paintable objects
+                    // (PaintableObjectCD) — genuine cosmetic colour variants (decor) —
+                    // dropping state variants (chest open/closed, seed growth, destructible
+                    // damage), which carry no PaintableObjectCD. Sweep found ~395 non-0
+                    // PlaceablePrefab keys, mixed cosmetic + state-junk; this keeps the
+                    // cosmetics. Cooked food / pets / cattle are re-emitted by Loops 2/3/4
+                    // and skipped by the existing guards below.
+                    if (od.variation != 0)
+                    {
+                        if (!PugDatabase.HasComponent<PaintableObjectCD>(od)) continue;
+                        var vinfo0 = PugDatabase.GetObjectInfo(od.objectID, od.variation);
+                        if (vinfo0 == null || (vinfo0.smallIcon == null && vinfo0.icon == null)) continue; // icon-guard
+                    }
 
                     // Iter-3.7: Cooked-Food family-items (IDs in [9500,9599]) are
                     // handled by the α-enumeration loop further down — skip them here
@@ -253,6 +263,12 @@ namespace ItemChecklist
                         locText = PascalCaseSplitter.Split(od.objectID.ToString());
                     if (string.IsNullOrEmpty(rawText))
                         rawText = PascalCaseSplitter.Split(od.objectID.ToString());
+
+                    // Iter-17: a kept paintable colour variant shares the base item's name
+                    // ("Calendar" ×3) — suffix it so the slots are distinguishable (else the
+                    // conflict pass leaves identical "Calendar (Items/Calendar)" rows).
+                    if (od.variation != 0)
+                        locText = $"{locText} {Loc.F("ItemChecklist-General/ColorSuffix", od.variation)}";
 
                     long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
                     localizedNames[key]   = locText;
