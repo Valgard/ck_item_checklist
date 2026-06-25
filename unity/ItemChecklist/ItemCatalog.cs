@@ -146,55 +146,6 @@ namespace ItemChecklist
                 // structural baby→adult fold (BreedStateCD.babyType), before Loop 1.
                 CattleRegistry.Build();
 
-                // ITER-17 PROBE — REMOVE BEFORE SHIPPING.
-                {
-                    var varHist = new Dictionary<int, int>();          // objectId → distinct-variation count
-                    int nonZero = 0;
-                    foreach (var od in PugDatabase.objectsByType.Keys)
-                    {
-                        int oid = (int)od.objectID;
-                        varHist[oid] = varHist.TryGetValue(oid, out var c) ? c + 1 : 1;
-                        if (od.variation != 0)
-                        {
-                            nonZero++;
-                            var pinfo = PugDatabase.GetObjectInfo(od.objectID, od.variation);
-                            Debug.Log($"[IC-PROBE] nonzero id={oid} var={od.variation} " +
-                                $"type={pinfo?.objectType} icon={(pinfo?.smallIcon != null || pinfo?.icon != null)} " +
-                                $"dyn={pinfo?.variationIsDynamic} name={pinfo?.objectID}");
-                        }
-                    }
-                    int multi = 0; foreach (var kv in varHist) if (kv.Value > 1) multi++;
-                    Debug.Log($"[IC-PROBE] total-nonzero-keys={nonZero} objectIds-with-multi-var={multi}");
-
-                    // Cattle colour rendering + possession-variation probe (gate b).
-                    foreach (var od in PugDatabase.objectsByType.Keys)
-                    {
-                        if (od.variation != 0 || !PugDatabase.HasComponent<CattleCD>(od)) continue;
-                        if (CattleRegistry.IsBaby((int)od.objectID)) continue;
-                        var i0 = PugDatabase.GetObjectInfo(od.objectID, 0);
-                        for (int v = 0; v <= 4; v++)
-                        {
-                            var iv = PugDatabase.GetObjectInfo(od.objectID, v);
-                            bool sameAs0 = ReferenceEquals(iv, i0);
-                            Debug.Log($"[IC-PROBE] cattle id={(int)od.objectID} v={v} " +
-                                $"null={iv == null} sameAs0={sameAs0} icon={(iv?.smallIcon != null || iv?.icon != null)}");
-                        }
-                    }
-
-                    // Bucket-2 census (D-runtime): discovered (id, v≠0) with NO objectsByType row.
-                    foreach (var k in DiscoveredState.Instance.DebugKeys())
-                    {
-                        int id = DiscoveredState.KeyObjectId(k);
-                        int v  = DiscoveredState.KeyVariation(k);
-                        if (v == 0) continue;
-                        bool dbAuthored = PugDatabase.objectsByType.ContainsKey(
-                            new ObjectDataCD { objectID = (ObjectID)id, amount = 1, variation = v });
-                        if (dbAuthored) continue;
-                        bool isCattle = CattleRegistry.IsCattle(id);
-                        Debug.Log($"[IC-PROBE] runtime-var id={id} v={v} cattle={isCattle}");
-                    }
-                }
-
                 // Pre-resolve mod-id → display-name once so the per-entry loop
                 // is a single Dictionary lookup.
                 var modIdToName = new Dictionary<long, string>();
