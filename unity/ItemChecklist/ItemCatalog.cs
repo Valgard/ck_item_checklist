@@ -474,6 +474,33 @@ namespace ItemChecklist
                     keyToIndex[DiscoveredState.PackKey(entries[i].ObjectId, entries[i].Variation)] = i;
 
                 Debug.Log($"[ItemChecklist] ItemCatalog baked: {entries.Length} items");
+
+                // ITER-17 MISSING-ROW PROBE — REMOVE BEFORE SHIPPING.
+                // Every DISCOVERED (id, v) that has NO catalog row = owned/discovered but
+                // not counted (the Teppich/Boden/Wand case c). Log type + paintable + inDB
+                // to tell a filter-bug (inDB=true, wrongly dropped) from a runtime colour
+                // (inDB=false, needs generic Bucket-2 handling).
+                {
+                    var dk = DiscoveredState.Instance;
+                    int miss = 0;
+                    foreach (var k in dk.DiscoveredKeys())
+                    {
+                        int mid = DiscoveredState.KeyObjectId(k);
+                        int mv  = DiscoveredState.KeyVariation(k);
+                        if (keyToIndex.ContainsKey(k)) continue;          // has a row → fine
+                        miss++;
+                        if (miss > 60) continue;                          // bound the log
+                        var minfo = PugDatabase.GetObjectInfo((ObjectID)mid, mv);
+                        bool paint = PugDatabase.HasComponent<PaintableObjectCD>(
+                            new ObjectDataCD { objectID = (ObjectID)mid, amount = 1, variation = 0 });
+                        bool inDB = PugDatabase.objectsByType.ContainsKey(
+                            new ObjectDataCD { objectID = (ObjectID)mid, amount = 1, variation = mv });
+                        Debug.Log($"[IC-MISS] id={mid} v={mv} type={minfo?.objectType} " +
+                            $"paint={paint} inDB={inDB} name={(ObjectID)mid}");
+                    }
+                    Debug.Log($"[IC-MISS] total discovered-without-row = {miss}");
+                }
+
                 float perfTotalMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
                 UnityEngine.Debug.Log(
                     $"[ItemChecklist] PERF bake-total={perfTotalMs:F0}ms catalog-size={entries.Length}");
