@@ -234,13 +234,14 @@ namespace ItemChecklist.UI
                 // discovered flag for both. nameKnown gates only the ???/tooltip; the
                 // "collected" detail flag (Iter-16.4) routes through the shared chokepoint
                 // so the row tick, the Discovery filter, and the N/M counter cannot drift.
-                // Iter-17: cattle colour slots are species-gated like pet skins — show the
-                // species name on ALL slots once ANY colour is discovered (a cattle may be
-                // first met at a non-0 colour, so the gate is "any variation", not var 0).
-                // The per-colour collected tick still routes through IsCollected below.
+                // Iter-17: colour-variant slots (cattle colours + paintable variants) are
+                // species-gated like pet skins — show the item name on ALL slots once ANY
+                // form is discovered (a cattle may be first met at a non-0 colour; a paintable
+                // item may be found coloured before plain), so the gate is "any variation",
+                // not var 0. The per-variant collected tick still routes through IsCollected.
                 bool nameKnown = entry.IsPetSkin
                     ? state.IsDiscovered(entry.ObjectId, 0)
-                    : entry.IsCattle
+                    : entry.IsColourVariant
                         ? state.IsDiscoveredAnyVariation(entry.ObjectId)
                         : state.IsDiscovered(entry.ObjectId, entry.Variation);
                 bool showDetails = ItemChecklistMod.IsCollected(entry.ObjectId, entry.Variation);

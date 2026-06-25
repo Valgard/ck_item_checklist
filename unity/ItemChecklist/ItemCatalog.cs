@@ -55,11 +55,13 @@ namespace ItemChecklist
             public readonly bool IsCraftable;   // ObjectInfo.requiredObjectsToCraft non-empty
             public readonly bool IsPetSkin;     // Iter-16.1: pet-skin row — Variation carries skinIndex, collected via PetCollection
             public readonly bool IsCattle;      // Iter-16.3: cattle species row (drives the Cattle category + collection routing)
+            public readonly bool IsColourVariant; // Iter-17: a colour-variant slot (cattle colour OR paintable variant) — name is
+                                                  // species-gated (shown once ANY form of the item is discovered), unlike per-variation rows
 
             public Entry(int objectId, int variation, string displayName, Sprite icon,
                 string modOrigin, Rarity rarity, ObjectType objectType,
                 int level, int sellValue, bool isCraftable, bool isPetSkin = false,
-                bool isCattle = false)
+                bool isCattle = false, bool isColourVariant = false)
             {
                 ObjectId = objectId;
                 Variation = variation;
@@ -73,6 +75,7 @@ namespace ItemChecklist
                 IsCraftable = isCraftable;
                 IsPetSkin = isPetSkin;
                 IsCattle = isCattle;
+                IsColourVariant = isColourVariant;
             }
         }
 
@@ -425,7 +428,8 @@ namespace ItemChecklist
                         cattleEntries.Add(new Entry(
                             cid, v, colourName, cIcon, cMod,
                             cInfo.rarity, ObjectType.Creature,
-                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: false, isCattle: true));
+                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: false,
+                            isCattle: true, isColourVariant: true));
                     }
                 }
 
@@ -447,10 +451,13 @@ namespace ItemChecklist
                             finalName = $"{finalName} ({rawName})";
                     }
                     string modOrigin = ResolveModOrigin(od, modIdToName);
+                    // Iter-17: a paintable item (base var0 + its colour variants) is a colour
+                    // family → species-gated name reveal (all slots named once any form known).
                     list.Add(new Entry((int)od.objectID, od.variation, finalName, iconCache[key],
                         modOrigin, rarityCache[key], objectTypeCache[key],
                         levelCache[key], sellValueCache[key], craftableCache[key],
-                        isPetSkin: false, isCattle: CattleRegistry.IsCattle((int)od.objectID)));
+                        isPetSkin: false, isCattle: false,
+                        isColourVariant: PugDatabase.HasComponent<PaintableObjectCD>(od)));
                 }
 
                 // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
