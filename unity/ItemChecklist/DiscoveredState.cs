@@ -47,6 +47,8 @@ namespace ItemChecklist
         public bool IsDiscovered(int objectId, int variation) =>
             keys.Contains(PackKey(objectId, variation));
 
+        internal IEnumerable<long> DebugKeys() => keys;   // ITER-17 PROBE — REMOVE
+
         /// <summary>Raised when a single new (objectId, variation) is added.</summary>
         public event Action<int, int> Discovered;
         /// <summary>Raised after any mutation (Snapshot or AddOne).</summary>
