@@ -32,8 +32,11 @@ Discovery is tracked **per world × per player**.
   undiscovered matches stay `???`.
 - **Per-row Level and Value** columns (sell value in Ancient Coins).
 - **Rarity colouring** of item names and icon borders (undiscovered rows too).
-- **Per-permutation cooked-food tracking** (~10,916 catalog entries; Mushroom
+- **Per-permutation cooked-food tracking** (~11,119 catalog entries; Mushroom
   Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
+- **Per-colour cattle and paint-colour tracking** — farm animals get one row per
+  colour (5 colour slots each), and paintable items (furniture, rugs) get a row
+  per paint colour with its real colour name (e.g. "(Red)").
 - **English and German**, following the in-game language; switches live.
 
 ## Requirements
@@ -49,13 +52,13 @@ alongside it.
 
 ## Known Limitations
 
-- **No per-variation tracking** (one exception). Each item family is tracked once;
-  colour / state variants do not get their own row. The exception is **pet skins**
-  — each pet skin is a separate collectible with its own row.
-- **Cattle colour variants.** Farm animals (cattle) are tracked one row per species.
-  The game records discovery per colour variant, so a cattle you own but have only
-  ever seen in a non-default colour can still show as `???` until a future update adds
-  per-colour rows. Owning any cattle of a *discovered* species shows its count as usual.
+- **Per-colour possession is only counted for placeable furniture, not floors or
+  walls.** Cattle and paintable furniture/rugs each get one row per colour with a
+  per-colour owned count, but floors and walls are map tiles rather than objects, so
+  they have no per-colour count and show "—" in the possession column.
+- **Non-paintable design variants aren't split.** Items that come in fixed shape /
+  state variants without a paint colour (e.g. the different Stalagmite shapes) are
+  still tracked as a single row rather than one row per variant.
 - **Cooked-food Rare/Epic tiers** are included but not yet verified against live
   cooking events — unreachable tiers, if any, simply stay greyed out.
 

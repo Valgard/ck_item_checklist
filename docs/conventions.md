@@ -83,6 +83,13 @@ techniques keep the history clean (all used in the Iter-12 extension):
   canonical serialization so the next Editor save yields no phantom diff — make a
   dedicated `style(prefab): …` commit that re-applies the Editor's trailing
   spaces / block order. Functional change and format reconciliation stay separate.
+- **Failure mode — don't blanket-discard a "noisy" prefab diff.** A real functional
+  user edit (e.g. a one-field override like `MaxVisibleRows: 9`) can hide *inside* the
+  Editor's reserialization churn; a wholesale `git checkout -- <prefab>` of a diff that
+  "looks like pure reserialization" silently discards it. Before discarding such a diff,
+  inspect it field-by-field (or ask the user). Prefer **recovering** the functional edit
+  as a minimal hand-added YAML field — Unity deserializes by field **name**, not
+  position, so a single added line is enough — once the Editor is confirmed closed.
 
 ## Worktree Conventions
 
@@ -205,7 +212,7 @@ debug scaffold *in front of* the reviewed core — then remove it via
 reviewed version.
 
 Iter-3.8 example: reaching the end of the list (~10,720 entries at Iter-3.8;
-~10,916 today) by scrolling takes
+~11,119 today) by scrolling takes
 too long to verify flush-geometry on the last row. A throwaway
 `DebugDiscoveredOnly` index-remap was added in front of the recycler
 (`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of the list

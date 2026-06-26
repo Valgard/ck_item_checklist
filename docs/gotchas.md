@@ -1185,3 +1185,37 @@ fix is per-colour rows using CK's **native** per-variation discovery (cattle, un
 pet skins, have a native per-variation signal, so no ledger is needed) — Iter-17.
 See `docs/architecture.md § Cattle Collection (Iter-16.3)` and the
 `reference_ck_cattle_objecttype` memory.
+
+> **Resolved in Iter-17.** Cattle now get one row per colour — 5 fixed slots per
+> species, read from each prefab's `ObjectPropertiesCD.PossibleChildVariation[]`
+> palette (every species is `{0,1,2,3,4}`). The slots are driven by CK's native
+> per-`(id, variation)` discovery (no ledger), and `Entry.IsColourVariant` reveals
+> the species name on all slots once any colour is discovered, so the non-0-variation
+> `???` symptom is fixed. See `docs/architecture.md § Per-Variation Tracking (Iter-17)`.
+
+## Per-Variation Tracking (Iter-17)
+
+### `RandomObjectEnabler.variations` / `SpriteObject.SpriteAsset.staticVariantCount` are VISUAL-only
+
+While hunting for the cattle colour count, both
+`RandomObjectEnabler.variations` and `SpriteObject.SpriteAsset.staticVariantCount`
+looked like promising "how many variants does this object have?" sources. They are
+**not** — they are sprite/GameObject variant mechanisms (visual randomisation of an
+object's appearance) that do **not** set `ObjectDataCD.variation`, so they are
+**discovery-irrelevant**: a row is keyed on `(objectID, variation)`, and these never
+touch that field. Do not re-chase them as a variant-count source. The real source for
+the cattle colour palette was each prefab's
+`ObjectPropertiesCD.PossibleChildVariation[]` (property id `239678920`); see
+`docs/architecture.md § Per-Variation Tracking`.
+
+### Search-field focus race recurs (Iter-20's fix is incomplete)
+
+When a list refresh races the search field's focus-init (e.g. on open), the caret
+blinks but **keystrokes are swallowed** until another widget is clicked. Iter-20
+mitigated this by running the scan + `ListView.Refresh()` **before** `OpenModUI`, but
+the race **recurred during Iter-17** — so the mitigation is incomplete, not a full fix.
+Workaround for the user: click a dropdown (or any widget) first, then click the search
+field, and typing works. There are **0 exceptions in the log** when it happens, which
+is the tell that it is a focus/timing ordering issue, not a code crash. Still open;
+logged to `docs/roadmap.md` for a future re-investigation of the open-time refresh/focus
+ordering.

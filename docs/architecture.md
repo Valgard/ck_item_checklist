@@ -213,7 +213,7 @@ public interface IScrollable
 
 ## Viewport Virtualization (Iter-3.8)
 
-The catalog grows to ~10,916 entries. The pre-Iter-3.8 design instantiated one
+The catalog grows to ~11,119 entries. The pre-Iter-3.8 design instantiated one
 `ItemRow` GameObject per entry on every open (`SpawnRows`), which froze the
 window ~905 ms. Iter-3.8 replaced that with a fixed-size pool of row
 GameObjects recycled as the user scrolls, so the GameObject count is bounded
@@ -225,7 +225,7 @@ cooked-food browser) is **not** a viewport recycler: it builds a *fixed* pool
 of `MAX_ROWS × MAX_COLUMNS` slots (50×5 = 250) once and breaks at
 `num >= itemSlots.Count`, so entries past slot 250 are simply never shown. It
 scrolls by translating the whole pool under the clip mask, recycling nothing.
-That is fine for ≤250 recipes but unusable for ~10,916 entries. No CK class
+That is fine for ≤250 recipes but unusable for ~11,119 entries. No CK class
 recycles rows by index, so ItemChecklist implements its own on top of the
 `IScrollable` contract.
 
@@ -393,7 +393,7 @@ fine-tuning + real sprites are deferred to Iter-12 (pixel-art).
 
 ## Data Architecture
 
-### ItemCatalog Three-Loop Bake (Iter-3.7 / Iter-16.1)
+### ItemCatalog Four-Loop Bake (Iter-3.7 / Iter-16.1 / Iter-17)
 
 `ItemCatalog.Bake()` runs once per world-load, triggered from the
 `PlayerController.OnOccupied` coroutine (after
@@ -412,6 +412,10 @@ tierMap:      ObjectID → (base, rare, epic)  (from CookedFoodCD fields)
 for objectId in PugDatabase.objectsByType.Keys:
     if IsCookedFood(objectId): skip   // handled by Loop 2
     emit CatalogEntry(objectId, variation=0)
+    // Iter-17 (Bucket 1): the variation != 0 guard is no longer a blanket
+    // drop — a non-0 (objectID, variation) key is also emitted when the object
+    // carries PaintableObjectCD, so paintable colour variants get their own row
+    // (curated keep-filter: cosmetic paint colours in, chest/seed state-junk out).
 ```
 
 **Loop 2 — Cooked-food α-enumeration:**
@@ -425,15 +429,81 @@ for i1 in ingredients:
             emit CatalogEntry(tier_objectId, variation=var)
 ```
 
-**Resulting catalog size:** ~10,916 entries (~1240 standard + ~9480
-cooked-food permutations: 3160 pairs × 3 tiers).
+*(Loop 3 — pet skins, Iter-16.1 — emits one entry per `(petObjectID,
+skinIndex)`; see § Per-Variation Tracking and § Pet Collection.)*
+
+**Loop 4 — Cattle colour variants (Iter-17):**
+
+```
+for species in CattleRegistry.adults:               // 6 species
+    for colour in CattleRegistry.ColoursOf(species): // {0,1,2,3,4}, 5 colours
+        emit CatalogEntry(species, variation=colour)
+```
+
+`ColoursOf` reads each cattle prefab's `ObjectPropertiesCD.PossibleChildVariation[]`
+palette (property id `239678920`) — the breeding-outcome set, which is also the
+species' full caught-colour set. 6 × 5 = 30 cattle rows. See
+§ Per-Variation Tracking (Iter-17).
+
+**Resulting catalog size:** ~11,119 entries — broadly ~1240 standard + ~9480
+cooked-food permutations (3160 pairs × 3 tiers), plus the creature/variant
+additions accreted across iterations: Iter-16.1 pet skins, Iter-16.2 critters
+(+25), Iter-16.3 cattle species, Iter-17 cattle colours (+30 from Loop 4) and
+paintable colour variants (+179 from the Bucket-1 guard-lift). (The exact
+decomposition drifts each iteration — treat the components as indicative, the
+total as authoritative.)
 
 **Expected bake time:** < 200 ms on a typical machine (empirically ~384 ms
-on this machine for the full ~10,916-entry bake). Bake time is independent
+on this machine for the full ~11,119-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
 `PlayerController.OnOccupied` coroutine.
+
+### Per-Variation Tracking (Iter-17)
+
+The bake historically collapsed every family to its `variation == 0` row.
+Iter-17 splits two **buckets** of variants out, discriminated by a fact about
+`PugDatabase.objectsByType`: that dict is keyed on `(objectID, variation)`
+(`ObjectDataCD.Equals/GetHashCode` include `variation`). A discovered
+`(id, v)` **present** in the dict is **DB-authored** (Bucket 1); **absent** =
+runtime-assigned (Bucket 2). A measurement sweep found the only runtime
+variations in play are cooked food (already handled by Loop 2) and cattle
+colours — so no generic Bucket-2 loop was built.
+
+**Bucket 2 — cattle (pet-skin model).** CK exposes no colour-count API, but
+each cattle prefab's `ObjectPropertiesCD` carries a
+`PossibleChildVariation[]` palette (property id `239678920`, the
+breeding-outcome / caught-colour set), read sandbox-safe via
+`PugDatabase.TryGetComponent<ObjectPropertiesCD>` + `props.TryGetList(...)`.
+Every species' palette is `{0,1,2,3,4}` — so Loop 4 emits a **fixed 5 colour
+slots** per species, always. Display follows the pet-skin model:
+`Entry.IsColourVariant` marks the rows so the species name is shown on **all**
+slots once any colour is discovered (`IsDiscoveredAnyVariation` — species-gated
+reveal-all, `???` otherwise), while the per-colour collected tick stays
+`IsDiscovered(id, colour)`. No placeholder row, no mod-owned ledger: CK's
+**native** per-`(id, variation)` discovery fires `Changed`, so the existing
+refresh path handles reveal. This structurally fixes the Iter-16.3
+`???`-on-non-0-variation trap.
+
+**Bucket 1 — paintable items (DB-authored).** Loop 1's `variation != 0` guard
+is lifted, but a non-0 key is kept **only** when the object carries
+`PaintableObjectCD` (a curated filter: cosmetic paint colours in, chest/seed
+state-junk out) — +179 rows. `Entry.IsColourVariant` gives these the same
+reveal-all behaviour. Colour names come from the 14 paintbrushes: each
+`PaintToolCD.paintIndex` (`PaintBrushRed=70 … Teal=83`) is the variation that
+brush applies, and the brush's enum name minus the `PaintBrush` prefix is the
+English colour, localized through 14 own `ItemChecklist-PaintColor` terms — so
+"(Farbe 3)" renders "(Rot)".
+
+**Per-colour possession.** `PossessionScanner` credits live entities per
+`(id, colour)` into a `colourCounts` map, exposed via
+`PossessionView.CountColour`. A penned/caged cattle and a placed paintable
+furniture/rug carry their colour in `ObjectDataCD.variation`, so each colour
+slot gets its own owned count. **Tilemap-vs-entity rule:** floors and walls
+are tilemap **tiles**, not entities — they have no per-tile `ObjectDataCD` to
+scan, so per-colour possession is **not** countable for them and renders "—";
+placeable furniture/rugs **are** entities and do count.
 
 ### DiscoveredState Packed-Long Key Schema
 
@@ -802,7 +872,7 @@ the main-list machinery is wrong here:
    serialized `scrollable` does not resolve to an `IScrollable` on the *same*
    GameObject at load (see § Awake Logic). The `Dropdown` skeleton is deliberately
    component-less (Iter-18), so a skeleton `UIScrollWindow` would self-disable.
-2. `UIScrollWindow` exists to virtualize ~10,916 catalog rows; the popup has ≤~29
+2. `UIScrollWindow` exists to virtualize ~11,119 catalog rows; the popup has ≤~29
    *real* row GameObjects — virtualization is overkill.
 
 Instead `PopupWidget` caps the panel to `MaxVisibleRows × rowSpacing` (serialized
@@ -1234,8 +1304,11 @@ construction. It gates on the **same** discovered flag that drives `???`-vs-name
 
 > The gate is correct regardless of *why* a row is undiscovered. The distinct
 > variation-keyed-discovery case — a family discovered only at a non-0 variation
-> would still render `???` because the row checks `IsDiscovered(objectId, 0)` — is a
-> separate concern deferred to **Iter-17** (per-variation tracking).
+> would still render `???` because the row checks `IsDiscovered(objectId, 0)` — was a
+> separate concern. **Resolved in Iter-17:** colour-variant families (cattle,
+> paintable items) now ship one row per variation with per-`(id, variation)`
+> discovery + reveal-all naming, so the non-0-only-discovered family is shown
+> coherently. See § Per-Variation Tracking (Iter-17).
 
 ### Two symmetric chokepoints — never read raw `DiscoveredState` for an aggregate (Iter-16.4)
 
@@ -1299,7 +1372,7 @@ requires a 3D collider **on the same GameObject** (where `UIMouse`'s
 `GetComponent<UIelement>()` resolves), on the **UI layer**, passing
 `isVisibleOnScreen` (active + enabled + non-zero lossy scale). There is **no**
 `isSelectable` flag — presence of the collider on a visible UI-layer GO *is* the
-gate. (Reusable for any future CK-UI hover/selection work, e.g. Iter-17.)
+gate. (Reusable for any further CK-UI hover/selection work; done in Iter-17.)
 
 ### ItemChecklist wiring
 
@@ -1401,7 +1474,7 @@ outside the possession scan's `ContainedObjectsBuffer`).
 `ItemCatalog.Bake` Loop 3 emits one `Entry` per `(petObjectID, skinIndex)`, with
 `skinIndex` stored in the entry's **`Variation`** slot and `IsPetSkin: true`. The
 per-skin names are unique, so these rows bypass Loop 1's name-conflict pass. (See
-the three-loop overview in § ItemCatalog Three-Loop Bake — Loop 3 is the pet axis.)
+the four-loop overview in § ItemCatalog Four-Loop Bake — Loop 3 is the pet axis.)
 
 ### Pet collection ledger (not CK `DiscoveredState`)
 
@@ -1489,14 +1562,18 @@ own ObjectID** (`CAGED id=1303`, not `CattleCage`) + auxData — folds to the ad
 inventory-pickup path (`DetectUndiscoveredObjectsInInventory` →
 `SetObjectAsDiscovered`), keyed per **`(objectID, variation)`** where the variation is
 the animal's **colour variant** (measured in-game: `SetObjectAsDiscovered(Cow=1300,
-var=2)`; bake membership `1300@var0=False, 1302@var0=True`). The catalog collapses to
-one var-0 row per species, so a species discovered only at a non-0 colour reads as
-`???` on its row — the deferred Iter-17 variation-keyed-discovery case (see
-`docs/gotchas.md § Cattle colour variants`). An ever-owned ledger
-(`CattleCollection`) was built then **removed** during the iteration: it merely masked
-this symptom, and the proper fix (per-colour rows using CK's native per-variation
-discovery — no ledger, unlike pets) belongs to Iter-17. Full narrative:
-`docs/iteration-history.md § Iter-16.3`.
+var=2)`; bake membership `1300@var0=False, 1302@var0=True`). Iter-16.3 collapsed cattle
+to one var-0 row per species, so a species discovered only at a non-0 colour read as
+`???` on its row — the deferred variation-keyed-discovery case. An ever-owned ledger
+(`CattleCollection`) was built then **removed** during that iteration: it merely masked
+the symptom rather than fixing it.
+
+> **Resolved in Iter-17.** Cattle now ship one row per colour (5 fixed slots per
+> species, read from the `PossibleChildVariation[]` palette — see § Per-Variation
+> Tracking), driven by CK's **native** per-`(id, variation)` discovery (no ledger,
+> unlike pets). The `???`-on-non-0-variation trap is gone: all five slots show the
+> species name once any colour is discovered. Full narrative:
+> `docs/iteration-history.md § Iter-16.3` + `§ Iter-17`.
 
 ## Runtime Glyph Injection (Iter-25)
 
