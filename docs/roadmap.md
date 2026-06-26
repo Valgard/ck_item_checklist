@@ -104,21 +104,21 @@ remaining backlog.
   Behaviour-identical for non-pet rows. The now-dead injected `DiscoveredState`
   field/ctor-param on `ItemListViewModel` were removed. Pure behavioural C# (+84/−21);
   no prefab/art touch. Critters (Iter-16.2) were unaffected (normal CK discovery).
-- **Iter-17 (tentative) -- per-variation/skin tracking.** The bake collapses every
-  family to its `variation == 0` entry (the `od.variation != 0` guard in
-  `ItemCatalog.Bake`), so colour/skin/state
-  variants never get their own row. CK tracks discovery per `(objectID, variation)`
-  and IB exposes `ignoreVariation` (`ObjectUtility.cs:422`); we hardwired "ignore
-  variation" to keep a one-tick-per-item checklist. Revisit only with a UI story
-  for grouping/expanding variants. Distinct from the Iter-7.1 catalog fix.
-  **Concrete instance from Iter-16.3 (cattle):** cattle come in **colour variants**
-  stored in the `variation` field, and CK discovers them per `(objectID, variation)`
-  (verified in-game: `SetObjectAsDiscovered(Cow=1300, var=2)` for a colour the player
-  owns). So a cattle owned but only discovered at a non-0 variation reads as `???` on
-  its var-0 species row — the symptom Iter-16.3 ships with. **The cattle fix needs no
-  ledger** (unlike pet skins, which had no native per-skin discovery): split cattle per
-  colour variant and use CK's **native** per-variation discovery directly. This is the
-  same problem class as the Iter-16.1 pet-skin split, with a native signal available.
+- **Iter-17 -- per-variation/skin tracking. DONE** (see `docs/iteration-history.md`).
+  Two **buckets**, both reshaped by in-game measurement (`objectsByType` is
+  `(objectID, variation)`-keyed → in-dict = DB-authored, absent = runtime).
+  **Bucket 2 (cattle):** the pet-skin split with a native signal. CK exposes no colour-
+  count API, but each cattle prefab's `ObjectPropertiesCD.PossibleChildVariation[]`
+  (prop 239678920) IS the palette — verified `{0..4}` (5 colours), sandbox-safe.
+  `CattleRegistry.ColoursOf` reads it; Loop 4 emits all 5 colour slots/species always,
+  `nameKnown` species-gated via `IsDiscoveredAnyVariation` (pet-skin parity, fixes the
+  Iter-16.3 `???`-on-non-0 trap); per-colour possession from the live entity's variation.
+  **Bucket 1 (placeables):** Loop-1 guard-lift kept behind a `PaintableObjectCD` filter
+  (cosmetic colours in, chest/seed state-junk out, +179 rows); reveal-all via
+  `Entry.IsColourVariant`; the 14 paint-colour names come from the paintbrushes
+  (`PaintToolCD.paintIndex`, enum name minus `PaintBrush`, localized via own
+  `ItemChecklist-PaintColor` terms — "(Rot)" not "(Farbe 3)"). Catalog 10916 → 11119.
+  The generic Bucket-2 loop (non-cattle runtime variants) was measured empty and not built.
 - **Iter-19 -- search-field word-wrap crash. DONE** (see
   `docs/iteration-history.md`). `SearchBar` overrides `Awake` to force
   `pugText.maxWidth = 0` after `base.Awake()`, removing the search field's PugText

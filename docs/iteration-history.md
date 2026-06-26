@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-25: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), and Iter-16.3 (cattle collection) are DONE on main. Iter-3.8
+As of 2026-06-26: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), and Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -1074,3 +1074,64 @@ bug. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox compile
 coherent display (named+counted vs. `???`). The standing lesson reinforced a fourth time:
 **measure CK creature mechanics in-game; the decompile and the on-paper decision were both
 overturned by what the probe logged.**
+
+**Iter-17 (per-variation tracking) — DONE (2026-06-26, branch `iter-17`).** The long-
+deferred "colour/skin/state variants get their own row" item. Brainstormed into two
+**buckets**, both reshaped by in-game measurement (the design spec
+`docs/specs/2026-06-25-iter-17-per-variation-tracking-design.md` was overtaken at almost
+every step). Final catalog **10916 → 11119**.
+
+**The discriminator (settled by a Step-1 throwaway sweep).** `PugDatabase.objectsByType`
+is keyed on `(objectID, variation)` (`ObjectDataCD.Equals/GetHashCode` include variation).
+A discovered `(id, v)` **in** that dict is **DB-authored** (Bucket 1); **absent** = runtime-
+assigned (Bucket 2). The sweep overturned the decompile's "Bucket 1 ≈ empty" guess:
+**600 DB-authored non-0 keys / 204 objectIds**, ~395 PlaceablePrefab — mixed cosmetic
+(paintable decor) + state-junk (chest open/closed, seed growth). And the only Bucket-2
+runtime variations are cooked food (Loop 2, already handled) + cattle colours — so the
+**generic Bucket-2 loop was measured empty and not built**.
+
+**Bucket 2 — cattle, the value (pet-skin parity).** The catch: CK exposes **no** colour-
+count API (no table, no field; `GetObjectInfo(id, v)` falls back to var0 for every v → no
+"exists" signal; ItemBrowser never enumerates per-colour). First built **discover-to-reveal**
+(rows appear as colours are found; a placeholder keyed on `IsDiscoveredAnyVariation` for
+zero-colour species — fixing the Iter-16.3 `???`-on-non-0-variation trap structurally). Then
+a probe found the enumeration anyway: each cattle prefab's `Pug.Properties.ObjectPropertiesCD`
+carries a **`PossibleChildVariation[]`** list under property id **239678920** (the breeding-
+outcome set `Pug.Other.GetChildVariation` rolls from) — read via
+`PugDatabase.TryGetComponent<ObjectPropertiesCD>` + `props.TryGetList(239678920, out
+NativeArray<BreedStateCD.PossibleChildVariation>, Allocator.Temp)`, **sandbox-safe**
+(`safetyCheck=True`). In-game: **every species = {0,1,2,3,4}** (5 colours), and all wild-
+**caught** colours fall within it (the user's "caught not bred" worry — the list IS the
+species palette, not breeding-only). So discover-to-reveal was **reworked into the pet
+model**: `CattleRegistry.ColoursOf` reads the palette; Loop 4 emits ALL 5 colour slots per
+species always; `nameKnown` is species-gated (`IsDiscoveredAnyVariation` — all slots named
+once any colour is found, `???` otherwise), the per-colour collected tick stays
+`IsDiscovered(id, colour)`. The placeholder + a live-re-bake both dropped (fixed slots; CK's
+native per-colour discovery fires `Changed` → existing refresh). 6 species × 5 = **30 cattle
+rows**. Per-colour possession: the scanner reads a live penned/caged cattle's variation and
+credits `colourCounts[(adult, colour)]` (live, like pet skins).
+
+**Bucket 1 — paintable variants.** Lift the Loop-1 `variation != 0` guard, keep var≠0 ONLY
+when `PaintableObjectCD` is present (curated: cosmetic colours in, chest/seed state-junk out)
+→ **+179 rows**. **Reveal-all** generalised across colour families via a new
+`Entry.IsColourVariant` flag (cattle + paintable base/variants): the item name shows on all
+slots once any form is known. The 14 **paint-colour names** come from the paintbrushes
+(`PaintBrushRed=70 … Teal=83`, each `PaintToolCD.paintIndex` = the variation it applies); the
+brush's **enum name** minus the `PaintBrush` prefix is the English colour, localized via 14
+own `ItemChecklist-PaintColor` terms (DE "Rot", …) — so "(Farbe 3)" renders "(Rot)". Per-
+colour possession for placed paintable furniture mirrors the cattle path (the entity carries
+its paint colour in variation); tile floors/walls aren't entities → no count → "—"; the base
+(var0) row keeps its objectID-total.
+
+**Process.** Five throwaway in-game probes (variation sweep, breeding-list, missing-row,
+each committed-then-reverted per the build-reverts-uncommitted-edits discipline) drove every
+decision; the user's screenshots + questions repeatedly redirected the design (discover-to-
+reveal → pet model; paint-colours kept as a split; enum names over parsed brush names). The
+recurring lesson held a **fifth/sixth time**: the decompile and on-paper plan were overturned
+by what the probe logged. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox compile
+(0 `CompileFailed`/NRE), `baked: 11119 items`, `paint colours mapped: 14`; cattle show 5
+named/`???` colour slots with per-colour counts, paintable items show localized paint-colour
+slots, base rows counted, reveal-all confirmed. Known limits: a non-paintable DB design
+variant (e.g. Stalagmite var1) is dropped by the `PaintableObjectCD` filter; per-colour
+furniture possession is live-only and unavailable for tile floors/walls. The Iter-20 search-
+focus race recurred (pre-existing, not this iter).
