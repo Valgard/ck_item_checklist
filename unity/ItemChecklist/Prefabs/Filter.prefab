@@ -1317,6 +1317,7 @@ MonoBehaviour:
   caretClosed: {fileID: 1907094303, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
   caretOpen: {fileID: -1597693367, guid: b00ef63bae8086014b9ce2e32387bcb8, type: 3}
   rowSpacing: 0.625
+  MaxVisibleRows: 9
 --- !u!1 &5278107263486996921 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4002831670443938804, guid: 5702e8cf30bd84b3798937cfae7a1d31,
