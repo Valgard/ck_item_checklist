@@ -13,7 +13,7 @@ namespace ItemChecklist.UI
     {
         public SpriteRenderer handleSprite;   // the thumb (maskInteraction: None so the popup mask doesn't clip it)
         public GameObject scrollbarRoot;       // track + handle container, toggled with overflow
-        public float trackLength = 3.75f;      // travel span = cap height (calibrated in-game)
+        public float trackLength = 3.75f;      // travel span = cap height; runtime-overwritten by SetTrackLength (this is just the 6-row fallback)
         public float minHandle = 0.6f;         // min thumb height in world units
         public PopupWidget owner;              // runtime-wired by PopupWidget.EnsurePanel
 
@@ -21,6 +21,21 @@ namespace ItemChecklist.UI
         public void SetActiveScrolling(bool active)
         {
             if (scrollbarRoot != null && scrollbarRoot.activeSelf != active) scrollbarRoot.SetActive(active);
+        }
+
+        /// <summary>Set the track travel span (= the popup's visible viewport height, i.e. the cap
+        /// when scrolling) and resize the track sprite + collider to match. <see cref="trackLength"/>
+        /// drives the thumb height, its travel range, and the drag→offset mapping, so all three —
+        /// plus the visual track and its click area — must equal the live viewport rather than the
+        /// baked 6-row prefab constant. The track sprite + collider sit on this same GO.</summary>
+        public void SetTrackLength(float length)
+        {
+            if (length <= 0f) return;
+            trackLength = length;
+            var track = GetComponent<SpriteRenderer>();   // the track BG (the thumb is `handleSprite`, a child)
+            if (track != null) track.size = new Vector2(track.size.x, length);
+            var col = GetComponent<BoxCollider>();
+            if (col != null) { Vector3 cs = col.size; col.size = new Vector3(cs.x, length, cs.z); }
         }
 
         /// <summary>Thumb height ∝ viewport/content; thumb centre ∝ scroll fraction (0 top … 1 bottom).</summary>

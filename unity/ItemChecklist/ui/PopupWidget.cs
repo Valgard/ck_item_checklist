@@ -113,6 +113,17 @@ namespace ItemChecklist.UI
             if (_panel != null)
                 _panel.size = new Vector2(_panel.size.x, _viewportH);
 
+            // The popup SpriteMask is sized by its transform scale (a unit sprite) and is NOT
+            // tracked anywhere else, so resize it here in lockstep with the BG. Both are centred
+            // on the popup origin (local 0,0), so equal heights keep the clip window flush with
+            // the panel. Authored at the 6-row default (scale.y = 6 * rowSpacing); without this,
+            // MaxVisibleRows > 6 grew the cap but not the mask, clipping the first/last rows.
+            if (scrollMask != null)
+            {
+                Vector3 ms = scrollMask.transform.localScale;
+                scrollMask.transform.localScale = new Vector3(ms.x, _viewportH, ms.z);
+            }
+
             if (rowContainer != null)
             {
                 if (_scrollActive)
@@ -140,6 +151,7 @@ namespace ItemChecklist.UI
             if (scrollMask != null && !scrollMask.activeSelf) scrollMask.SetActive(true);
             if (scrollHandle != null)
             {
+                scrollHandle.SetTrackLength(_viewportH);   // track span = visible window (the cap when scrolling), never the baked 6-row constant
                 scrollHandle.SetActiveScrolling(_scrollActive);
                 if (_scrollActive) scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
             }
