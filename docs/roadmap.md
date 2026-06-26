@@ -224,14 +224,17 @@ remaining backlog.
   Covers full Western-European + partial Eastern-European/Cyrillic/typography. thinTiny
   is digits-only in CK, so the global insert is harmless. Full font architecture in the
   `reference-ck-pugfont-architecture` memory + `docs/research/pixaki-format.md`.
-- **Search-field focus race recurrence (tentative).** Iter-20's mitigation (run the
+- **Iter-26 (tentative) -- search-field focus race fix.** Iter-20's mitigation (run the
   scan + `ListView.Refresh()` **before** `OpenModUI` so the rebind doesn't race the
   search field's focus-init) is **incomplete**: the race **recurred during Iter-17** —
   after a list refresh the caret blinks but keystrokes are swallowed until another
   widget is clicked (workaround: click any other widget first, then the search field).
   No exceptions are logged when it happens (a focus/timing-ordering issue, not a crash).
-  A future iter should re-investigate the open-time refresh/focus ordering. See
-  `docs/gotchas.md § Per-Variation Tracking (Iter-17) → Search-field focus race`.
+  Re-investigate the open-time refresh/focus ordering — likely a deeper fix than the
+  Iter-20 reorder: e.g. defer the search field's `SetActiveInputField` to the frame
+  *after* the post-open refresh settles, or re-assert focus once `ListView.Refresh()`
+  has rebound the rows. See `docs/gotchas.md § Per-Variation Tracking (Iter-17) →
+  Search-field focus race`.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
