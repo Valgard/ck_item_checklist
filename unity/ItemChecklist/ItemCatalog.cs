@@ -161,6 +161,31 @@ namespace ItemChecklist
                 // structural baby→adult fold (BreedStateCD.babyType), before Loop 1.
                 CattleRegistry.Build();
 
+                // Iter-17: paint-colour names. CK has exactly 14 paintbrushes
+                // (PaintBrushRed=70 … PaintBrushTeal=83), each carrying PaintToolCD.paintIndex
+                // = the variation it applies; the brush's localized name carries the colour.
+                // Build variation → colour name so a paintable item's "(Farbe N)" can show the
+                // real colour (e.g. "(Rot)") instead. Falls back to "(Farbe N)" when unmapped.
+                var paintColours = new Dictionary<int, string>();
+                foreach (var od in PugDatabase.objectsByType.Keys)
+                {
+                    if (od.variation != 0) continue;
+                    if (!PugDatabase.TryGetComponent<PaintToolCD>(od, out var pt)) continue;
+                    // The brush's enum name is code-stable English ("PaintBrushRed"); strip
+                    // the "PaintBrush" prefix → the colour key ("Red"), then localize via our
+                    // own ItemChecklist-PaintColor terms (DE "Rot", …). Fall back to the
+                    // English colour if a term is missing. (ObjectID.ToString is sandbox-safe
+                    // — already used by the PascalCaseSplitter fallback.)
+                    string enumName = od.objectID.ToString();
+                    string key = enumName.StartsWith("PaintBrush", StringComparison.Ordinal)
+                        ? enumName.Substring("PaintBrush".Length) : enumName;
+                    if (string.IsNullOrEmpty(key)) continue;
+                    string term = $"ItemChecklist-PaintColor/{key}";
+                    string loc = Loc.T(term);
+                    paintColours[pt.paintIndex] = (string.IsNullOrEmpty(loc) || loc == term) ? key : loc;
+                }
+                Debug.Log($"[ItemChecklist] paint colours mapped: {paintColours.Count}");
+
                 // Pre-resolve mod-id → display-name once so the per-entry loop
                 // is a single Dictionary lookup.
                 var modIdToName = new Dictionary<long, string>();
@@ -277,9 +302,13 @@ namespace ItemChecklist
 
                     // Iter-17: a kept paintable colour variant shares the base item's name
                     // ("Calendar" ×3) — suffix it so the slots are distinguishable (else the
-                    // conflict pass leaves identical "Calendar (Items/Calendar)" rows).
+                    // conflict pass leaves identical "Calendar (Items/Calendar)" rows). Prefer
+                    // the real paint-colour name (from the brush, e.g. "(Rot)"); fall back to
+                    // "(Farbe N)" for variations with no matching brush.
                     if (od.variation != 0)
-                        locText = $"{locText} {Loc.F("ItemChecklist-General/ColorSuffix", od.variation)}";
+                        locText = paintColours.TryGetValue(od.variation, out var pcn)
+                            ? $"{locText} ({pcn})"
+                            : $"{locText} {Loc.F("ItemChecklist-General/ColorSuffix", od.variation)}";
 
                     long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
                     localizedNames[key]   = locText;

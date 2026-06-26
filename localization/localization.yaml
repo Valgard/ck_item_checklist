@@ -72,6 +72,24 @@ ItemChecklist-Categories:
   Critters:         { en: "Critters",            de: "Krabbeltiere" }
   Cattle:           { en: "Cattle",               de: "Nutztiere" }
   Other:            { en: "Other",               de: "Sonstiges" }
+# Iter-17: paint-colour names for paintable-furniture variant rows. Keyed on the
+# English colour from the paintbrush enum (PaintBrushRed=70 ... Teal=83). Falls back
+# to the English key if a term is missing.
+ItemChecklist-PaintColor:
+  Red:    { en: "Red",    de: "Rot" }
+  Yellow: { en: "Yellow", de: "Gelb" }
+  Green:  { en: "Green",  de: "Grün" }
+  Purple: { en: "Purple", de: "Lila" }
+  Blue:   { en: "Blue",   de: "Blau" }
+  Brown:  { en: "Brown",  de: "Braun" }
+  White:  { en: "White",  de: "Weiß" }
+  Black:  { en: "Black",  de: "Schwarz" }
+  Orange: { en: "Orange", de: "Orange" }
+  Cyan:   { en: "Cyan",   de: "Cyan" }
+  Pink:   { en: "Pink",   de: "Pink" }
+  Grey:   { en: "Grey",   de: "Grau" }
+  Peach:  { en: "Peach",  de: "Pfirsich" }
+  Teal:   { en: "Teal",   de: "Petrol" }
 ControlMapper:
   ItemChecklist-ToggleChecklistPC:
     hint: "Keybind name shown in the game Controls menu."
