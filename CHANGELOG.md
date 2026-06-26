@@ -6,6 +6,79 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.0.0] - 2026-06-26
+
+The 1.0 milestone. The checklist is now feature-complete on three axes —
+**discovery**, **possession**, and **collection** of pets, critters and farm
+animals — with native item tooltips, a scrollable filter, and original
+pixel-art throughout. Everything in 0.9.x is carried forward; the headline
+additions below are all new since the 0.9 series.
+
+### Added
+
+- **Possession tracking.** Each row now shows how many of that item you
+  currently **own** — your carried inventory plus the contents of storage and
+  display furniture around your base. The checkbox tints **blue** when you own
+  at least one, and a new **"in / not in possession"** filter lets you hunt
+  down what you've discovered but don't actually have. Items stored at a remote
+  base stay counted while you're away. Spoiler-safe: an undiscovered (`???`)
+  row never reveals possession.
+- **Pet, critter and farm-animal collection.** Tamed pets are tracked **per
+  skin** — each colour variant of a pet is its own collectible row with its own
+  recoloured icon. Catchable critters (including fireflies) and farm livestock
+  now get rows too, under new **Pets**, **Critters** and **Cattle** filter
+  categories.
+- **Per-colour tracking for cattle and paintable items.** Farm animals get one
+  row per colour (five colour slots each), and paintable furniture and rugs get
+  a row per paint colour, labelled with the real colour name (e.g. "(Red)").
+  Where the game counts a placed object's colour, the owned count is per-colour
+  too.
+- **Row-hover tooltips.** Hover any row to see Core Keeper's native item
+  tooltip — name, description and stats — plus an inventory-slot hover
+  highlight. Discovered rows show the full tooltip; undiscovered rows highlight
+  but reveal only a minimal `??? - not yet discovered`, so there are no
+  spoilers.
+- **Scrollable, collapsible filter.** The filter popup now scrolls (mouse wheel + 
+  draggable scrollbar) instead of overflowing, and each section can be folded
+  by clicking its header — sections fold independently and all start open.
+
+### Changed
+
+- **Original pixel-art throughout.** Every remaining placeholder sprite was
+  replaced with original art, including a dedicated "unknown object" icon for
+  undiscovered rows; item icons now render at their native size with the game's
+  per-item offset.
+- **The discovery counter can reach 100 %.** Collecting pet skins now counts
+  toward the `N / M` total (footer and HUD), the **Discovered** filter shows
+  collected skins, and "· N shown" counts them — so a full collection actually
+  reads as complete.
+- **Small UI labels render accents and umlauts correctly.** The sort/filter
+  and header/footer labels use Core Keeper's small font, which ships without
+  accented letters; the mod now supplies its own, so German (and other
+  Western/Eastern-European) text reads correctly at that size.
+- **Tidier combobox header** with a better-aligned search caret.
+
+### Fixed
+
+- **Typing in the search field no longer spams errors.** A latent Core Keeper
+  word-wrap bug threw an exception every frame while typing in the search box;
+  the field is now kept off that path.
+- **A rebound toggle key now fully takes effect.** Previously F1 kept opening
+  the checklist even after you rebound the toggle to another key; only the bound
+  key opens it now.
+
+### Known limitations
+
+- After the list refreshes, the **search field** may not register the first
+  keystrokes until you click it again (or click another widget first). It's a
+  focus-timing quirk with no crash — a fix is tracked for a later release.
+- **Per-colour possession** is counted only for placeable furniture, not for
+  floors or walls (those are map tiles, not objects, so they show "—").
+- **Non-paintable design variants** (e.g. the different Stalagmite shapes) are
+  still tracked as a single row rather than one row per variant.
+- **Cooked-food Rare/Epic tiers** are included but not yet verified against live
+  cooking events; any unreachable tier simply stays greyed out.
+
 ## [0.9.1] - 2026-06-07
 
 ### Fixed

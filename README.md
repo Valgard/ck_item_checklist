@@ -34,6 +34,10 @@ Discovery is tracked **per world × per player**.
 - **Rarity colouring** of item names and icon borders (undiscovered rows too).
 - **Per-permutation cooked-food tracking** (~11,119 catalog entries; Mushroom
   Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
+- **Creature collection** — tamed pets are tracked **per skin** (each colour
+  variant is its own row with its own recoloured icon), and catchable critters
+  and farm animals get rows too, under dedicated **Pets**, **Critters** and
+  **Cattle** filter categories.
 - **Per-colour cattle and paint-colour tracking** — farm animals get one row per
   colour (5 colour slots each), and paintable items (furniture, rugs) get a row
   per paint colour with its real colour name (e.g. "(Red)").
@@ -52,6 +56,9 @@ alongside it.
 
 ## Known Limitations
 
+- **The search field may not register the first keystrokes right after the list
+  refreshes.** It's a focus-timing quirk (no crash); if typing doesn't take,
+  click the search field again — or click another widget first, then the field.
 - **Per-colour possession is only counted for placeable furniture, not floors or
   walls.** Cattle and paintable furniture/rugs each get one row per colour with a
   per-colour owned count, but floors and walls are map tiles rather than objects, so
