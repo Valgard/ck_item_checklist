@@ -6,6 +6,18 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.0.1] - 2026-06-26
+
+A bug-fix patch for the scrollable filter introduced in 1.0.0.
+
+### Fixed
+
+- **The filter popup no longer cuts off its top and bottom rows.** With the
+  taller filter list shown in 1.0.0, the first and last entries were clipped and
+  the scrollbar didn't match the visible area. The popup now sizes its visible
+  window and scrollbar to the row limit, so every entry is fully visible and the
+  scrollbar fills and travels the whole list.
+
 ## [1.0.0] - 2026-06-26
 
 The 1.0 milestone. The checklist is now feature-complete on three axes —
