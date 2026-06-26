@@ -104,6 +104,14 @@ namespace ItemChecklist
         public bool IsCattleEntry(int objectId, int variation)
             => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
 
+        // Iter-17: a paintable colour VARIANT slot (var≠0 colour-variant, not cattle).
+        // OwnedCount routes these through CountColour (per-(id, paint-colour), like cattle):
+        // a placed painted entity is counted at its colour; non-scannable tile floors/walls
+        // have no entry → 0 → "—". The base (var0) row keeps its objectID-total count.
+        public bool IsPaintableVariantSlot(int objectId, int variation)
+            => variation != 0 && TryGetEntry(objectId, variation, out var e)
+               && e.IsColourVariant && !e.IsCattle;
+
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
         /// <list type="bullet">

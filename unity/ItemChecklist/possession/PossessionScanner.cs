@@ -75,7 +75,7 @@ namespace ItemChecklist.Possession
 
             var carried = new Dictionary<int, int>();
             var petSkins = new Dictionary<long, int>();   // Iter-16.1: live per-(objectId, skinIndex)
-            var cattleColours = new Dictionary<long, int>();   // Iter-17: live per-(adultId, colourVariation)
+            var colourCounts = new Dictionary<long, int>();   // Iter-17: live per-(id, colour) — cattle + placed paintable furniture
             var liveKeys = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
@@ -136,7 +136,7 @@ namespace ItemChecklist.Possession
                 if (em.HasComponent<CattleCD>(e))
                 {
                     long ck = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
-                    cattleColours[ck] = (cattleColours.TryGetValue(ck, out var cc) ? cc : 0) + 1;
+                    colourCounts[ck] = (colourCounts.TryGetValue(ck, out var cc) ? cc : 0) + 1;
                     continue;
                 }
 
@@ -163,6 +163,16 @@ namespace ItemChecklist.Possession
                 // contents. Stations' transient input/output slots are NOT counted.
                 var tile = Tile(scan, key);
                 AddOne(tile, id);
+                // Iter-17: a painted/coloured placeable carries its paint colour in
+                // variation → also credit per (id, colour) so the per-colour checklist slot
+                // shows its own owned count (mirrors the cattle path; live-only). variation 0
+                // = the base/unpainted item, already counted by AddOne above (the base row).
+                // Tile floors/walls aren't individual entities → never reach here → "—".
+                if (od.variation != 0)
+                {
+                    long cck = DiscoveredState.PackKey(id, od.variation);
+                    colourCounts[cck] = (colourCounts.TryGetValue(cck, out var pcc) ? pcc : 0) + 1;
+                }
                 if (!em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e))
                     AddBuffer(em, e, tile, petSkins);
             }
@@ -184,7 +194,7 @@ namespace ItemChecklist.Possession
                         pets.MarkCollected(DiscoveredState.KeyObjectId(kv.Key), DiscoveredState.KeyVariation(kv.Key));
 
             ledger.SetCarried(carried);
-            return ledger.BuildView(liveKeys, petSkins, cattleColours);
+            return ledger.BuildView(liveKeys, petSkins, colourCounts);
         }
 
         // Keep only stations that have ≥1 other station within ClusterRadius — a base

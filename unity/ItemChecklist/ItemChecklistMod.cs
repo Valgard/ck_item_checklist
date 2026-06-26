@@ -73,10 +73,15 @@ namespace ItemChecklist
                     : 0;
 
             var disc = DiscoveredState.Instance;
-            // Iter-17: cattle colour slots get their OWN live owned count (per
-            // (adultId, colour)), spoiler-gated on that colour being discovered — so each of
-            // the 5 slots shows how many of THAT colour are penned/caged, not the species total.
-            if (Catalog != null && Catalog.IsCattleEntry(objectId, variation))
+            // Iter-17: colour-variant slots get their OWN live owned count (per (id, colour))
+            // via CountColour, spoiler-gated on that colour being discovered — so each slot
+            // shows how many of THAT colour are owned, not the species/item total. Covers
+            // cattle (live penned/caged, adult-folded) AND placed paintable furniture
+            // (the entity carries its paint colour in variation). Non-scannable items
+            // (tile floors/walls) have no entry → CountColour returns 0 → "—".
+            if (Catalog != null
+                && (Catalog.IsCattleEntry(objectId, variation)
+                    || Catalog.IsPaintableVariantSlot(objectId, variation)))
                 return disc != null && disc.IsDiscovered(objectId, variation)
                     ? Possession.CountColour(objectId, variation)
                     : 0;

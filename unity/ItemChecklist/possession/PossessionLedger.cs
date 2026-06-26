@@ -48,8 +48,8 @@ namespace ItemChecklist.Possession
 
         // Iter-17: + the live per-colour cattle counts (same live-only model as pet skins).
         public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins,
-            Dictionary<long, int> cattleColours)
-            => BuildView(liveKeys).WithPetSkins(petSkins).WithCattleColours(cattleColours);
+            Dictionary<long, int> colourCounts)
+            => BuildView(liveKeys).WithPetSkins(petSkins).WithColourCounts(colourCounts);
 
         public PossessionView BuildView(HashSet<long> liveKeys)
         {
