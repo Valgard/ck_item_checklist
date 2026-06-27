@@ -6,6 +6,19 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.0.2] - 2026-06-27
+
+A performance patch.
+
+### Fixed
+
+- **No more occasional stutter in your base.** The possession tracker recounts
+  what you own every few seconds, and in a built-up base that recount could
+  briefly hitch the frame rate each time it ran. It now reads the world far more
+  efficiently — the recount is roughly twice as fast and its worst case no longer
+  overruns a single frame, so the periodic stutter is gone. Your possession
+  counts are unchanged.
+
 ## [1.0.1] - 2026-06-26
 
 A bug-fix patch for the scrollable filter introduced in 1.0.0.
