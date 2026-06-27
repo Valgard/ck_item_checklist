@@ -72,6 +72,14 @@ namespace ItemChecklist.Possession
                 ComponentType.ReadOnly<ObjectDataCD>(),
                 ComponentType.ReadOnly<LocalTransform>());
             using var ents = objQuery.ToEntityArray(Allocator.TempJob);
+            // Bulk-copy the two components read for EVERY entity (chunk-sequential memcpy)
+            // instead of a per-entity GetComponentData random chunk lookup in the loop.
+            // The three arrays are index-aligned: same query, captured back-to-back with no
+            // structural change between, so ents[i]/ods[i]/xforms[i] are the same entity.
+            // Per-entity `em` access then remains only for the player + gate-passers
+            // (HasComponent/GetBuffer/PetOwner), i.e. the gated minority — not all N.
+            using var ods = objQuery.ToComponentDataArray<ObjectDataCD>(Allocator.TempJob);
+            using var xforms = objQuery.ToComponentDataArray<LocalTransform>(Allocator.TempJob);
 
             var carried = new Dictionary<int, int>();
             var petSkins = new Dictionary<long, int>();   // Iter-16.1: live per-(objectId, skinIndex)
@@ -90,9 +98,9 @@ namespace ItemChecklist.Possession
             for (int i = 0; i < ents.Length; i++)
             {
                 var e = ents[i];
-                var od = em.GetComponentData<ObjectDataCD>(e);
+                var od = ods[i];                // bulk array, not GetComponentData(e)
                 int id = (int)od.objectID;
-                var pos = em.GetComponentData<LocalTransform>(e).Position;
+                var pos = xforms[i].Position;    // bulk array, not GetComponentData(e)
 
                 if (od.objectID == ObjectID.Player)
                 {
