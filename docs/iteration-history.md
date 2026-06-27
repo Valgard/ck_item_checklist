@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-26: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), and Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants) are DONE on main. Iter-3.8
+As of 2026-06-27: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), and Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -1135,3 +1135,46 @@ slots, base rows counted, reveal-all confirmed. Known limits: a non-paintable DB
 variant (e.g. Stalagmite var1) is dropped by the `PaintableObjectCD` filter; per-colour
 furniture possession is live-only and unavailable for tile floors/walls. The Iter-20 search-
 focus race recurred (pre-existing, not this iter).
+
+**Iter-27 (possession-scan perf — in-base stutter) — DONE (2026-06-27, branch
+`perf-possession-scan`).** A user-reported intermittent stutter "in the base, every few
+seconds" — correctly suspected to be the 3s possession refresh. **Measured before
+guessing** (systematic-debugging Phase 1): a throwaway PERF probe in `PossessionScanner.Scan`
+logged per-scan wall-time split into four phases (world/setup/loop/build) plus entity,
+near-anchor and anchor counts, then in-base play (278 scans) was analysed.
+
+**Diagnosis (empirical).** In steady-state base scans (~1300 loaded-world entities, ~840
+passing the anchor gate, 44 clustered anchors): `total` median 3.4ms but **p99 16.4ms,
+MAX 21.5ms**, and the **`loop` phase dominated** (avg 3.49ms of 4.7ms total; `world` 0.26ms,
+`setup` 0.12ms, `build` 0.83ms). The spike mechanism: the loop read `ObjectDataCD` +
+`LocalTransform` via a **per-entity `em.GetComponentData<T>(e)`** (a random chunk+index
+lookup) for **every** one of the ~1300 entities, on the main thread, synchronously in one
+`Update` tick. At 60fps the 16.7ms frame budget is blown by a single ~21ms scan → exactly
+one dropped frame every 3s = the reported periodic stutter. **CPU-bound, not GC** — the
+managed-allocation `build` phase stayed small and the spikes tracked `loop`/`ents`, not a
+periodic GC signature.
+
+**Fix — F1 only.** Copy the two universally-read components in bulk via
+`objQuery.ToComponentDataArray<ObjectDataCD>` + `ToComponentDataArray<LocalTransform>`
+(chunk-sequential memcpy) and index `ods[i]`/`xforms[i]` in the loop. The three arrays
+(`ents[]`/`ods[]`/`xforms[]`) are **index-aligned** — same query, captured back-to-back
+with no structural change between. Per-entity `em` access (`HasComponent`/`GetBuffer`/
+`PetOwnerCD`) remains only for the player + the gated near-anchor minority, not all N. This
+trades ~2×1300 random chunk lookups per scan for two bulk copies + sequential array reads.
+
+**Measured after** (same base, same activity): **MAX 21.5→9.6ms** (now comfortably under
+the 16.7ms budget — no dropped frame), `loop` avg 3.49→1.82ms (**−48%**), `total` p90
+8.1→3.4ms, p99 16.4→6.6ms; the variance collapsed (the random-chunk-walk that caused the
+outliers is gone), and `ents`/`near` were unchanged (~1300/~800) — proving the win is the
+**access pattern**, not a changed entity set, i.e. behaviour-neutral. Sandbox-clean
+(`Successfully compiled ItemChecklist safetyCheck=True`; `ToComponentDataArray` passes the
+Roslyn sandbox, as `ToEntityArray` already did).
+
+**Rejected by measurement** (not built): **F3** caching `ResolveWorld` (`world` only 0.26ms
+in steady state; the 3.7ms was a one-time world-load cold start, not the recurring stutter,
+and a session-cached `World` ref risks staleness across world reloads), **F2** anchor
+spatial-hash (only 44 anchors → the `WithinAnchor` inner loop is negligible; `setup` 0.12ms),
+**F4** reusing the per-scan `Dictionary`/`HashSet` buffers vs GC (the `build`/alloc phase was
+small and no GC-signature spikes appeared). The standing project lesson held again: the
+single, evidence-backed change beat a bundle of plausible-but-unmeasured optimisations. Pure
+behavioural C# (one query split + two loop-read swaps); no prefab/art touch.

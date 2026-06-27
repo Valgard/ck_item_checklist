@@ -235,6 +235,21 @@ remaining backlog.
   *after* the post-open refresh settles, or re-assert focus once `ListView.Refresh()`
   has rebound the rows. See `docs/gotchas.md § Per-Variation Tracking (Iter-17) →
   Search-field focus race`.
+- **Iter-27 -- possession-scan perf (in-base stutter). DONE** (see
+  `docs/iteration-history.md`). The 3s `PossessionScanner.Scan` iterated ~1300
+  loaded-world entities reading `ObjectDataCD` + `LocalTransform` via a **per-entity
+  `GetComponentData`** (random chunk lookup) for each. A throwaway PERF probe measured
+  it in a built-up base: the per-entity `loop` phase dominated, with total-scan spikes
+  of **~21ms** — past the 16.7ms@60fps frame budget, so one dropped frame every 3s =
+  the reported periodic in-base stutter (CPU-bound, not GC — the alloc/`build` phase
+  stayed small). Fix = **F1 only**: copy the two universally-read components in bulk via
+  `ToComponentDataArray` (chunk-sequential memcpy) and index `ods[i]`/`xforms[i]` in the
+  loop (index-aligned with `ents[]`); per-entity `em` access stays only for the player +
+  the gated near-anchor minority. Measured after: **MAX 21.5→9.6ms** (under budget),
+  loop avg 3.49→1.82ms (−48%), p99 16.4→6.6ms, same entity/anchor counts (behaviour-
+  neutral). F3 (cache `ResolveWorld`), F2 (anchor spatial-hash) and F4 (reuse alloc
+  buffers) were all **measured unnecessary** — `world`/`setup` were 0.26/0.12ms and only
+  44 anchors. Pure behavioural C# (one query split + two loop reads); no prefab/art.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
