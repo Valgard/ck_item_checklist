@@ -1167,8 +1167,8 @@ the 16.7ms budget — no dropped frame), `loop` avg 3.49→1.82ms (**−48%**), 
 8.1→3.4ms, p99 16.4→6.6ms; the variance collapsed (the random-chunk-walk that caused the
 outliers is gone), and `ents`/`near` were unchanged (~1300/~800) — proving the win is the
 **access pattern**, not a changed entity set, i.e. behaviour-neutral. Sandbox-clean
-(`Successfully compiled ItemChecklist safetyCheck=True`; `ToComponentDataArray` passes the
-Roslyn sandbox, as `ToEntityArray` already did).
+on CK 1.2.1.5 (`Successfully compiled ItemChecklist safetyCheck=True`; `ToComponentDataArray`
+passes the Roslyn sandbox, as `ToEntityArray` already did).
 
 **Rejected by measurement** (not built): **F3** caching `ResolveWorld` (`world` only 0.26ms
 in steady state; the 3.7ms was a one-time world-load cold start, not the recurring stutter,

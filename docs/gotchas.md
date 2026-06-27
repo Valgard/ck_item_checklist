@@ -1219,3 +1219,42 @@ field, and typing works. There are **0 exceptions in the log** when it happens, 
 is the tell that it is a focus/timing ordering issue, not a code crash. Still open;
 logged to `docs/roadmap.md` for a future re-investigation of the open-time refresh/focus
 ordering.
+
+## ECS Scan Performance (Iter-27)
+
+### A synchronous main-thread scan must stay under the frame budget (16.7 ms @ 60 fps)
+
+Any work a mod does **synchronously on the main thread** inside a periodic
+`Update`/coroutine tick must finish in **< 16.7 ms** (the 60 fps frame budget) or that
+frame is dropped → a visible stutter. The **cadence** of the loop is rarely the
+problem; the **per-tick cost** is. Iter-27: the possession refresh runs every 3 s, but a
+single scan spiking to ~21 ms blew the budget once every 3 s = "ab und zu ruckelt es",
+worst in the base (highest entity density). Diagnose on the **MAX**, not the median
+(see `docs/conventions.md § Phase-split PERF probe`): a path whose median fits the
+budget but whose worst case exceeds 16.7 ms still hitches.
+
+### Per-entity `GetComponentData` in a hot scan loop is a random-chunk lookup — bulk-read with `ToComponentDataArray`
+
+For a recurring scan over many ECS entities, **do not** call
+`em.GetComponentData<T>(entity)` per entity in the loop: each is a random chunk+index
+lookup, and over ~1300 entities (Iter-27's loaded-world `ObjectDataCD + LocalTransform`
+set) the 2×N lookups were the dominant cost — their cache-cold variance is what produced
+the 17–21 ms spikes. Instead **bulk-copy** the components read for *every* entity:
+
+```csharp
+using var ents   = q.ToEntityArray(Allocator.TempJob);
+using var ods    = q.ToComponentDataArray<ObjectDataCD>(Allocator.TempJob);
+using var xforms = q.ToComponentDataArray<LocalTransform>(Allocator.TempJob);
+// ents[i] / ods[i] / xforms[i] are index-aligned: same query, captured back-to-back
+// with NO structural change between. Index them in the loop, not GetComponentData(e).
+```
+
+`ToComponentDataArray` is a chunk-sequential memcpy and is **sandbox-safe** (same
+surface as `ToEntityArray`; `safetyCheck=True`). Keep per-entity `em` access
+(`HasComponent`/`GetBuffer`/`PetOwnerCD`) only for the **gated minority** that survives
+your cheap range/type filter — not for all N. Measured (Iter-27): MAX 21.5→9.6 ms (back
+under budget), `loop` phase −48 %, variance collapsed (p90 8.1→3.4 ms), behaviour-neutral
+(same entity set, same counts). The rule generalises to any mod reading the live ECS
+world on a timer (e.g. an ECS-driven HUD). See `docs/iteration-history.md § Iter-27`,
+`docs/architecture.md` (the `PossessionScanner` row), and the
+`reference_ck_mod_persistence_and_ecs_access` memory.

@@ -45,7 +45,7 @@ Discovery is tracked **per world × per player**.
 
 ## Requirements
 
-- Core Keeper (verified on 1.2.1.4)
+- Core Keeper (verified on 1.2.1.5)
 - [CoreLib](https://mod.io/g/corekeeper/m/corelib) — required dependency
 
 ## Installation

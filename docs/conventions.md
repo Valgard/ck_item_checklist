@@ -282,6 +282,36 @@ pkill -KILL -f "Core Keeper"   # GNU pgrep/pkill -f variant; macOS-safe
 
 Do not use the normal quit path — it blocks and the process must be killed.
 
+### Phase-split PERF probe — measure before optimizing, fix only the dominant phase
+
+When a *recurring* path is suspected of causing a frame hitch (the Iter-27 in-base
+possession-scan stutter), do **not** guess at the cause — instrument it with a
+throwaway probe **before** touching it:
+
+- **Split wall-time into named phases + log counts.** Bracket each phase with
+  `Time.realtimeSinceStartup` and emit one `Debug.Log("[ItemChecklist] PERF …")` per
+  call carrying `total` + per-phase ms + work counts (Iter-27:
+  `world`/`setup`/`loop`/`build` + `ents`/`near`/anchor counts). Both APIs are
+  sandbox-proven (precedent: `ItemCatalog.cs` `PERF bake-total`). Mark every insert
+  `// PROBE` so removal is a trivial grep. It is a throwaway: **commit it before the
+  build** (§ "Worktree builds silently revert…"), then collapse it back out before the
+  fix lands (`git reset` to one clean `perf(...)` commit).
+- **Analyse the distribution, not a single number.** Read `Player.log` and compute
+  median / p90 / p99 / **MAX** + the N heaviest samples + per-phase averages. **The
+  worst-case spike is the stutter, not the median** — a scan whose median fits the
+  frame budget but whose MAX exceeds 16.7 ms drops one frame per occurrence (see
+  `docs/gotchas.md § ECS Scan Performance`).
+- **Fix only the measured-dominant phase, then re-measure.** The same probe gives a
+  clean before/after across the `Player.log` ↔ `Player-prev.log` rotation. Iter-27: the
+  `loop` phase was ~75 % of cost → bulk `ToComponentDataArray` → MAX 21.5→9.6 ms.
+- **Measure rejected optimizations away.** The probe also *disproves* secondary
+  suspects: Iter-27's `world`/`setup` were 0.26/0.12 ms and the alloc phase small, so
+  caching `ResolveWorld`, anchor spatial-hashing and buffer-reuse were dropped as
+  measured-unnecessary. One evidence-backed change beats a bundle of
+  plausible-but-unmeasured ones — the timing twin of "trust the in-game delta, not
+  inference" (next section), and the perf sibling of the "Temp-`Debug.Log` measurement
+  technique" (a single value) and "Spike + counter-probe" (a single case) above.
+
 ### Catalog inclusion/exclusion: trust the in-game size delta, not a decompile count
 
 When relaxing or tightening an `ItemCatalog.Bake` filter (the Iter-7.1 /
