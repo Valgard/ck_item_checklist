@@ -56,6 +56,21 @@ namespace ItemChecklist.Possession
             5804,  // TallLandKelp
             5710,  // CavelingFloorTileDark (natural biome floor)
             5571,  // RuinsPiece2
+
+            // Iter-30 diag dump: wild mineable ore/boulder deposits — placed near base
+            // anchors but never owned, tag-less so caught only by ID. These were the
+            // churn source defeating the autosave-skip (counted as placed objects, added
+            // then PruneStaleNear-removed as the player roams). The diag saw Iron(2202)/
+            // Gold(2203); the rest of the family is listed for cross-biome coverage.
+            2200, 2201, 2202, 2203, 2204,  // Copper/Tin/Iron/Gold/Scarlet OreBoulder
+            2205, 2206, 2207, 2209, 2218,  // Octarine/Galaxite/Solarite/Pandorium/Relucite OreBoulder
+            5606,  // AmberBoulder
+            5879,  // CrystalMeteorBoulder
+            // NOTE: MeadowTree (15500) is deliberately NOT here. A tree within the base
+            // anchor radius is plausibly placed décor (user wants it counted as owned),
+            // and the anchor gate already excludes wild trees OUTSIDE the base from path
+            // #1 — so leaving it un-blacklisted gives "kept in base, ignored outside" for
+            // free. Ore boulders differ: never owned, even right next to base → blacklist.
         };
 
         public static bool IsWorldNature(int objectId, ObjectInfo info)
