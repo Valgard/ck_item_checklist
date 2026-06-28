@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-28: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter), and Iter-28 (possession scan — exclude world nature via tag+ID blacklist + one-time ledger eviction; kills the autosave-serialize spike) are DONE on main. Iter-3.8
+As of 2026-06-29: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter), and Iter-28 (possession scan — exclude world nature via tag+ID blacklist + one-time ledger eviction; kills the autosave-serialize spike), Iter-30 (config-gated possession diagnostic log), and Iter-31 (possession scope — anchor the base on workbenches, killing remote world-structure pollution; + save-write-skip + ledger v2 migration) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -1240,3 +1240,80 @@ nice-to-have smoothness pass, weighed against its real complexity (holding the e
 snapshot across frames + accumulating `liveKeys` before pruning). Pure behavioural C#
 (`PossessionClassifier.IsWorldNature` + `PossessionLedger.PruneByPredicate` + a one-time
 scan call); no prefab/art touch.
+
+**Iter-30 (config-gated possession diagnostic log) — DONE (2026-06-29, branch `iter-30`).**
+A permanent, default-OFF diagnostic so a recurring possession stutter (or wild nature leaking
+past the Iter-28 blacklist in a new biome) can be captured **without** re-adding a throwaway
+probe each time. Gated on `PossessionConfig.Diagnostics` — a second `API.Config` key beside
+`anchorRadius`, read once at startup; toggle by editing `Possession-diagnostics.json` and
+relaunching. When on it logs three things to `Player.log`: the per-scan timing split
+(`world/setup/loop/build`) + ledger size; the per-save `serialize`/`write` timing
+(`PossessionStore`); and **once per launch** a dump of every distinct counted placed object
+with its tags + `IsWorldNature` verdict — a `nature=False` row for an obviously-wild object is
+exactly the next blacklist gap to fill. Zero overhead when off (every timing read is a
+`diag ? Time.realtimeSinceStartup : 0f` ternary; the object recorder early-returns on a dumped
+flag). This tool drove the whole of Iter-31.
+
+**Iter-31 (possession scope — anchor the base on workbenches) — DONE (2026-06-29, branch
+`iter-30`).** Two *new* symptoms after Iter-28 (the user was explicit they were new, not an
+incomplete fix): (a) a residual save-write hitch even with the small post-Iter-28 ledger, and
+(b) "massive lag spikes outside the base". The Iter-30 diag + **parsing the real savegame
+ledger** turned both into a single root cause — and the fix is the *true base detection*
+Iter-20 had punted on.
+
+**Save-write-skip (the cheap half).** `SaveManager.WriteCharacter` fires on every autosave, but
+base storage rarely changes between two; `Serialize()` (~1 ms) is cheap while the
+`API.ConfigFilesystem.Write` under Wine is the 5–13 ms main-thread cost. So `PossessionStore`
+keeps a **64-bit FNV-1a content hash** of the last written text per character GUID and elides
+the write (and the `DirectoryExists` probe) when the hash is unchanged. FNV-1a/64 deliberately:
+**not** 32-bit `string.GetHashCode` (a 1/2³² collision would skip a needed save = data loss),
+and **not** SHA/MD5 (cryptographic strength we don't need against our own data; heavier per
+byte on a main-thread path; allocates a `byte[]`; and `System.Security.Cryptography` is exactly
+the BCL surface the Roslyn sandbox locks down — FNV is pure value-type arithmetic, zero BCL
+dependency). The first save per character still lands.
+
+**The diag exposed why the skip barely fired (1 of 37 saves): the ledger churned** — the
+`containers` count bounced 523→667→707→525 every save. Parsing the actual ledger
+(`possession-<guid>.txt`, ASCII `x,z|id:count`) — **not inferring** — showed why: the
+OreBoulders the user questioned sat **337–693 tiles from the Core base**, and ~90 of the 523
+entries were **remote world content the player merely explored past**: Sunken-Sea nature
+(GlowingCoral ×36, JellyFish ×14, KelpTree), abandoned-camp furniture (tent/mattress/campfire/
+stool/table), a mechanical vault (electricity generator + seed extractor + farm seeds), ruins
+pedestals, **and the loot inside world chests the player never opened** (GoldBar/ScarletBar/
+AncientCoin/HunterBreastArmor/keys). I twice asserted the boulders were "within the 48-tile
+base radius" from inference — both wrong; the user forced the ledger check that disproved it
+(now the [[feedback_validate_against_savegame]] memory).
+
+**Root cause + the semantic discriminator.** The scan anchored on **any `CraftingCD` station**,
+and CK world structures *contain* functional stations — an abandoned camp has a campfire, a
+vault a seed extractor — so two within 16 tiles passed the old ≥2-station cluster filter and
+anchored the structure's loot chest + surrounding nature/boulders as "owned". A type/spatial
+blacklist is hopeless here (you cannot blacklist `GoldBar` loot, and CK encodes no
+world-vs-placed flag). The user's insight gave the clean discriminator: a base is **built
+around a Workbench** — the first thing a player builds — and CK places none in world
+structures. **Validated against the save before coding: 11 workbenches, all at the Core base;
+0 in any remote cluster.** So anchors became **workbenches + the crafting stations standing
+within a workbench's `AnchorRadius`** (the base's own furnaces/campfires/seed-extractors still
+count, but the *same* station in a workbench-less camp does not). The link is workbench→station
+only, never station→station, so the base can't chain out to a far structure; a single workbench
+suffices, so the ≥2-cluster filter is gone (`ClusteredAnchors` deleted). `WorkbenchIds` is the
+material-tier progression (Wooden/Copper/Tin/Iron/Scarlet/Octarine/Galaxite/Solarite), editable.
+
+**Ledger v2 migration.** Pre-fix ledgers are polluted with the remote loot and `PruneStaleNear`
+(180-tile window) never reaches it, so `PossessionLedger` gained a `#icl-ledger-v2` first-line
+marker; `LoadFrom` discards any file lacking it once, and the base re-scans clean —
+auto-migrating every player on update. **Near-base wild boulders stay blacklisted:** the
+OreBoulder family (`2200-2207, 2209, 2218` + Amber/CrystalMeteor) is added to
+`PossessionClassifier.WorldNatureIds` (Iter-28's twin) for deposits *within* the base radius;
+MeadowTree (15500) is deliberately **not** blacklisted — a tree near base is plausibly placed
+décor (kept), wild trees away are excluded structurally by the workbench gate.
+
+**Measured after (against the savegame, per the lesson):** ledger **523 → 403, 0 remote**
+(>100 tiles from Core); save-skip now dominates (`SKIPPED 9` vs `write 3`); scan **~1 ms outside
+base** (no workbench → no anchors → nothing counted) and ~4–5 ms at base; host-overrun **4 vs
+626** frames. **The "massive lag spike outside base" was NOT ItemChecklist:** the log showed
+**40× "GarbageCollector disposing of ComputeBuffer"** — a GPU resource leak in a **bundled**
+render asset (no mod `.cs` references ComputeBuffer; prime suspect *Enemy Health Bars*, which
+renders one bar per enemy and so scales with the high enemy count exactly while exploring).
+ItemChecklist allocates **zero** ComputeBuffers (verified). Realised across five commits (diag,
+save-skip, ore blacklist, workbench anchor + ledger v2); built/sandbox-verified on CK 1.2.1.5.

@@ -269,7 +269,31 @@ remaining backlog.
   gone. Verified smooth in-game (1.2.1.5). Process lesson: a runaway background decompile-grep
   ate CPU through every test and confounded the "is it smooth?" signal for several rounds —
   kill stray background jobs before measuring perf.
-- **Iter-29 (tentative) -- chunk / time-slice the possession scan.** The 3s
+- **Iter-30 -- config-gated possession diagnostic log. DONE** (see
+  `docs/iteration-history.md`). A permanent, default-OFF diag (`PossessionConfig.Diagnostics`,
+  a second `API.Config` key) so a recurring stutter or blacklist gap is captured without a
+  throwaway probe: per-scan timing + ledger size, per-save serialize/write, and a one-time
+  dump of every counted placed object with its `IsWorldNature` verdict. Zero overhead when
+  off. Drove all of Iter-31.
+- **Iter-31 -- possession scope: anchor the base on workbenches. DONE** (see
+  `docs/iteration-history.md`). Two new post-Iter-28 symptoms (residual save-write hitch +
+  "lag spikes outside base") traced — by parsing the real savegame ledger, **not** inference —
+  to one root cause: the scan anchored on **any `CraftingCD`**, so world structures the player
+  explored (abandoned-camp campfires, a vault's seed extractor) passed the ≥2-cluster filter
+  and anchored their loot chests + surrounding nature/boulders as "owned" (~90 of 523 entries
+  were remote world loot 337–693 tiles from base — GlowingCoral, world-chest GoldBar/armor/
+  keys). The discriminator is **semantic**: a base is built around a **Workbench** (CK places
+  none in world structures; verified 11 at base / 0 remote). Anchors = workbenches + the
+  stations within a workbench's radius (link workbench→station only, a single workbench
+  suffices → cluster filter gone). + a 64-bit-FNV save-write-skip, a `#icl-ledger-v2` one-time
+  migration (discard polluted pre-fix ledgers), and the near-base OreBoulder blacklist.
+  Measured: ledger 523→403 / 0 remote, save-skip dominates, scan ~1ms outside base,
+  host-overrun 4 vs 626. The "outside-base spike" itself was **not ItemChecklist** — 40×
+  ComputeBuffer-GC from a bundled render asset (prime suspect Enemy Health Bars); the mod uses
+  zero ComputeBuffers.
+- **Iter-29 (tentative; largely obsoleted by Iter-31 — the workbench-anchor fix shrank the
+  ledger and killed the remote churn, so the scan is now ~1ms outside base / ~4–5ms at base
+  with no felt hitch; kept only as a nice-to-have) -- chunk / time-slice the possession scan.** The 3s
   `PossessionScanner.Scan` iterates the full ~2000-entity loaded-world set on a single tick;
   a ~9.6ms scan on one frame every 3s is a felt micro-hitch even "under budget". Spread one
   pass across several ticks so no single tick does the whole scan. **Not a regression** (1.0.2
