@@ -1258,3 +1258,44 @@ under budget), `loop` phase −48 %, variance collapsed (p90 8.1→3.4 ms), beha
 world on a timer (e.g. an ECS-driven HUD). See `docs/iteration-history.md § Iter-27`,
 `docs/architecture.md` (the `PossessionScanner` row), and the
 `reference_ck_mod_persistence_and_ecs_access` memory.
+
+## Possession Persistence & World Nature (Iter-28)
+
+### A persisted store that grows unbounded → an autosave `Serialize()` main-thread spike (not the scan)
+
+A mod that persists per-character state in lockstep with CK's save (a Harmony postfix on
+`SaveManager.WriteCharacter(int)`) pays the **full serialize cost synchronously on the main
+thread at every autosave**. If the persisted structure can grow unbounded, *that* — not the
+periodic read/scan — becomes the recurring frame spike. Iter-28: the possession ledger had
+grown to 5503 entries / 89 KB, and `PossessionLedger.Serialize()` of it was **12–37 ms**
+(serialize 8–24 ms + write 4–13 ms), firing ~10× in a short session. Because it runs on the
+main thread it also pushed CK's **host simulation** over its **55 ms** frame budget
+(`ServerUpdateFrequencyTracker` warnings: 626/1109 host frames over budget) — felt as
+*constant* rubber-banding, distinct from a per-3s scan hitch. **Diagnose the save, not just
+the scan:** the Iter-27 PERF data already showed `BuildView` was ~0.8 ms even at 5503 entries,
+so the read was never the peak. Budget the autosave serialize like any < 16.7 ms frame op, and
+**keep the persisted store small at the source** (the world-nature gate below). A
+radius-bounded self-heal (`PruneStaleNear`, 180 tiles) does **not** retroactively clear a
+backlog an old bug accumulated — pair the source fix with a one-time full eviction
+(`PossessionLedger.PruneByPredicate` at the first scan, gated by a `WorldNaturePruned` flag).
+
+### CK encodes no "world-spawned vs player-placed" signal — don't try to derive it
+
+Iter-28 had to exclude wild nature (bushes/grass/kelp/stalagmites/lilies/ruins) from the
+"count the placed object itself" path while keeping placed walls/torches/furniture/trophies/
+waypoints. **No object-level signal separates them** — proven over three in-game probe rounds:
+`cat`/`stack`/`icon` are uniformly true; `craft` collides (PottedGoldenOrbBush 5589 is
+craftable décor → `craft=True` like a torch; Caveling/Slime/Mushroom/Larva trophies are
+non-craftable décor → `craft=False` like wild nature); `tags` collide (Stalagmite 5610 and
+WaterLily 5614 are **tag-less**, exactly like WayPoint 6514 which must count); and even the
+entity-level candidates collide — `DontDropSelfCD` is an `IEnableableComponent` (present on
+*everything*; its enabled state isn't sandbox-stable), and `DiggableCD`/`DestructibleObjectCD`
+give Stalagmite ≡ CavelingFloorTile 5710 and GraveTree 5622 ≡ WayPoint ≡ Idol 3930 ≡
+RuinsPiece 5571. **CK simply does not store the distinction** — it is a real property of CK,
+not a search failure. The sanctioned fallback is a **curated, editable tag+ObjectID blacklist**
+(`PossessionClassifier.IsWorldNature`): nature tags (`Greenery`/`Destructible`/`CattleKelpFood`/
+`Ruins` = stable `ObjectCategoryTag` ints 5/13/33/4) catch the bulk and future tagged nature,
+plus a short ObjectID list for the tag-less stragglers. (Iter-20 had removed the `MineableCD`
+gate so menu-removable furniture counts — which is what let mineable wild nature in;
+`MineableCD` is not a usable discriminator either.) Gate **only the placed-object path** —
+container contents + carried are untouched, so nature actually stored in a chest still counts.

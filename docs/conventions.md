@@ -374,6 +374,7 @@ unity/ItemChecklist/
   SaveManagerActiveSelectHook.cs  Harmony patch for active-character resolution
   SaveManagerWriteCharacterHook.cs  Harmony patch — persist possession ledger on character save (Iter-20)
   CharacterDataDiscoverySnapshot.cs  initial-state reader on OnAfterDeserialize
+  CattleRegistry.cs               cattle id set + structural baby→adult fold + colour palette (Iter-16.3/17)
   PascalCaseSplitter.cs           pure utility (display-name fallback formatting)
   Loc.cs                          localisation helpers (Loc.T / Loc.F) (Iter-11)
   ProgressFormat.cs               shared discovered/total counter string — footer + HUD (Iter-11.5)
