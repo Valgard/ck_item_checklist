@@ -1299,3 +1299,64 @@ plus a short ObjectID list for the tag-less stragglers. (Iter-20 had removed the
 gate so menu-removable furniture counts — which is what let mineable wild nature in;
 `MineableCD` is not a usable discriminator either.) Gate **only the placed-object path** —
 container contents + carried are untouched, so nature actually stored in a chest still counts.
+
+## Possession Base Scope & Persistence (Iter-31)
+
+### Workbench = the semantic "is this the player's base?" discriminator
+
+CK has **no base concept** and (per the Iter-28 lesson above) **no world-spawned-vs-placed
+signal**, so neither position nor cluster-density tells a base from a world structure: a
+fixed radius around the player misses an outbuilding (Iter-20), and "≥ 2 crafting stations
+nearby" mis-fires because CK world structures *pack* functional stations — an abandoned camp
+has a campfire + cooking pot, a mechanical vault a seed extractor + generator — so they pass a
+cluster filter and anchor their loot as "owned". The clean discriminator is **semantic, and
+CK does encode it**: a base is built around a **Workbench** (the universal first build), and
+CK places **no** workbench in any world structure. Validated against a real save: **11
+workbenches, all at the Core base; 0 in any remote cluster.** So anchor on workbenches + the
+stations within a workbench's radius (link **workbench→station only**, never station→station,
+so the base can't chain out to a far structure; a single workbench suffices → no cluster count
+needed). Reusable for any CK mod that needs "does the player own/control this place?" — reach
+for a **player-built marker object** (workbench) before any spatial/type heuristic.
+
+### Hash width is the safety knob for a skip-if-unchanged persistence guard
+
+When you elide an expensive write because the serialized content is unchanged (Iter-31:
+`PossessionStore` skips the 5–13 ms Wine disk write when the freshly serialized ledger hashes
+to the last-written value), a **hash collision = a skipped needed save = silent data loss**,
+so the hash width *is* the data-safety margin. Use **FNV-1a/64** (collision ≈ 1/2⁶⁴ per save —
+negligible):
+- **Not** 32-bit `string.GetHashCode` — 1/2³² is not negligible across a long session of
+  saves, and it isn't even stable across runtimes.
+- **Not** SHA/MD5 — cryptographic strength is irrelevant (you're hashing your own data, not
+  defending against an adversary), it is heavier per byte on a **main-thread** path, it
+  **allocates** a `byte[]` (FNV is a zero-alloc `ulong` of pure value-type arithmetic), and
+  `System.Security.Cryptography` is exactly the BCL surface the Roslyn sandbox bans — so it
+  would `CompileFailed` the mod anyway. FNV has zero BCL dependency.
+
+Record the hash **only after a successful write**, and let the first save (no prior hash) always
+land — so the skip path can never drop the initial persist or a write that failed.
+
+### Validate an inference against the actual savegame/ledger, not your own reasoning
+
+The possession ledger on disk (`possession-<guid>.txt`, ASCII `x,z|id:count` per container) is
+a **first-class diagnostic data source** — parse it; do not reason about what it "should"
+contain. Twice during Iter-31 an "those OreBoulders are inside the 48-tile base radius"
+inference was asserted from memory and was **wrong** — parsing the ledger proved the entries
+sat **337–693 tiles** from the Core base (remote world content the player had merely explored
+past: Sunken-Sea coral/jellyfish, abandoned-camp furniture, a vault's farm seeds, and loot
+inside world chests never opened). The on-disk file beats the inference every time the two can
+both be reached; let it redirect the fix (here: from "blacklist those boulders" to "the anchor
+model itself is wrong"). (Memory: `feedback_validate_against_savegame`.)
+
+### A bundled render asset can leak `ComputeBuffer`s — an exploration hitch that looks like your mod
+
+A frame-hitch correlated with exploring/enemies is easy to pin on your own mod, but a **bundled
+render asset** in *another* loaded mod can leak GPU `ComputeBuffer`s and cause it. A code grep
+won't find it in your tree — no `.cs` references `ComputeBuffer` (it's inside a prefab/material
+bundle, not source). Iter-31's "massive lag spike outside base": the log showed **40×
+"GarbageCollector disposing of ComputeBuffer"**, a GPU leak in a bundled render asset (prime
+suspect *Enemy Health Bars*, which renders one bar per enemy and so scales exactly with the high
+enemy count while exploring) — **not** ItemChecklist, which allocates zero ComputeBuffers.
+Diagnostic: when a hitch tracks a content type (enemies/exploration), grep `Player.log` for
+`ComputeBuffer` GC churn and identify which loaded mod ships per-entity render bundles — but
+**prove your own innocence first** with `grep -rn ComputeBuffer unity/` over your own tree.

@@ -601,7 +601,9 @@ The `RarityBorder` child of the `ItemRow` prefab uses **`maskInteraction: 1`
 the Iter-5 scrollbar's `None`). Sorting order 49 places the hollow frame above
 the icon (order 48). It defaults to `m_Enabled: 0` (hidden until `Bind` proves
 rarity ≥ Uncommon). The sprite is the placeholder `ui_rarity_border` (a white
-1-px hollow frame, tinted at runtime), rendered as a proper **9-slice**
+1-px hollow frame, tinted at runtime — the shipped placeholder was fully
+transparent until fixed; see `docs/gotchas.md § Bridge placeholder sprite may
+be fully transparent`), rendered as a proper **9-slice**
 (`spriteBorder {1,1,1,1}` in its `.meta`, `m_DrawMode: 1`) so the 1-px ring
 stays a thin fixed-pixel frame at any `m_Size` instead of thickening with the
 sprite. Real pixel-art (a designed border in place of the tinted white ring)
@@ -1262,17 +1264,40 @@ item", not just "discovered every item".
 
 | Class | Responsibility |
 |---|---|
-| `PossessionScanner` | Resolves the inventory world (`World.All`, max `ContainedObjectsBuffer` count = ServerWorld in SP), then scans **all** placed `ObjectDataCD` entities. **Possession = carried + base storage.** Carried = the player's whole `ContainedObjectsBuffer` (always live; includes the 0–9 equipment slots). Base storage = placed furniture/display within `AnchorRadius` of a **clustered** crafting-station anchor; contents read from the entity buffer. Counts the placed object itself, not just contents. **Reads the universally-needed `ObjectDataCD` + `LocalTransform` in bulk via `ToComponentDataArray` (chunk-sequential memcpy, index-aligned with `ToEntityArray`) — not a per-entity `GetComponentData` random-chunk lookup; per-entity `em` access stays only for the player + the gated near-anchor minority (Iter-27 perf, sandbox-safe, scan MAX 21.5→9.6ms). See `docs/gotchas.md § ECS Scan Performance` + `docs/iteration-history.md § Iter-27`.** **Iter-28: three count paths — (1) carried, (2) container contents (`AddBuffer`), (3) the placed object itself (`AddOne`). World nature is excluded from path #3 ONLY (`!PossessionClassifier.IsWorldNature`), so chest-stored nature (path #2) + carried still count and the remember-from-afar feature is preserved; a one-time `ledger.PruneByPredicate` evicts pre-existing nature at the first scan. See `docs/gotchas.md § Possession Persistence & World Nature`.** |
-| `PossessionLedger` | Keys containers by world tile `(x,z)` (packed `long`), merges `carried + per-container` in `BuildView`, and marks items present only in not-currently-observed containers as "remembered" (check ownership while away from base). **Iter-28: `PruneByPredicate(Func<int,bool>)` drops matching items from every container (empties removed); run once at the first scan (`WorldNaturePruned` flag) to evict the pre-existing world-nature backlog — `PruneStaleNear`'s 180-tile window is far too slow to clear it by roaming.** |
-| `PossessionStore` | Persists the ledger per character GUID via `API.ConfigFilesystem` (hand-rolled ASCII, sandbox-safe). |
-| `PossessionConfig` | Exposes `AnchorRadius`. |
-| `PossessionClassifier` | Type/ID predicates: `PlaceablePrefab` = 800 is the ownership gate; locked chests + boss statues count the **object** but not contents (loot unknown / boss chest is carriable). **Iter-28: `IsWorldNature(objectId, info)` — a curated tag+ObjectID blacklist (CK stores no object-level world-spawned-vs-placed signal; see `docs/gotchas.md § Possession Persistence & World Nature`): nature tags Greenery/Destructible/CattleKelpFood/Ruins + a short tag-less-straggler ID list, editable.** |
+| `PossessionScanner` | Resolves the inventory world (`World.All`, max `ContainedObjectsBuffer` count = ServerWorld in SP), then scans **all** placed `ObjectDataCD` entities. **Possession = carried + base storage.** Carried = the player's whole `ContainedObjectsBuffer` (always live; includes the 0–9 equipment slots). Base storage = placed furniture/display within `AnchorRadius` of a **workbench-anchored** station; contents read from the entity buffer. **Iter-31: anchors = workbenches + the `CraftingCD` stations standing within `AnchorRadius` of a workbench; the link is workbench→station only (never station→station), a single workbench suffices, and the old ≥2-station `ClusteredAnchors` filter is DELETED — see the workbench-anchor paragraph below + `docs/gotchas.md § Possession Base Scope`.** Counts the placed object itself, not just contents. **Reads the universally-needed `ObjectDataCD` + `LocalTransform` in bulk via `ToComponentDataArray` (chunk-sequential memcpy, index-aligned with `ToEntityArray`) — not a per-entity `GetComponentData` random-chunk lookup; per-entity `em` access stays only for the player + the gated near-anchor minority (Iter-27 perf, sandbox-safe, scan MAX 21.5→9.6ms). See `docs/gotchas.md § ECS Scan Performance` + `docs/iteration-history.md § Iter-27`.** **Iter-28: three count paths — (1) carried, (2) container contents (`AddBuffer`), (3) the placed object itself (`AddOne`). World nature is excluded from path #3 ONLY (`!PossessionClassifier.IsWorldNature`), so chest-stored nature (path #2) + carried still count and the remember-from-afar feature is preserved; a one-time `ledger.PruneByPredicate` evicts pre-existing nature at the first scan. See `docs/gotchas.md § Possession Persistence & World Nature`.** |
+| `PossessionLedger` | Keys containers by world tile `(x,z)` (packed `long`), merges `carried + per-container` in `BuildView`, and marks items present only in not-currently-observed containers as "remembered" (check ownership while away from base). **Iter-28: `PruneByPredicate(Func<int,bool>)` drops matching items from every container (empties removed); run once at the first scan (`WorldNaturePruned` flag) to evict the pre-existing world-nature backlog — `PruneStaleNear`'s 180-tile window is far too slow to clear it by roaming.** **Iter-31: `Serialize` writes a `#icl-ledger-v2` first-line marker; `LoadFrom` discards (clears) any file lacking it once, so the cluster-anchor-polluted pre-fix ledger is dropped and the base re-scans clean — auto-migrating every player on update.** |
+| `PossessionStore` | Persists the ledger per character GUID via `API.ConfigFilesystem` (hand-rolled ASCII, sandbox-safe). **Iter-31: a 64-bit FNV-1a content hash of the last-written text per GUID elides the disk write (and the `DirectoryExists` probe) when the freshly serialized ledger is unchanged — the `WriteCharacter` hook fires every autosave but base storage rarely changes between two, and the Wine `Write` is the 5–13 ms cost. The first save per character always lands (no `_lastSavedHash` entry); the hash is recorded only after a successful write → a skip can never drop a needed save. FNV-64 (not 32-bit `GetHashCode`) — see `docs/gotchas.md § Hash width is the safety knob`.** |
+| `PossessionConfig` | Exposes `AnchorRadius` and (Iter-30) `Diagnostics` — a second default-off `API.Config` key read once at startup that gates the per-scan/per-save timing logs + the one-time counted-object dump. |
+| `PossessionClassifier` | Type/ID predicates: `PlaceablePrefab` = 800 is the ownership gate; locked chests + boss statues count the **object** but not contents (loot unknown / boss chest is carriable). **Iter-28: `IsWorldNature(objectId, info)` — a curated tag+ObjectID blacklist (CK stores no object-level world-spawned-vs-placed signal; see `docs/gotchas.md § Possession Persistence & World Nature`): nature tags Greenery/Destructible/CattleKelpFood/Ruins + a short tag-less-straggler ID list, editable.** **Iter-31: `IsWorkbench(objectId)` (`WorkbenchIds` = Wooden/Copper/Tin/Iron/Scarlet/Octarine/Galaxite/Solarite — the material-tier progression, editable) seeds the base anchors; and `WorldNatureIds` gained the near-base OreBoulder family (Copper…Relucite 2200-2207/2209/2218 + AmberBoulder 5606 + CrystalMeteorBoulder 5879), tag-less wild deposits that sit right beside a base and would otherwise churn the ledger.** |
 | `PossessionView` | The immutable per-refresh snapshot: `Count(objectId)` → owned total. `ItemChecklistMod.Possession` holds the current one (refreshed on open + a throttled interval). |
 
-**Cluster filter — "your base".** A station only anchors if part of a **cluster**
-(≥ 1 other station within `ClusterRadius` = 16 tiles) — a real base packs stations
-together; a lone outpost / boss-arena / NPC station does not. This stops a remote
-world container (e.g. a Copper Key in Ghorm's spawn arena) from counting as owned.
+**Workbench anchor — "your base" (Iter-31, replaces the deleted cluster filter).**
+A base is **seeded by a workbench** — the first thing a player builds and what a real
+base is built around; CK places **none** in any world structure. The base's other
+crafting stations (furnaces, campfires, seed extractors) also anchor, but **only when
+standing within `AnchorRadius` of a workbench** (a workbench is trivially within 0 of
+itself, so it always anchors). The link is workbench→station only — never
+station→station — so the base cannot chain out to a far structure, and a single
+workbench suffices. No workbench loaded → no base here → nothing counted.
+
+> **Why the old cluster filter failed.** Iter-20 anchored on *any* `CraftingCD`
+> station and required a **cluster** (≥ 2 stations within 16 tiles) as the
+> base proxy. But CK world structures *pack* ≥ 2 functional stations — an abandoned
+> camp has a campfire **and** a cooking pot, a mechanical vault a seed extractor **and**
+> an electricity generator — so they passed the ≥2 filter and anchored their loot chests
+> + surrounding nature/boulders as "owned" (parsing a real save: ~90 of 523 ledger
+> entries were remote world loot 337–693 tiles from base — `GlowingCoral`, a world
+> chest's `GoldBar`/armor/keys). A workbench is the clean **semantic** discriminator
+> CK *does* encode, where no spatial/type heuristic worked — validated against the save
+> (11 workbenches, all at base; 0 in any remote cluster). See `docs/gotchas.md §
+> Possession Base Scope`.
+
+**Three count paths + the two gates (Iter-28 / Iter-31).** Possession sums three paths:
+**(1)** carried, **(2)** container contents (`AddBuffer`), **(3)** the placed object
+itself (`AddOne`). Two independent gates now interact: the **anchor gate** (Iter-31,
+moved from cluster→workbench) decides which placed entities are even in range for paths
+#2 and #3 at all; the **`IsWorldNature` gate** (Iter-28) then drops wild nature from
+path #3 **only**, so chest-stored nature (path #2) + carried still count.
 
 **Durability vs stack.** `ContainedObjectsBuffer.amount` is double-purposed (stack
 size for stackables, **durability** for equipment). Mirror CK's `GetTotalAmount`:
@@ -1550,7 +1575,7 @@ short-circuits to the new `Cattle`/`Nutztiere` category before the switch (see
 **Possession.** A live penned animal is a `Creature` ECS entity the Iter-20 scan
 already enumerates (it has `ObjectDataCD` + `LocalTransform`) but the furniture gate
 drops (not `PlaceablePrefab`). `PossessionScanner` adds a `CattleCD` branch: a live
-cattle within a clustered base anchor counts toward the **adult** species
+cattle within a workbench-anchored base counts toward the **adult** species
 (`AdultOf`); a caged animal in a container buffer — which appears as the **animal's
 own ObjectID** (`CAGED id=1303`, not `CattleCage`) + auxData — folds to the adult in
 `AddBuffer`. Wild animals roam far from any anchor → excluded by the existing

@@ -68,6 +68,14 @@ alongside it.
   still tracked as a single row rather than one row per variant.
 - **Cooked-food Rare/Epic tiers** are included but not yet verified against live
   cooking events — unreachable tiers, if any, simply stay greyed out.
+- **Possession base detection is workbench-anchored.** "Owned" base storage is the
+  contents of containers near one of your **workbenches** (and the crafting stations
+  beside it). Because the game never places a workbench in a world structure, loot in
+  camps, vaults, ruins or unopened world chests you merely explored past no longer
+  counts as yours — there are no remote-structure false positives. (Note: an observed
+  "lag spike while exploring outside the base" was traced to a *different* mod's
+  bundled render asset leaking GPU buffers, not to this mod — ItemChecklist allocates
+  none.)
 
 ## Localisation
 

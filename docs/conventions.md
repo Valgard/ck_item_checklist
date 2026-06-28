@@ -413,12 +413,12 @@ unity/ItemChecklist/
     PetSkinIcon.cs                gradient skin-icon material (Amplify/UISpriteColorReplace) (Iter-16.1)
     TooltipSlot.cs                shared SlotUIBase helper feeding CK native tooltips for rows (Iter-22)
   possession/                     possession scan/ledger/persist package (Iter-20)
-    PossessionScanner.cs          live ECS scan: carried + clustered-base storage
-    PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes
-    PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem)
+    PossessionScanner.cs          live ECS scan: carried + workbench-anchored base storage
+    PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes; #icl-ledger-v2 marker (Iter-31)
+    PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem); FNV-64 save-write-skip (Iter-31)
     PossessionView.cs             immutable per-refresh snapshot (Count(objectId))
-    PossessionConfig.cs           AnchorRadius + tuning
-    PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues)
+    PossessionConfig.cs           AnchorRadius (Iter-20) + Diagnostics (Iter-30)
+    PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues, IsWorldNature (Iter-28), IsWorkbench (Iter-31))
     PetCollection.cs              persistent ever-owned per-(objectID,skinIndex) ledger (Iter-16.1)
     PetCollectionStore.cs         per-GUID persistence — petskins-<guid>.txt (Iter-16.1)
   Localization/
