@@ -104,9 +104,16 @@ namespace ItemChecklist.Possession
         // --- Persistence (storage containers only; carried is never persisted) ---
         // Format: one line per container "x,z|id:count,id:count".
 
+        // Iter-31: ledgers written before the workbench-anchor fix are polluted with remote
+        // world-structure loot (camps/ruins anchored by their campfires/seed-extractors were
+        // counted as bases). A version marker on line 1 lets LoadFrom discard any pre-fix file
+        // exactly once; the base then re-scans and repopulates cleanly. The marker has no '|'
+        // so the per-line parser skips it like any non-data line.
+        private const string VersionMarker = "#icl-ledger-v2";
+
         public string Serialize()
         {
-            var lines = new List<string>();
+            var lines = new List<string> { VersionMarker };
             foreach (var pair in _containers)
             {
                 if (pair.Value.Count == 0) continue;
@@ -121,6 +128,8 @@ namespace ItemChecklist.Possession
         {
             _containers.Clear();
             if (string.IsNullOrEmpty(text)) return;
+            // Discard pre-v2 ledgers (polluted with remote world loot) — rebuild clean.
+            if (!text.StartsWith(VersionMarker)) return;
             foreach (var line in text.Split('\n'))
             {
                 if (line.Length == 0) continue;

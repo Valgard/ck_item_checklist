@@ -59,8 +59,17 @@ namespace ItemChecklist.Possession
                 ledger.WorldNaturePruned = true;
             }
 
-            // Anchors.
-            var anchors = new List<Vector2>();
+            // Anchors = WORKBENCHES + the crafting stations standing within a workbench's
+            // radius. Iter-31: a base is SEEDED by a workbench — the first thing a player
+            // builds and what a real base is built around; CK places none in world structures.
+            // Around it, the base's other stations (seed extractors, campfires, furnaces) also
+            // anchor — but ONLY when near a workbench, so the SAME campfire in a workbench-less
+            // abandoned camp does NOT anchor, and the camp's loot chest + surrounding nature/
+            // boulders stop counting as owned. Replaces the old "any CraftingCD + ≥2-cluster"
+            // heuristic, which mistook world structures (campfire + seed extractor) for bases.
+            // Validated against a real save: 11 workbenches all at base, 0 in any remote cluster.
+            var stations = new List<Vector2>();
+            var workbenches = new List<Vector2>();
             using (var anchorQuery = em.CreateEntityQuery(
                 ComponentType.ReadOnly<CraftingCD>(),
                 ComponentType.ReadOnly<LocalTransform>(),
@@ -72,15 +81,21 @@ namespace ItemChecklist.Possession
                     var od = em.GetComponentData<ObjectDataCD>(anchorEnts[i]);
                     if (od.objectID == ObjectID.Player) continue;
                     var p = em.GetComponentData<LocalTransform>(anchorEnts[i]).Position;
-                    anchors.Add(new Vector2(p.x, p.z));
+                    var v = new Vector2(p.x, p.z);
+                    stations.Add(v);
+                    if (PossessionClassifier.IsWorkbench((int)od.objectID)) workbenches.Add(v);
                 }
             }
 
-            // Cluster filter: a station only counts as a BASE anchor if it is part of a
-            // cluster (≥1 other station within ClusterRadius). A real base packs many
-            // stations together; a lone station at a remote outpost / boss arena / world
-            // structure must not anchor foreign world content as "owned".
-            anchors = ClusteredAnchors(anchors);
+            // A station anchors the base iff it stands within AnchorRadius of a workbench (a
+            // workbench is trivially within 0 of itself, so it always anchors). The link is to
+            // WORKBENCHES only — never station→station — so the base cannot chain out to a far
+            // structure. No workbench loaded → no base here → nothing counted.
+            float wr2 = radius * radius;
+            var anchors = new List<Vector2>();
+            if (workbenches.Count > 0)
+                foreach (var s in stations)
+                    if (WithinAnchor(workbenches, s.x, s.y, wr2)) anchors.Add(s);
             float dTAnchors = diag ? Time.realtimeSinceStartup : 0f;
 
             // ALL placed entities (not just containers) so the placed object itself
@@ -272,23 +287,6 @@ namespace ItemChecklist.Possession
             foreach (var kv in _diagObjects)
                 Debug.Log($"[ItemChecklist] DIAG placed id={kv.Key} count={kv.Value.count} {kv.Value.sig}");
             Debug.Log($"[ItemChecklist] DIAG placed distinct={_diagObjects.Count} (nature=True ones are excluded from path #1)");
-        }
-
-        // Keep only stations that have ≥1 other station within ClusterRadius — a base
-        // packs stations together; a lone remote station is not a base anchor.
-        private static List<Vector2> ClusteredAnchors(List<Vector2> anchors)
-        {
-            const float ClusterRadius = 16f;
-            float c2 = ClusterRadius * ClusterRadius;
-            var clustered = new List<Vector2>();
-            for (int a = 0; a < anchors.Count; a++)
-                for (int b = 0; b < anchors.Count; b++)
-                {
-                    if (a == b) continue;
-                    float dx = anchors[a].x - anchors[b].x, dz = anchors[a].y - anchors[b].y;
-                    if (dx * dx + dz * dz <= c2) { clustered.Add(anchors[a]); break; }
-                }
-            return clustered;
         }
 
         private static bool WithinAnchor(List<Vector2> anchors, float x, float z, float r2)

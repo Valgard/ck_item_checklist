@@ -81,5 +81,26 @@ namespace ItemChecklist.Possession
                     if (WorldNatureTagValues.Contains((int)t)) return true;
             return false;
         }
+
+        // Iter-31: a base ANCHOR is a workbench — the first thing a player builds and what a
+        // real base is built around. World structures (abandoned-camp campfires, mechanical-
+        // vault seed extractors) carry CraftingCD too, so anchoring on "any station" counted
+        // their loot chests + surrounding nature as owned; none of them contain a workbench.
+        // Narrow sense: the material-tier crafting progression. Validated against a real save
+        // (11 workbenches here, all at the Core base; 0 in any remote cluster). Editable — add
+        // specialised benches if a real base is ever missed.
+        private static readonly HashSet<int> WorkbenchIds = new HashSet<int>
+        {
+            4003,  // WoodenWorkBench (the universal first build)
+            4043,  // CopperWorkbench
+            4019,  // TinWorkbench
+            4010,  // IronWorkBench
+            4016,  // ScarletWorkBench
+            4027,  // OctarineWorkbench
+            4033,  // GalaxiteWorkbench
+            4049,  // SolariteWorkbench
+        };
+
+        public static bool IsWorkbench(int objectId) => WorkbenchIds.Contains(objectId);
     }
 }
