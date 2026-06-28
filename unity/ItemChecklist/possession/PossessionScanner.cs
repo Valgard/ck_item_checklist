@@ -39,9 +39,12 @@ namespace ItemChecklist.Possession
         /// streamed) storage and overwrite the persisted file with the loss.</summary>
         public static PossessionView Scan(PossessionLedger ledger, PetCollection pets, float radius, bool allowPrune)
         {
+            bool diag = PossessionConfig.Diagnostics;
+            float dT0 = diag ? Time.realtimeSinceStartup : 0f;
             var world = ResolveWorld();
             if (world == null) return PossessionView.Empty;
             var em = world.EntityManager;
+            float dTWorld = diag ? Time.realtimeSinceStartup : 0f;
 
             // Iter-28: one-time eviction of pre-existing world nature from the loaded ledger.
             // The old scan persisted nature into the per-(x,z) ledger (it grew to ~5500
@@ -78,6 +81,7 @@ namespace ItemChecklist.Possession
             // stations together; a lone station at a remote outpost / boss arena / world
             // structure must not anchor foreign world content as "owned".
             anchors = ClusteredAnchors(anchors);
+            float dTAnchors = diag ? Time.realtimeSinceStartup : 0f;
 
             // ALL placed entities (not just containers) so the placed object itself
             // counts — a workbench/torch/decoration is owned even with no inventory.
@@ -107,6 +111,7 @@ namespace ItemChecklist.Possession
             // earlier SetLiveContainer must not be overwritten by the next entity on the
             // same tile (that lost the mannequin's displayed armor → counted 0).
             var scan = new Dictionary<long, Dictionary<int, int>>();
+            int dNear = 0;
 
             for (int i = 0; i < ents.Length; i++)
             {
@@ -143,6 +148,7 @@ namespace ItemChecklist.Possession
 
                 // Cheap range gate first → DB/type checks only for near-anchor entities.
                 if (!WithinAnchor(anchors, pos.x, pos.z, r2)) continue;
+                if (diag) dNear++;
 
                 long key = PossessionLedger.Key(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.z));
 
@@ -178,6 +184,7 @@ namespace ItemChecklist.Possession
                 // NPCs(900), TheCore(0); stations fall out via !CraftingCD below.
                 var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                 if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
+                if (diag) DiagRecordPlaced(id, info);
 
 
                 // A placed object within range. Iter-28: count the object itself ONLY when it
@@ -221,9 +228,51 @@ namespace ItemChecklist.Possession
                         pets.MarkCollected(DiscoveredState.KeyObjectId(kv.Key), DiscoveredState.KeyVariation(kv.Key));
 
             ledger.SetCarried(carried);
-            return ledger.BuildView(liveKeys, petSkins, colourCounts);
+            float dTLoop = diag ? Time.realtimeSinceStartup : 0f;
+            var view = ledger.BuildView(liveKeys, petSkins, colourCounts);
+            if (diag)
+            {
+                float dTEnd = Time.realtimeSinceStartup;
+                int lc = 0, lp = 0;
+                foreach (var c in ledger.Containers) { lc++; lp += c.Value.Count; }
+                Debug.Log($"[ItemChecklist] DIAG scan total={(dTEnd - dT0) * 1000f:F1}ms " +
+                    $"(world={(dTWorld - dT0) * 1000f:F1} setup={(dTAnchors - dTWorld) * 1000f:F1} " +
+                    $"loop={(dTLoop - dTAnchors) * 1000f:F1} build={(dTEnd - dTLoop) * 1000f:F1}) " +
+                    $"ledgerC={lc} pairs={lp} ents={ents.Length} near={dNear} anchors={anchors.Count}");
+                DiagDumpObjectsOnce();
+            }
+            return view;
         }
 
+
+        // --- Diagnostics (config-gated via PossessionConfig.Diagnostics; default off, zero
+        // overhead when off). The scan logs per-scan timing + ledger size, the save logs
+        // serialize/write (PossessionStore), and once per launch the distinct counted placed
+        // objects are dumped with their tags + IsWorldNature verdict — so a `nature=False`
+        // placeable that is obviously wild nature (leaking past the blacklist in a new biome)
+        // is visible and its tag/ID can be added to PossessionClassifier.
+        private static bool _diagObjectsDumped;
+        private static readonly Dictionary<int, (int count, string sig)> _diagObjects = new();
+
+        private static void DiagRecordPlaced(int id, ObjectInfo info)
+        {
+            if (_diagObjectsDumped) return;
+            if (_diagObjects.TryGetValue(id, out var r)) { _diagObjects[id] = (r.count + 1, r.sig); return; }
+            string tags = "";
+            if (info.tags != null) foreach (var t in info.tags) tags += (int)t + ",";
+            bool craft = info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0;
+            bool nature = PossessionClassifier.IsWorldNature(id, info);
+            _diagObjects[id] = (1, $"craft={craft} nature={nature} tags=[{tags}]");
+        }
+
+        private static void DiagDumpObjectsOnce()
+        {
+            if (_diagObjectsDumped || _diagObjects.Count == 0) return;
+            _diagObjectsDumped = true;
+            foreach (var kv in _diagObjects)
+                Debug.Log($"[ItemChecklist] DIAG placed id={kv.Key} count={kv.Value.count} {kv.Value.sig}");
+            Debug.Log($"[ItemChecklist] DIAG placed distinct={_diagObjects.Count} (nature=True ones are excluded from path #1)");
+        }
 
         // Keep only stations that have ≥1 other station within ClusterRadius — a base
         // packs stations together; a lone remote station is not a base anchor.

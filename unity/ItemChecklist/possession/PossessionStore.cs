@@ -17,10 +17,16 @@ namespace ItemChecklist.Possession
             try
             {
                 if (!API.ConfigFilesystem.DirectoryExists(Dir)) API.ConfigFilesystem.CreateDirectory(Dir);
+                bool diag = PossessionConfig.Diagnostics;
+                float t0 = diag ? UnityEngine.Time.realtimeSinceStartup : 0f;
                 string text = ledger.Serialize();
+                float t1 = diag ? UnityEngine.Time.realtimeSinceStartup : 0f;
                 var bytes = new byte[text.Length];
                 for (int i = 0; i < text.Length; i++) bytes[i] = (byte)text[i];   // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
+                if (diag)
+                    Debug.Log($"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms " +
+                        $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.Containers.Count}");
             }
             catch (System.Exception e) { Debug.LogWarning($"[ItemChecklist] possession save failed: {e.Message}"); }
         }

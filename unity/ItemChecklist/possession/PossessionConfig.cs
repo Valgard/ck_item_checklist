@@ -29,5 +29,32 @@ namespace ItemChecklist.Possession
                 return r;
             }
         }
+
+        private static bool? _diagCached;
+
+        /// <summary>When true, the possession scan logs per-scan timing + ledger size, the
+        /// save logs serialize/write timing, and a one-time dump of the distinct counted
+        /// placed objects (with tags + IsWorldNature verdict) is written to Player.log — to
+        /// diagnose a recurring stutter or spot wild nature leaking past the blacklist in a
+        /// new biome. Default false; read once at startup, so set it in the config and
+        /// relaunch to toggle. Zero overhead when false.</summary>
+        public static bool Diagnostics
+        {
+            get
+            {
+                if (_diagCached.HasValue) return _diagCached.Value;
+                bool d = false;
+                try
+                {
+                    API.Config.Register("ItemChecklist", "Possession",
+                        "Log possession-scan perf + a one-time counted-object dump to Player.log (stutter diagnosis / world-nature blacklist completion).",
+                        "diagnostics", false);
+                    if (API.Config.TryGet("ItemChecklist", "Possession", "diagnostics", out bool v)) d = v;
+                }
+                catch { /* config unavailable — keep default */ }
+                _diagCached = d;
+                return d;
+            }
+        }
     }
 }
