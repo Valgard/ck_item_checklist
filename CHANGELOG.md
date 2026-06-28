@@ -6,6 +6,36 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.0.3] - 2026-06-29
+
+A possession-accuracy and performance patch.
+
+### Fixed
+
+- **Possession now counts only your real base, not half the world.** "Owned"
+  base storage is anchored on your **workbenches** (and the crafting stations
+  standing next to them). Previously any cluster of crafting stations counted as
+  a base — including the ones the game itself places in world structures — so
+  loot in abandoned camps, vaults and ruins, and items inside unopened world
+  chests you merely walked past, were wrongly counted as yours. The game never
+  puts a workbench in a world structure, so only your actual base counts now.
+  Your owned numbers will drop to reflect what you genuinely have.
+- **No more peaks that build up the longer you play, or away from your base.**
+  World-generated nature near a base (bushes, grass, kelp, stalagmites, ore
+  deposits) was being remembered as "owned" and steadily bloating the save file,
+  so each autosave hitched more and more over a session — even far from home.
+  Wild nature is no longer counted as a placed possession (it still counts when
+  actually stored in a chest or carried), and autosaves now skip rewriting the
+  possession data when nothing has changed.
+
+### Changed
+
+- **Your possession data rebuilds itself once, cleanly.** On the first load
+  after this update the stored possession ledger — which had collected world
+  content from everywhere you had explored — is discarded and rebuilt from your
+  real base. This is automatic and one-time; your owned counts will settle to
+  your actual base contents.
+
 ## [1.0.2] - 2026-06-27
 
 A performance patch.
