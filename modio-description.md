@@ -1,3 +1,5 @@
+# Item Checklist
+
 **Item Checklist** adds a scrollable, searchable checklist of every discoverable
 item in Core Keeper — vanilla and mod-added alike — so you always know what's
 left to find, and how much of it you own.
@@ -37,3 +39,9 @@ Requires **CoreLib**.
 Per-colour possession is counted for placeable furniture only (not floor or wall
 tiles); non-paintable shape variants share a single row; and right after the list
 refreshes the search field may need one extra click to take focus.
+
+---
+
+*Built with the official Pugstorm Core Keeper Mod SDK. Personal-use,
+non-commercial (Core Keeper EULA). Not affiliated with or endorsed by
+Pugstorm.*
