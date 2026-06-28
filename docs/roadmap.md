@@ -250,6 +250,34 @@ remaining backlog.
   neutral). F3 (cache `ResolveWorld`), F2 (anchor spatial-hash) and F4 (reuse alloc
   buffers) were all **measured unnecessary** — `world`/`setup` were 0.26/0.12ms and only
   44 anchors. Pure behavioural C# (one query split + two loop reads); no prefab/art.
+- **Iter-28 -- possession scan: exclude world nature. DONE** (see
+  `docs/iteration-history.md`). A *second*, distinct stutter from Iter-27: peaks that grow
+  with session length and persist away from base. On-disk evidence: the possession ledger
+  had grown to **5503 entries / 89 KB**, ~90% **world-spawned nature** (bushes/grass/kelp/
+  stalagmites/lilies/ruins) counted as "owned" by Iter-20's place-object path and remembered
+  forever. The real peak was **not the scan** but the **autosave `Serialize()`** of that
+  89 KB ledger (12–37ms main-thread spike, also pushing CK's host sim over budget). **No
+  object-level signal separates wild nature from placed objects** in CK (cat/stack/icon/
+  craft/sell/tags/DontDropSelfCD/Diggable/Destructible all collide: Stalagmite ≡
+  CavelingFloorTile, GraveTree ≡ WayPoint), proven over three in-game probe rounds — so the
+  filter is a **curated tag+ObjectID blacklist** (`PossessionClassifier.IsWorldNature`: tags
+  Greenery/Destructible/CattleKelpFood/Ruins + a short tag-less-straggler ID list, editable).
+  Gated on **path #1 only** (placed-object count) — container contents + carried untouched,
+  so nature stored in a chest still counts and remember-from-afar is preserved. A **one-time
+  `PruneByPredicate` at first scan** evicts the pre-existing backlog (`PruneStaleNear`'s
+  180-tile window was far too slow), ledger **5503→~520**, save spike + host-overrun warnings
+  gone. Verified smooth in-game (1.2.1.5). Process lesson: a runaway background decompile-grep
+  ate CPU through every test and confounded the "is it smooth?" signal for several rounds —
+  kill stray background jobs before measuring perf.
+- **Iter-29 (tentative) -- chunk / time-slice the possession scan.** The 3s
+  `PossessionScanner.Scan` iterates the full ~2000-entity loaded-world set on a single tick;
+  a ~9.6ms scan on one frame every 3s is a felt micro-hitch even "under budget". Spread one
+  pass across several ticks so no single tick does the whole scan. **Not a regression** (1.0.2
+  had the identical scan and was smooth) — a nice-to-have smoothness pass. Real complexity to
+  weigh: hold the entity snapshot across frames (Persistent allocator + disposal, not
+  TempJob), accumulate `liveKeys` across all chunks **before** `PruneStaleNear` runs (it
+  assumes a full pass), and handle world-unload mid-pass. Measure the current scan first; the
+  simpler lever (raise the interval 3s→5–6s) may suffice. Requested 2026-06-28.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered

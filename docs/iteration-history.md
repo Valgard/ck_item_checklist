@@ -5,8 +5,8 @@ onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
 canonical per-iter merge points; retained (ADR-gated) design specs live under
 `docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
 
-As of 2026-06-27: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), and Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter) are DONE on main. Iter-3.8
+As of 2026-06-28: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter), and Iter-28 (possession scan — exclude world nature via tag+ID blacklist + one-time ledger eviction; kills the autosave-serialize spike) are DONE on main. Iter-3.8
 replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
 entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
 pool recycled from `IScrollable.UpdateContainingElements`, reporting the
@@ -1178,3 +1178,65 @@ spatial-hash (only 44 anchors → the `WithinAnchor` inner loop is negligible; `
 small and no GC-signature spikes appeared). The standing project lesson held again: the
 single, evidence-backed change beat a bundle of plausible-but-unmeasured optimisations. Pure
 behavioural C# (one query split + two loop-read swaps); no prefab/art touch.
+
+**Iter-28 (possession scan — exclude world nature) — DONE (2026-06-28, branch `iter-28`).**
+A *second*, distinct stutter beyond Iter-27 (the user was explicit: "Iter-27 fully solved
+the symptom it described; these are new symptoms"): peaks that worsen the **longer** a
+session runs and persist **away from base** — a time-accumulating, location-independent
+signature, unlike Iter-27's in-base entity-loop spike.
+
+**Root cause (measured, three escalating probes).** On-disk evidence with no build: the
+character's `possession-<guid>.txt` ledger had grown to **5503 entries / 89 KB**, of which
+**99 % were single placed objects with no contents** and **~90 % were world-spawned nature**
+(Bush 5619 ×1102, Stalagmite 5610 ×988, WaterKelp 5613 ×922, TallGrass 5620 ×864, …).
+Iter-20's "count the placed object itself" path counted wild nature near a clustered anchor
+as owned, and the per-`(x,z)` ledger **remembered it forever** (`PruneStaleNear` only prunes
+within 180 tiles). A throwaway PERF probe pinned the actual peak: **not the scan** — the
+Iter-27 data already showed `BuildView` was ~0.8 ms even at 5503 — but the **autosave SAVE**:
+`SaveManager.WriteCharacter` → `Serialize()` of the 89 KB ledger was a **12–37 ms main-thread
+spike** every autosave, which also pushed CK's *host simulation* over its 55 ms frame budget
+(`ServerUpdateFrequencyTracker` warnings: 626/1109 frames over budget). Time-accumulating
+(ledger grows) and location-independent (autosave is time-based) — both symptoms explained.
+
+**The discriminator is impossible — the hard lesson.** "Exclude wild nature, keep everything
+else" needs to tell a wild Bush/Stalagmite from a placed Wall/Torch/Trophy/WayPoint. Three
+in-game probe rounds proved **no object-level signal separates them**: `cat`/`stack`/`icon`
+are uniformly true; `craft` collides (the PottedGoldenOrbBush 5589 is craftable décor, the
+CavelingSpearmanTrophy/SlimeTrophy 5181/5088 are non-craftable décor); `tags` collide
+(Stalagmite and WaterLily are tag-less, exactly like the WayPoint that must count); and the
+entity-level candidates `DontDropSelfCD`/`DiggableCD`/`DestructibleObjectCD` collide too
+(`DontDropSelfCD` is an `IEnableableComponent` → present on everything; Stalagmite ≡
+CavelingFloorTile, GraveTree ≡ WayPoint ≡ Idol ≡ RuinsPiece on every probed column). CK
+simply does not encode "world-generated vs player-placed" in object data. So
+`PossessionClassifier.IsWorldNature` is the user-chosen answer: a **curated tag + ObjectID
+blacklist** — nature tags (`Greenery`/`Destructible`/`CattleKelpFood`/`Ruins`, stable enum
+ints 5/13/33/4) catch the bulk and future tagged nature; a short ID list
+(Stalagmite/WaterLily/GraveTree/TallLandKelp/CavelingFloorTile/RuinsPiece) catches the
+tag-less stragglers. Editable by design.
+
+**The fix — gate + one-time eviction.** The blacklist gates **path #1 only** (the placed-
+object `AddOne`); container contents (`AddBuffer`) and carried are untouched, so nature
+actually STORED in a chest still counts (verified via a path-#2 probe that showed the user's
+chest-stored Stalagmite/ores/armor/seeds were captured independently) and the
+remember-from-afar feature is preserved. Because `PruneStaleNear`'s 180-tile window was far
+too slow to clear the 5500-entry backlog (it only reached ~3866 after a minute of roaming,
+so the save spike persisted), a **one-time `PruneByPredicate(IsWorldNature)` at the first
+scan** (where `PugDatabase` is ready) evicts the whole pre-existing backlog at once. Result:
+ledger **5503 → ~520 (89 KB → 9 KB)**, save spike gone, host-overrun warnings gone (0 vs 3),
+verified **smooth at base** in-game (1.2.1.5).
+
+**Process lesson — the runaway background grep.** For several diagnosis rounds a
+decompile-ID `ugrep` I had launched (a per-ID loop over the 120-DLL decompile) **never
+terminated** and ate CPU in the background through *every* in-game test, confounding the
+"is it smooth?" signal — under CrossOver/Wine a sustained background grep competes directly
+with the game. The user's key observation ("it was smooth before with the same mods") pinned
+it: the only new variable since 1.0.2 was that grep, not the mod. Killing it + the small
+ledger = smooth. **Kill stray background jobs before trusting any in-game perf measurement.**
+
+**Deferred → Iter-29:** chunking/time-slicing the 3s scan so one tick doesn't do the full
+~2000-entity pass (a ~9.6 ms scan on one frame every 3 s is a felt micro-hitch even "under
+budget"). Not a regression (1.0.2 had the identical scan and was smooth), so it is a
+nice-to-have smoothness pass, weighed against its real complexity (holding the entity
+snapshot across frames + accumulating `liveKeys` before pruning). Pure behavioural C#
+(`PossessionClassifier.IsWorldNature` + `PossessionLedger.PruneByPredicate` + a one-time
+scan call); no prefab/art touch.
