@@ -43,6 +43,19 @@ namespace ItemChecklist.Possession
             if (world == null) return PossessionView.Empty;
             var em = world.EntityManager;
 
+            // Iter-28: one-time eviction of pre-existing world nature from the loaded ledger.
+            // The old scan persisted nature into the per-(x,z) ledger (it grew to ~5500
+            // entries); PruneStaleNear's 180-tile window is far too slow to clear that backlog,
+            // leaving the autosave-serialize spike. Do a full one-time sweep here, where
+            // PugDatabase is ready. The scan gate below keeps the ledger nature-free from now
+            // on; legitimately-stored nature re-adds itself via container contents.
+            if (!ledger.WorldNaturePruned)
+            {
+                ledger.PruneByPredicate(itemId =>
+                    PossessionClassifier.IsWorldNature(itemId, PugDatabase.GetObjectInfo((ObjectID)itemId, 0)));
+                ledger.WorldNaturePruned = true;
+            }
+
             // Anchors.
             var anchors = new List<Vector2>();
             using (var anchorQuery = em.CreateEntityQuery(
@@ -166,24 +179,30 @@ namespace ItemChecklist.Possession
                 var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
                 if (info == null || (int)info.objectType != PossessionClassifier.PlaceablePrefab) continue;
 
-                // A placed, owned furniture object within range. Count the object itself
-                // (+1), plus — if it is storage/display (not a crafting station) — its
-                // contents. Stations' transient input/output slots are NOT counted.
+
+                // A placed object within range. Iter-28: count the object itself ONLY when it
+                // is NOT world-spawned nature. Wild nature (bushes/grass/kelp/stalagmites/ruins)
+                // is excluded here so it never enters the ledger (the autosave-serialize spike);
+                // it still counts via container contents (AddBuffer below) or carried. Walls/
+                // torches/furniture/trophies/waypoints are kept. Stations' transient input/
+                // output slots are NOT counted (the !CraftingCD guard).
+                bool owned = !PossessionClassifier.IsWorldNature(id, info);
+                bool isContainer = !em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e);
+                if (!owned && !isContainer) continue;   // wild nature with no storage → skip
                 var tile = Tile(scan, key);
-                AddOne(tile, id);
-                // Iter-17: a painted/coloured placeable carries its paint colour in
-                // variation → also credit per (id, colour) so the per-colour checklist slot
-                // shows its own owned count (mirrors the cattle path; live-only). variation 0
-                // = the base/unpainted item, already counted by AddOne above (the base row).
-                // Tile floors/walls aren't individual entities → never reach here → "—".
-                if (od.variation != 0)
+                if (owned) AddOne(tile, id);
+                // Iter-17: a painted/coloured placeable carries its paint colour in variation →
+                // also credit per (id, colour) for the per-colour slot (live-only). variation 0
+                // = base item, already counted by AddOne. Tile floors/walls aren't individual
+                // entities → never reach here → "—".
+                if (owned && od.variation != 0)
                 {
                     long cck = DiscoveredState.PackKey(id, od.variation);
                     colourCounts[cck] = (colourCounts.TryGetValue(cck, out var pcc) ? pcc : 0) + 1;
                 }
-                if (!em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e))
-                    AddBuffer(em, e, tile, petSkins);
+                if (isContainer) AddBuffer(em, e, tile, petSkins);
             }
+
 
             foreach (var kv in scan) { ledger.SetLiveContainer(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
 
@@ -204,6 +223,7 @@ namespace ItemChecklist.Possession
             ledger.SetCarried(carried);
             return ledger.BuildView(liveKeys, petSkins, colourCounts);
         }
+
 
         // Keep only stations that have ≥1 other station within ClusterRadius — a base
         // packs stations together; a lone remote station is not a base anchor.
@@ -241,6 +261,7 @@ namespace ItemChecklist.Possession
                 var item = buf[j];
                 if (item.objectID == ObjectID.None) continue;
                 int id = (int)item.objectID;
+
 
                 // Iter-16.3: a caged animal in storage is the cattle ObjectID + auxData
                 // (verified in-game: a caged RolyPoly appears as objectID 1303). Credit the

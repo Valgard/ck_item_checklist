@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ItemChecklist.Possession
@@ -24,6 +25,29 @@ namespace ItemChecklist.Possession
         public void SetCarried(Dictionary<int, int> carried) => _carried = carried ?? new Dictionary<int, int>();
 
         public void SetLiveContainer(long key, Dictionary<int, int> contents) => _containers[key] = contents;
+
+        // Iter-28: set once a ledger has had its pre-existing world-nature entries evicted
+        // (a one-time cleanup of the old bloated ledger; the scan gate keeps it clean after).
+        public bool WorldNaturePruned;
+
+        /// <summary>One-time cleanup: drop every item whose id matches <paramref name="removeId"/>
+        /// from all containers, and drop containers that become empty. Used to evict world
+        /// nature the pre-Iter-28 scan persisted into the ledger; legitimately-stored items
+        /// re-add themselves via the live scan. Collect-then-remove to avoid mutating during
+        /// iteration.</summary>
+        public void PruneByPredicate(Func<int, bool> removeId)
+        {
+            List<long> dropKeys = null;
+            foreach (var pair in _containers)
+            {
+                List<int> dropItems = null;
+                foreach (var kv in pair.Value)
+                    if (removeId(kv.Key)) (dropItems ??= new List<int>()).Add(kv.Key);
+                if (dropItems != null) foreach (var k in dropItems) pair.Value.Remove(k);
+                if (pair.Value.Count == 0) (dropKeys ??= new List<long>()).Add(pair.Key);
+            }
+            if (dropKeys != null) foreach (var k in dropKeys) _containers.Remove(k);
+        }
 
         /// <summary>Self-healing: drop remembered containers that SHOULD be loaded
         /// (within `radius` of the player, i.e. inside the load bubble) yet were not
