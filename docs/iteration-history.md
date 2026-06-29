@@ -1311,9 +1311,13 @@ décor (kept), wild trees away are excluded structurally by the workbench gate.
 **Measured after (against the savegame, per the lesson):** ledger **523 → 403, 0 remote**
 (>100 tiles from Core); save-skip now dominates (`SKIPPED 9` vs `write 3`); scan **~1 ms outside
 base** (no workbench → no anchors → nothing counted) and ~4–5 ms at base; host-overrun **4 vs
-626** frames. **The "massive lag spike outside base" was NOT ItemChecklist:** the log showed
-**40× "GarbageCollector disposing of ComputeBuffer"** — a GPU resource leak in a **bundled**
-render asset (no mod `.cs` references ComputeBuffer; prime suspect *Enemy Health Bars*, which
-renders one bar per enemy and so scales with the high enemy count exactly while exploring).
-ItemChecklist allocates **zero** ComputeBuffers (verified). Realised across five commits (diag,
-save-skip, ore blacklist, workbench anchor + ledger v2); built/sandbox-verified on CK 1.2.1.5.
+626** frames. **The "massive lag spike outside base" was confirmed (by isolation, after the
+1.0.3 publish) to be *another mod*, not ItemChecklist:** disabling **Enemy Health Bars** (modId
+4164578 — it renders one bar per enemy, scaling with the high enemy count while exploring) via
+`state.json`'s `disabledMods` made a full session run with **no spikes**, while ItemChecklist's
+scan is ~1 ms. The first-pass **"40× ComputeBuffer-GC leak" theory was a red herring** — those
+`disposing of ComputeBuffer` warnings all fire at *process shutdown* (exit cleanup), not during
+play, and the count was **unchanged (40)** with the mod disabled (the lesson is distilled in
+`docs/gotchas.md § "GarbageCollector disposing of ComputeBuffer" is usually a SHUTDOWN artifact`).
+Realised across five commits (diag, save-skip, ore blacklist, workbench anchor + ledger v2);
+built/sandbox-verified on CK 1.2.1.5.

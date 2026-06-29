@@ -288,9 +288,9 @@ remaining backlog.
   suffices → cluster filter gone). + a 64-bit-FNV save-write-skip, a `#icl-ledger-v2` one-time
   migration (discard polluted pre-fix ledgers), and the near-base OreBoulder blacklist.
   Measured: ledger 523→403 / 0 remote, save-skip dominates, scan ~1ms outside base,
-  host-overrun 4 vs 626. The "outside-base spike" itself was **not ItemChecklist** — 40×
-  ComputeBuffer-GC from a bundled render asset (prime suspect Enemy Health Bars); the mod uses
-  zero ComputeBuffers.
+  host-overrun 4 vs 626. The "outside-base spike" itself was **not ItemChecklist** — isolation
+  (disable via `state.json`) confirmed *Enemy Health Bars* (per-enemy rendering); the first-pass
+  ComputeBuffer-GC theory was a red herring (those warnings fire only at process shutdown).
 - **Iter-29 (tentative; largely obsoleted by Iter-31 — the workbench-anchor fix shrank the
   ledger and killed the remote churn, so the scan is now ~1ms outside base / ~4–5ms at base
   with no felt hitch; kept only as a nice-to-have) -- chunk / time-slice the possession scan.** The 3s

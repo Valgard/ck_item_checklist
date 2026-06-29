@@ -1348,15 +1348,27 @@ inside world chests never opened). The on-disk file beats the inference every ti
 both be reached; let it redirect the fix (here: from "blacklist those boulders" to "the anchor
 model itself is wrong"). (Memory: `feedback_validate_against_savegame`.)
 
-### A bundled render asset can leak `ComputeBuffer`s — an exploration hitch that looks like your mod
+### "GarbageCollector disposing of ComputeBuffer" is usually a SHUTDOWN artifact — check WHERE it fires
 
-A frame-hitch correlated with exploring/enemies is easy to pin on your own mod, but a **bundled
-render asset** in *another* loaded mod can leak GPU `ComputeBuffer`s and cause it. A code grep
-won't find it in your tree — no `.cs` references `ComputeBuffer` (it's inside a prefab/material
-bundle, not source). Iter-31's "massive lag spike outside base": the log showed **40×
-"GarbageCollector disposing of ComputeBuffer"**, a GPU leak in a bundled render asset (prime
-suspect *Enemy Health Bars*, which renders one bar per enemy and so scales exactly with the high
-enemy count while exploring) — **not** ItemChecklist, which allocates zero ComputeBuffers.
-Diagnostic: when a hitch tracks a content type (enemies/exploration), grep `Player.log` for
-`ComputeBuffer` GC churn and identify which loaded mod ships per-entity render bundles — but
-**prove your own innocence first** with `grep -rn ComputeBuffer unity/` over your own tree.
+A frame-hitch correlated with exploring/enemies is easy to misattribute. Iter-31's "lag spike
+outside base" looked like a textbook case: the log showed **40× "GarbageCollector disposing of
+ComputeBuffer"**, and the leading theory was a GPU leak in *another* mod's bundled render asset
+(no `.cs` references `ComputeBuffer`, so it would hide inside a prefab/material bundle, not
+source). **Both halves of that theory were wrong** — and how they were caught *is* the lesson:
+
+- **Check the log POSITION of the GC warnings.** All 40 sat in the **last 40 lines** of the log,
+  immediately after `Input System module state changed to: Shutdown` — they are the GC's
+  **process-exit cleanup** of buffers never explicitly `Release()`d, not mid-play hitches (a
+  mid-play GC would *spread* the warnings through the log, not bunch them at the very end).
+  Benign. They never touched a gameplay frame.
+- **Isolate by toggling + the player's feel, not by a count.** The suspected render mod was
+  disabled via `state.json`'s `disabledMods` array (NOT the in-game mod menu — that triggers a
+  mod.io resync that deletes fake-ID dev entries; edit `…/mod.io/5289/state.json`, add the modId
+  string to `existingUsers/<uid>/disabledMods`, keep it in `subscribedMods`). The next session
+  ran **with no spikes** — *that* confirmed the culprit (a per-enemy render mod, by its rendering
+  cost), while the ComputeBuffer count was **unchanged at 40**, proving those warnings were never
+  the cause.
+
+Lesson: don't promote a GC/leak warning to "the gameplay lag" without checking its **log
+position**; and isolate a render mod by **disable + subjective smoothness**, not by a GC count.
+(Prove your own innocence first: `grep -rn ComputeBuffer unity/` — ItemChecklist's is zero.)

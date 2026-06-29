@@ -72,10 +72,10 @@ alongside it.
   contents of containers near one of your **workbenches** (and the crafting stations
   beside it). Because the game never places a workbench in a world structure, loot in
   camps, vaults, ruins or unopened world chests you merely explored past no longer
-  counts as yours — there are no remote-structure false positives. (Note: an observed
-  "lag spike while exploring outside the base" was traced to a *different* mod's
-  bundled render asset leaking GPU buffers, not to this mod — ItemChecklist allocates
-  none.)
+  counts as yours — there are no remote-structure false positives. (ItemChecklist's
+  possession scan is lightweight — about 1 ms — so it isn't the source of
+  exploration-time frame hitches; an observed lag spike turned out to be a different
+  mod.)
 
 ## Localisation
 
