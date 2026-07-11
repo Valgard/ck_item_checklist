@@ -95,3 +95,20 @@ ControlMapper:
     hint: "Keybind name shown in the game Controls menu."
     en: "Item Checklist: Toggle"
     de: "Item-Checkliste: Umschalten"
+
+# Mod Settings Menu section (Options -> Mod Settings). The framework looks up each SETTING label by
+# `<ModId>-Config/<key>` and the section HINT by `<ModId>-Config/_hint`. Slider/Toggle values render
+# without loc, so (unlike a Choice) no per-option terms are needed.
+ItemChecklist-Config:
+  _hint:
+    hint: "Section hint shown under the Item Checklist heading."
+    en: "Possession tracking - how far from a workbench storage counts as yours, plus optional diagnostic logging."
+    de: "Besitz-Tracking - wie weit von einer Werkbank Lager als deins zählt, plus optionales Diagnose-Protokoll."
+  anchorRadius:
+    hint: "Slider label - base radius in tiles around a workbench within which storage counts as owned."
+    en: "Base radius"
+    de: "Basis-Radius"
+  diagnostics:
+    hint: "Toggle label - possession-scan diagnostic logging to Player.log."
+    en: "Diagnostic logging"
+    de: "Diagnose-Protokoll"

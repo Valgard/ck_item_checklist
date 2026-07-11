@@ -39,7 +39,7 @@ namespace ItemChecklist.Possession
         /// streamed) storage and overwrite the persisted file with the loss.</summary>
         public static PossessionView Scan(PossessionLedger ledger, PetCollection pets, float radius, bool allowPrune)
         {
-            bool diag = PossessionConfig.Diagnostics;
+            bool diag = ModConfig.Diagnostics;
             float dT0 = diag ? Time.realtimeSinceStartup : 0f;
             var world = ResolveWorld();
             if (world == null) return PossessionView.Empty;
@@ -260,7 +260,7 @@ namespace ItemChecklist.Possession
         }
 
 
-        // --- Diagnostics (config-gated via PossessionConfig.Diagnostics; default off, zero
+        // --- Diagnostics (config-gated via ModConfig.Diagnostics; default off, zero
         // overhead when off). The scan logs per-scan timing + ledger size, the save logs
         // serialize/write (PossessionStore), and once per launch the distinct counted placed
         // objects are dumped with their tags + IsWorldNature verdict — so a `nature=False`

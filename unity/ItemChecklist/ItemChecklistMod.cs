@@ -4,6 +4,7 @@ using CoreLib.Submodule.ControlMapping;
 using CoreLib.Submodule.UserInterface;
 using ItemChecklist.Possession;
 using ItemChecklist.UI;
+using ModSettingsMenu.Settings;
 using PugMod;
 using Rewired;
 using UnityEngine;
@@ -219,6 +220,17 @@ namespace ItemChecklist
         public void Init()
         {
             Debug.Log("[ItemChecklist] Init");
+
+            // Register the possession-tracking settings; ModConfig reads these live handles
+            // (replaces the former CoreLib API.Config surface). Section uses the default AsDeclared
+            // sort, so builder-call order IS render order: base radius, then the diagnostics toggle.
+            ModSettings.Section(this)
+                .Hint("Possession tracking - how far from a workbench storage counts as yours, plus optional diagnostic logging.")
+                .Slider(out var radius, "anchorRadius", 16f, 96f, 48f, 8f, SliderDisplay.Number)
+                .Toggle(out var diag, "diagnostics", false)
+                .Build();
+            ModConfig.Bind(radius, diag);
+
             Catalog = new ItemCatalog();
             ItemCatalogLocChangeHook.Subscribe();
             // Iter-17: cattle colour slots are FIXED (all 5 per species baked up front),
@@ -284,7 +296,7 @@ namespace ItemChecklist
                 {
                     _possessionTimer = PossessionRefreshSeconds;
                     bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
-                    Possession = PossessionScanner.Scan(s_ledger, Pets, PossessionConfig.AnchorRadius, allowPrune);
+                    Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, allowPrune);
                     // A scan may have newly collected a pet skin (no DiscoveredState.Changed
                     // fires for that — CK has no per-skin discovery event), so nudge the HUD.
                     RefreshHudCounterIfChanged();
@@ -329,7 +341,7 @@ namespace ItemChecklist
                     s_ledger = PossessionStore.Load(activeGuid);
                     Pets = PetCollectionStore.Load(activeGuid);
                     _possessionPlayableTime = 0f;   // fresh load → withhold prune until grace
-                    Possession = PossessionScanner.Scan(s_ledger, Pets, PossessionConfig.AnchorRadius, false);
+                    Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, false);
                 }
                 s_ledgerGuid = activeGuid;
             }
@@ -403,7 +415,7 @@ namespace ItemChecklist
                     // field then ignores keystrokes until another widget is clicked).
                     if (s_ledger != null)
                         Possession = PossessionScanner.Scan(
-                            s_ledger, Pets, PossessionConfig.AnchorRadius,
+                            s_ledger, Pets, ModConfig.AnchorRadius,
                             _possessionPlayableTime > PossessionPruneGraceSeconds);
                     ListView?.Refresh();
                     UserInterfaceModule.OpenModUI("ItemChecklist:Window");

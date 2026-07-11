@@ -37,7 +37,7 @@ namespace ItemChecklist.Possession
             if (string.IsNullOrEmpty(guid) || ledger == null) return;
             try
             {
-                bool diag = PossessionConfig.Diagnostics;
+                bool diag = ModConfig.Diagnostics;
                 float t0 = diag ? UnityEngine.Time.realtimeSinceStartup : 0f;
                 string text = ledger.Serialize();
                 float t1 = diag ? UnityEngine.Time.realtimeSinceStartup : 0f;

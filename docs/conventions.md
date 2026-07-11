@@ -366,6 +366,7 @@ tree):
 ```
 unity/ItemChecklist/
   ItemChecklistMod.cs             IMod bootstrap (EarlyInit/Init/Update/Shutdown)
+  ModConfig.cs                    Mod Settings Menu config adapter (AnchorRadius + Diagnostics; ex-possession/PossessionConfig)
   ItemCatalog.cs                  catalog bake + lookup
   ItemCatalogLocChangeHook.cs     Harmony patch — re-bake on language change
   ItemCatalogWorldLoadHook.cs     Harmony patch — kick bake on world load (OnOccupied)
@@ -417,7 +418,6 @@ unity/ItemChecklist/
     PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes; #icl-ledger-v2 marker (Iter-31)
     PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem); FNV-64 save-write-skip (Iter-31)
     PossessionView.cs             immutable per-refresh snapshot (Count(objectId))
-    PossessionConfig.cs           AnchorRadius (Iter-20) + Diagnostics (Iter-30)
     PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues, IsWorldNature (Iter-28), IsWorkbench (Iter-31))
     PetCollection.cs              persistent ever-owned per-(objectID,skinIndex) ledger (Iter-16.1)
     PetCollectionStore.cs         per-GUID persistence — petskins-<guid>.txt (Iter-16.1)
