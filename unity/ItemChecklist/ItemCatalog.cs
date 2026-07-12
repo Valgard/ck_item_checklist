@@ -741,7 +741,7 @@ namespace ItemChecklist
             if (disc == null || suppressedCookedPhantoms.Count == 0) return;
             foreach (var key in suppressedCookedPhantoms)
             {
-                int oid = (int)(key >> 32), v = (int)(uint)key;
+                int oid = DiscoveredState.KeyObjectId(key), v = DiscoveredState.KeyVariation(key);
                 if (disc.IsDiscovered(oid, v))
                     PhantomViolationStore.Record(oid, v);
             }
