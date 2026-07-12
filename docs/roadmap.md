@@ -345,6 +345,30 @@ remaining backlog.
   DOES show a rebind row under "Mods"** (the project's standing "read the working mod before
   decompile-guessing" rule) + inspect CoreLib `ControlMappingModule` — before touching code.
   Requested 2026-07-12.
+- **Iter-35 (tentative) -- foreign-mod item shows raw objectID as name + missing loc term.**
+  User-reported 2026-07-12 (screenshot): a discovered item from **another installed mod** —
+  *ChestsGalore*'s `WorkbenchChestExtra`, **objectID 32773** — renders its **name as the raw
+  number "32773"** in the checklist row, while its Iter-22 hover tooltip shows CK's
+  missing-term placeholder **`missing: Items/ChestsGalore:WorkbenchChestExtra`**. Icon, owned
+  count and the discovery tick all resolve correctly — **only the name is broken.** This
+  confirms `ItemCatalog.Bake` (Loop 1 over `PugDatabase.objectsByType`) includes **other
+  mods' registered items** — correct for a completionist catalog — but their localized names
+  don't resolve. **Prüfen warum, dann fixen.** The bug is already half-localized by the two
+  disagreeing render paths: the **row label** (ICL's `GetObjectName` port, baked) falls back
+  to `objectID.ToString()`, whereas CK's **native tooltip** path falls back to `missing:
+  <term>` — so ICL's bake-time name resolution diverges from CK's own. **Not yet
+  investigated** — hypotheses to *verify*, not assume: (a) the term is **mod-namespaced**
+  (`Items/ChestsGalore:WorkbenchChestExtra`, note the `ChestsGalore:` segment) and ICL's
+  resolution / `GetObjectName(localize:true)` path mishandles that form; (b) ChestsGalore
+  simply ships **no term** for the item (a *foreign-mod* bug) → the real ICL fix is a **better
+  fallback than the raw objectID**: show the term tail, an "Unknown"/`???`-style placeholder,
+  or exclude un-nameable foreign items; (c) a **bake-timing** race — baked before the other
+  mod's I2 terms load (cf. the Iter-11 loc-term class + the language-change re-bake). **Design
+  question underneath it:** should ICL include foreign-mod items at all, and if so with what
+  name policy (include-with-fallback vs. exclude vs. a config toggle)? **First step:**
+  reproduce with ChestsGalore installed, dump what `GetObjectName(buf, true)` / `(buf, false)`
+  return for objectID 32773 at bake time vs. later, then decide the policy before coding.
+  Requested 2026-07-12.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
