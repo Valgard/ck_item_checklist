@@ -207,6 +207,14 @@ namespace ItemChecklist
                 var levelCache       = new Dictionary<long, int>();
                 var sellValueCache   = new Dictionary<long, int>();
                 var craftableCache   = new Dictionary<long, bool>();
+                // Iter-32: guard against adding the same (objectID, variation) to
+                // `accepted` twice. A golden-ingredient recipe turns straight into a
+                // Rare family (CookingIngredientCD.turnsIntoFood → a Rare ID) whose
+                // CookedFoodCD.rareVersion self-references, so Loop 2's tier fan-out
+                // emits that (rareId, variation) via BOTH the base and the rare
+                // branch — duplicating the catalog row and double-counting the dish
+                // in N / M. Measured in-game: 11 such families, 858 duplicate keys.
+                var seenKeys         = new HashSet<long>();
 
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
@@ -362,19 +370,19 @@ namespace ItemChecklist
                     AddCookedEntry(
                         new ObjectDataCD { objectID = baseFamily, variation = variation },
                         localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                        levelCache, sellValueCache, craftableCache, accepted);
+                        levelCache, sellValueCache, craftableCache, accepted, seenKeys);
                     if (tierMap.TryGetValue(baseFamily, out var tiers))
                     {
                         if (tiers.rare != ObjectID.None)
                             AddCookedEntry(
                                 new ObjectDataCD { objectID = tiers.rare, variation = variation },
                                 localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                                levelCache, sellValueCache, craftableCache, accepted);
+                                levelCache, sellValueCache, craftableCache, accepted, seenKeys);
                         if (tiers.epic != ObjectID.None)
                             AddCookedEntry(
                                 new ObjectDataCD { objectID = tiers.epic, variation = variation },
                                 localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                                levelCache, sellValueCache, craftableCache, accepted);
+                                levelCache, sellValueCache, craftableCache, accepted, seenKeys);
                     }
                 }
 
@@ -635,10 +643,20 @@ namespace ItemChecklist
             Dictionary<long, int> levelCache,
             Dictionary<long, int> sellValueCache,
             Dictionary<long, bool> craftableCache,
-            List<ObjectDataCD> accepted)
+            List<ObjectDataCD> accepted,
+            HashSet<long> seenKeys)
         {
             var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
             if (info == null) return;
+
+            // Iter-32: skip a repeat (objectID, variation). A golden-ingredient
+            // recipe turns straight into a Rare family whose CookedFoodCD.rareVersion
+            // self-references, so Loop 2 emits this (rareId, variation) via BOTH the
+            // base and the rare branch (same baseFamily → same food variation).
+            // Without this guard the dish gets a duplicate `accepted` entry and is
+            // counted twice in the N / M discovery tally.
+            long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
+            if (!seenKeys.Add(key)) return;
 
             var (locText, locDontLocalize) = ResolveOne(od, localize: true);
             var (rawText, _)               = ResolveOne(od, localize: false);
@@ -649,7 +667,6 @@ namespace ItemChecklist
             if (string.IsNullOrEmpty(rawText))
                 rawText = PascalCaseSplitter.Split(od.objectID.ToString());
 
-            long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
             localizedNames[key]   = locText;
             unlocalizedNames[key] = rawText;
             accepted.Add(od);
