@@ -327,6 +327,24 @@ remaining backlog.
   the `flag` + `num3/num4/num5` logic) before deciding whether the α-enumeration must be
   tier-gated. Note: `GetFoodVariation` encodes ingredients only; the tier is a separate
   objectID swap (`rareVersion`/`epicVersion`), so variation ≠ tier. Requested 2026-07-12.
+- **Iter-34 (tentative) -- keybind rebind row missing under "Mods" in the controls menu.**
+  User-reported 2026-07-12: ItemChecklist's toggle keybind (default F1) has **no rebind row
+  under the "Mods" section** of Core Keeper's Controls settings, so the player cannot remap
+  it from the menu (the bind still works and is technically rebindable — Iter-23 — but the UI
+  entry is absent). **Prüfen warum, dann fixen.** Context: the action is registered via CoreLib
+  `ControlMappingModule.AddKeyboardBind` in `IMod.EarlyInit`, with the display name coming from
+  the loc term `ControlMapper/ItemChecklist-ToggleChecklistPC` (Iter-11). **Not yet
+  investigated** — hypotheses to *verify*, not assume (the standing "measure, don't guess"
+  lesson): (a) CoreLib version/API drift — the mod pins `UserInterfaceModule` 4.0.4; the
+  `ControlMappingModule` registration may now need a category/section argument (or a separate
+  call) to surface the bind under the "Mods" header, or the API that populated it changed;
+  (b) the `ControlMapper/...` display-name term fails to resolve → CK's control menu creates
+  no visible row (parallels the Iter-25 missing-glyph / Iter-11 loc-term class); (c) a
+  registration-timing/order issue between `AddKeyboardBind` and when CK's Controls UI builds
+  its section list. **First step:** reproduce in-game, then read a **working reference mod that
+  DOES show a rebind row under "Mods"** (the project's standing "read the working mod before
+  decompile-guessing" rule) + inspect CoreLib `ControlMappingModule` — before touching code.
+  Requested 2026-07-12.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
