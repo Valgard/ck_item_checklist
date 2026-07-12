@@ -82,6 +82,10 @@ namespace ItemChecklist
         private Entry[] entries = Array.Empty<Entry>();
         private readonly Dictionary<long, int> keyToIndex = new Dictionary<long, int>();
 
+        // Iter-33: keys of cooked-food epic rows suppressed as unreachable (flag=false).
+        // Retained per bake so SaveManagerDiscoveryHook can warn if CK ever discovers one.
+        private readonly HashSet<long> suppressedCookedPhantoms = new HashSet<long>();
+
         public int Count => entries.Length;
         public Entry GetByIndex(int index) => entries[index];
         public bool TryGetIndex(int objectId, int variation, out int index) =>
@@ -144,6 +148,7 @@ namespace ItemChecklist
                 return;
             }
             baking = true;
+            suppressedCookedPhantoms.Clear();
             try
             {
                 float perfT0 = UnityEngine.Time.realtimeSinceStartup;
@@ -379,10 +384,19 @@ namespace ItemChecklist
                                 localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
                                 levelCache, sellValueCache, craftableCache, accepted, seenKeys);
                         if (tiers.epic != ObjectID.None)
-                            AddCookedEntry(
-                                new ObjectDataCD { objectID = tiers.epic, variation = variation },
-                                localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                                levelCache, sellValueCache, craftableCache, accepted, seenKeys);
+                        {
+                            // Iter-33: epic is reachable only when the variation's
+                            // ingredients trigger CK's flag (Rare-rarity Flower / Legendary).
+                            // Otherwise CK can never cook it — drop the phantom row and
+                            // remember the key for the safety-net log.
+                            if (CookedEpicReachable(variation))
+                                AddCookedEntry(
+                                    new ObjectDataCD { objectID = tiers.epic, variation = variation },
+                                    localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
+                                    levelCache, sellValueCache, craftableCache, accepted, seenKeys);
+                            else
+                                suppressedCookedPhantoms.Add(DiscoveredState.PackKey((int) tiers.epic, variation));
+                        }
                     }
                 }
 
@@ -677,6 +691,34 @@ namespace ItemChecklist
             sellValueCache[key]  = ComputeSellValue(od, info);
             craftableCache[key]  = info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0;
         }
+
+        // Iter-33: faithful mirror of CK's cook-tier gate (Pug.Other:324037-324049).
+        // An epic cooked dish is only ever produced (as a Cooking-skill bonus roll) when an
+        // ingredient is a Rare-rarity Flower OR any Legendary ingredient — the Rare check is
+        // Flower-gated, the Legendary check is type-agnostic. Deterministic per variation.
+        // Base + rare are always reachable, so only the epic emit is gated on this. Measured
+        // (Iter-33 probe, 1.2.1.5): golden-base ⟺ flag=true exactly; 858 reachable / 2145
+        // phantom of 3003 variations.
+        private static bool CookedEpicReachable(int variation)
+        {
+            ObjectID primary   = CookedFoodCD.GetPrimaryIngredientFromVariation(variation);
+            ObjectID secondary = CookedFoodCD.GetSecondaryIngredientFromVariation(variation);
+            var pInfo = PugDatabase.GetObjectInfo(primary);
+            var sInfo = PugDatabase.GetObjectInfo(secondary);
+            if (PugDatabase.HasComponent<FlowerCD>(primary)   && pInfo != null && pInfo.rarity == Rarity.Rare) return true;
+            if (PugDatabase.HasComponent<FlowerCD>(secondary) && sInfo != null && sInfo.rarity == Rarity.Rare) return true;
+            if ((pInfo != null && pInfo.rarity == Rarity.Legendary) || (sInfo != null && sInfo.rarity == Rarity.Legendary)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// True if (objectId, variation) is a cooked-food epic row that <see cref="Bake"/>
+        /// suppressed as unreachable (flag=false). Only ever populated for epic IDs
+        /// (9575-9589); a given (epicId, variation) is produced by exactly one ingredient
+        /// pair, so a key is never both emitted and suppressed. See Iter-33.
+        /// </summary>
+        internal bool IsSuppressedCookedPhantom(int objectId, int variation)
+            => suppressedCookedPhantoms.Contains(DiscoveredState.PackKey(objectId, variation));
 
         // Faithful port of ItemBrowser ObjectUtility.GetValue (sell mode) +
         // GetRaritySellValue. Returns 0 for unsellable items (None /
