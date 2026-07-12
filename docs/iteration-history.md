@@ -1321,3 +1321,53 @@ play, and the count was **unchanged (40)** with the mod disabled (the lesson is 
 `docs/gotchas.md § "GarbageCollector disposing of ComputeBuffer" is usually a SHUTDOWN artifact`).
 Realised across five commits (diag, save-skip, ore blacklist, workbench anchor + ledger v2);
 built/sandbox-verified on CK 1.2.1.5.
+
+**Iter-32 (cooked dishes double-counted in discovery) — DONE (2026-07-12, branch
+`iter-32`).** A user-reported bug: a cooked dish counted as **two** discovered items in the
+`N / M` tally. **Root-caused by measurement, not the roadmap's guess** — and this iteration
+is the textbook case for it: the user twice pushed back on a premature hypothesis, which
+measurement then overturned each time.
+
+**The bug.** `ItemCatalog.Bake` Loop 2 builds cooked-food permutations by iterating
+ingredient pairs (`j >= i`) and, per pair, emitting three tier entries via `AddCookedEntry`:
+`(baseFamily, V)`, `(rareVersion, V)`, `(epicVersion, V)` — all sharing the food variation
+`V = GetFoodVariation(i1, i2)`. `accepted` is a `List` (not a set) and the final catalog is
+built 1:1 from it, so a repeated `(objectID, variation)` duplicates the row; `Count =>
+entries.Length` and `CollectedCatalogCount()` then count the dish twice, and discovering it
+flips both rows (`N += 2`).
+
+**Three hypotheses; the first two wrong.** (1) The roadmap guessed a discovery-side
+double-mirror or `epicVersion == rareVersion`. A throwaway bake probe (committed-then-
+reverted) grouping `accepted` by `PackKey` showed **858 duplicate keys, all cooked food,
+each exactly ×2, all Rare-tier IDs (9550–9563)** — so it is catalog-side, not discovery-side
+(a parallel `SaveManagerDiscoveryHook` probe confirmed CK fires `SetObjectAsDiscovered` per
+clean `(objectID, variation)`). (2) But the Epic tier exists as its own ID range
+(`CookedSoupEpic` 9575 … `CookedCakeEpic` 9589), so `epicVersion == rareVersion` was
+implausible. (3) A second probe — `producedBy`: objectID → the `(branch, baseFamily)` calls
+emitting it — nailed the real mechanism: `id=9551 by=[rare(bf=9501), base(bf=9551),
+rare(bf=9551)]`. The **same baseFamily 9551** emits `9551` via BOTH its base and rare branch.
+
+**Mechanism.** A **golden ingredient**'s `CookingIngredientCD.turnsIntoFood` points straight
+at a **Rare** family ID (9551 `CookedPuddingRare`, not the Base 9501), so a Rare ID appears
+as a `baseFamily` in Loop 2; and that Rare family's `CookedFoodCD.rareVersion`
+**self-references** (9551→9551). The base branch and the rare branch therefore collide on
+`(9551, V)` — same baseFamily ⇒ same food variation ⇒ a real duplicate. Tallies confirmed:
+`epicEqRare=0`, `baseEqRare=11` (the 11 golden-capable families). The Epic-tier collisions
+(`id=9576 by=[epic(bf=9501), epic(bf=9551)]`) have **different** bf ⇒ different V ⇒ no real
+duplicate — hence no Epic double-count. (CK's own cook code at `Pug.Other:324035` confirms
+the tier is an objectID swap gated on ingredient rarity, the variation staying constant.)
+
+**Fix.** A `HashSet<long> seenKeys` in `AddCookedEntry` skips a repeat `(objectID, variation)`
+before the (otherwise wasted) name/icon/value resolution. Correct regardless of the collision
+mechanism, because two `accepted` entries with the same `PackKey` are the same CK item by
+definition; no legitimate entry is lost (the legit `rare(bf=Base)` / `epic(bf=…)` rows carry
+different variations, so they survive). Pure behavioural C#; no prefab/art touch.
+
+**Measured in-game (1.2.1.5, fake-ID 9999997):** clean sandbox compile (`safetyCheck=True`,
+0 `CompileFailed`); `accepted` 11030→10172, catalog `baked` 11119→10265, `dupKeys` 858→0; the
+user confirmed a freshly cooked (previously undiscovered) dish now raises `N` by **1**, not 2.
+**Process lesson (reinforced):** the two rejected hypotheses were both symptom-plausible; only
+the `producedBy` probe — measuring the actual emit calls — settled it. Guessing the cause
+would have written a *wrong* root-cause into the commit + docs. **Surfaced for follow-up
+(Iter-33):** Loop 2 emits all three tiers per variation, but CK gates the achievable tier on
+ingredient rarity, so some tier rows may be unreachable "phantoms" — not yet measured.

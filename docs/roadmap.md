@@ -302,26 +302,31 @@ remaining backlog.
   TempJob), accumulate `liveKeys` across all chunks **before** `PruneStaleNear` runs (it
   assumes a full pass), and handle world-unload mid-pass. Measure the current scan first; the
   simpler lever (raise the interval 3s→5–6s) may suffice. Requested 2026-06-28.
-- **Iter-32 (tentative; BUG) -- cooked dishes double-counted in discovery.** A cooked
-  dish counts as **two** discovered items (user-observed 2026-07-12): the `N` discovered
-  counter (and likely the catalog `M`) over-counts each dish by one. **Prime suspect:**
-  `ItemCatalog.AddCookedEntry` appends to the `accepted` list (`accepted.Add(od)`,
-  `ItemCatalog.cs:~655`) with **no dedup guard** on `(objectID, variation)` — the
-  name/icon/rarity/... caches are keyed by the packed `key`, so a repeat merely overwrites
-  them (harmless), but `accepted` grows a second entry, so both the catalog size and the
-  discovery tally count the dish twice and discovering it flips both rows (`N += 2`). Loop 2
-  already dedups the symmetric swap (`j >= i`, `ItemCatalog.cs:~349-353`), so a catalog-side
-  duplicate would have to come from two *distinct* ingredient pairs resolving to the **same**
-  `(baseFamily/tier objectID, variation)`; alternatively the double-count is discovery-side
-  (the discovery hook mirroring a dish under two keys). **Fix per the user's hypothesis:
-  deduplicate dishes** — a `HashSet<long> seenKeys` in `Bake()` (or inside `AddCookedEntry`)
-  keyed on `DiscoveredState.PackKey(objectID, variation)`, skipping an already-added entry so
-  `accepted` holds each dish once. **First diagnostic step (measure, don't guess):** a
-  throwaway bake probe (committed-then-reverted per the build-reverts-uncommitted-edits
-  discipline) that groups `accepted` by packed `(objectID, variation)` and logs any key with
-  count > 1 — confirms whether the duplication is catalog-side and which pairs collide — plus
-  a check of what variation(s) CK fires via `SetObjectAsDiscovered` when a dish is cooked.
-  Requested 2026-07-12.
+- **Iter-32 -- cooked dishes double-counted in discovery. DONE** (see
+  `docs/iteration-history.md`). **Root-caused by measurement, not the roadmap's guess.** A
+  golden-ingredient recipe's `CookingIngredientCD.turnsIntoFood` points straight at a
+  **Rare** family ID (e.g. `CookedPuddingRare` 9551), whose `CookedFoodCD.rareVersion`
+  **self-references** (9551→9551) — so Loop 2's tier fan-out emitted that
+  `(rareId, variation)` via BOTH the base and the rare branch (same baseFamily → same food
+  variation), duplicating the catalog row so the dish counted twice in `N / M`. Fix: a
+  `HashSet<long> seenKeys` in `AddCookedEntry` skips the repeat `(objectID, variation)`. The
+  roadmap's `epicVersion == rareVersion` guess was **ruled out by measurement**
+  (`epicEqRare=0`, `baseEqRare=11`; a `producedBy` probe pinned the base+rare collision on
+  the same baseFamily). Measured in-game (1.2.1.5): 11 affected families, 858 duplicate keys;
+  `accepted` 11030→10172, catalog 11119→10265, `dupKeys` 858→0; a freshly cooked dish now
+  raises `N` by 1 (was 2). Pure behavioural C#; no prefab/art touch.
+- **Iter-33 (tentative) -- cooked-food tier reachability / possible phantom rows.**
+  Surfaced during Iter-32 (user question 2026-07-12). Loop 2 emits **all three** tiers
+  (base/rare/epic) for **every** food variation, but CK's cook logic
+  (`Pug.Other:324035`) gates the tier on ingredient rarity: `flag = (an ingredient is a
+  Rare-rarity Flower or Legendary)` drives rare/epic. So a variation cooked with a golden
+  flower (flag=true) may never yield a *base* tier, and a no-golden variation may never
+  yield *epic* — if so, the catalog holds unreachable "phantom" tier rows that stay `???`
+  forever, making 100 % unreachable (the Iter-16.4 bug class). **Not yet measured** — needs
+  a diagnostic probe that, per variation, logs which tiers CK can actually produce (mirror
+  the `flag` + `num3/num4/num5` logic) before deciding whether the α-enumeration must be
+  tier-gated. Note: `GetFoodVariation` encodes ingredients only; the tier is a separate
+  objectID swap (`rareVersion`/`epicVersion`), so variation ≠ tier. Requested 2026-07-12.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
