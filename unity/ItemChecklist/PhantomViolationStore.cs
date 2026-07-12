@@ -55,6 +55,14 @@ namespace ItemChecklist
                 var bytes = new byte[text.Length];
                 for (int i = 0; i < text.Length; i++) bytes[i] = (byte) text[i];   // ASCII content only
                 API.ConfigFilesystem.Write(Path, bytes);
+                // The one live heads-up (Record dedups cross-session, so it fires once ever per
+                // key). Emitted here — not at the call site — so the real-time hook AND the
+                // world-load sweeps all surface it identically.
+                Debug.LogWarning(
+                    $"[ItemChecklist] Iter-33: a cooked-food epic believed unreachable was " +
+                    $"discovered ({objectId},{variation}) — recorded to " +
+                    $"mods/ItemChecklist/phantom-violations.txt. The reachability model may be " +
+                    $"wrong (CK's tier gate changed, or a non-cooking source now exists).");
                 return true;
             }
             catch (System.Exception e)

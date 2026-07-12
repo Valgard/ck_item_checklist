@@ -533,6 +533,12 @@ namespace ItemChecklist
                     keyToIndex[DiscoveredState.PackKey(entries[i].ObjectId, entries[i].Variation)] = i;
 
                 Debug.Log($"[ItemChecklist] ItemCatalog baked: {entries.Length} items");
+
+                // Iter-33 self-healing backstop: durably record any cooked-food epic we
+                // suppressed as unreachable that CK has already discovered. No-op until the
+                // active char's DiscoveredState snapshot is applied; the reverse ordering is
+                // covered by the post-snapshot call in ItemChecklistMod. Idempotent.
+                SweepDiscoveredPhantoms();
                 float perfTotalMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
                 UnityEngine.Debug.Log(
                     $"[ItemChecklist] PERF bake-total={perfTotalMs:F0}ms catalog-size={entries.Length}");
@@ -719,6 +725,27 @@ namespace ItemChecklist
         /// </summary>
         internal bool IsSuppressedCookedPhantom(int objectId, int variation)
             => suppressedCookedPhantoms.Contains(DiscoveredState.PackKey(objectId, variation));
+
+        /// <summary>
+        /// Iter-33 self-healing backstop. Records (durably, via <see cref="PhantomViolationStore"/>)
+        /// any cooked-food epic this bake suppressed as unreachable that CK has nonetheless
+        /// discovered — a reachability-model violation. Re-derived from CK's durably-persisted
+        /// discovery (mirrored in <see cref="DiscoveredState"/>) at each world-load, so a failed
+        /// real-time write self-heals on the next load. Idempotent (<c>Record</c> dedups), so
+        /// firing it at BOTH bake-completion and snapshot-apply — whichever readies last — is safe.
+        /// No-op until both the suppressed set and the active char's discovery snapshot exist.
+        /// </summary>
+        public void SweepDiscoveredPhantoms()
+        {
+            var disc = DiscoveredState.Instance;
+            if (disc == null || suppressedCookedPhantoms.Count == 0) return;
+            foreach (var key in suppressedCookedPhantoms)
+            {
+                int oid = (int)(key >> 32), v = (int)(uint)key;
+                if (disc.IsDiscovered(oid, v))
+                    PhantomViolationStore.Record(oid, v);
+            }
+        }
 
         // Faithful port of ItemBrowser ObjectUtility.GetValue (sell mode) +
         // GetRaritySellValue. Returns 0 for unsellable items (None /

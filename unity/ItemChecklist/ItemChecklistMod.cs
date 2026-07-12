@@ -358,6 +358,10 @@ namespace ItemChecklist
                 DiscoveredState.Instance.Snapshot(ids);
                 lastAppliedFor = activeGuid;
                 Debug.Log($"[ItemChecklist] Snapshot applied: {ids.Length} ids for guid {activeGuid}");
+                // Iter-33 self-healing backstop: re-derive cooked-food phantom violations from
+                // the freshly-applied discovery snapshot (catches any the bake-time sweep missed
+                // because the snapshot wasn't loaded yet). Idempotent — PhantomViolationStore dedups.
+                Catalog?.SweepDiscoveredPhantoms();
             }
 
             // Hotkey poll — the rebindable Rewired action is the SOLE toggle

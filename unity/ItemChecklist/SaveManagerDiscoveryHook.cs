@@ -28,19 +28,13 @@ namespace ItemChecklist
             int variation = objectData.variation;
 
             // Iter-33: a suppressed cooked-food epic phantom should never be discovered
-            // (unreachable by cooking, the only source). If one is, persist it durably and
-            // warn once (PhantomViolationStore.Record owns the dedup + the file write).
+            // (unreachable by cooking, the only source). If one is, record it durably —
+            // PhantomViolationStore.Record owns the dedup, the file write, and the warning.
+            // A failed write here is not lost: the same store is swept at world-load
+            // (ItemCatalog.SweepDiscoveredPhantoms), self-healing from CK's persisted discovery.
             var cat = ItemChecklistMod.Catalog;
-            if (cat != null
-                && cat.IsSuppressedCookedPhantom(objectId, variation)
-                && PhantomViolationStore.Record(objectId, variation))
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"[ItemChecklist] Iter-33 invariant violated: cooked-food phantom " +
-                    $"({objectId},{variation}) was discovered — believed unreachable " +
-                    $"(flag=false epic). Recorded to mods/ItemChecklist/phantom-violations.txt. " +
-                    $"CK's tier gate may have changed or a non-cooking source now exists.");
-            }
+            if (cat != null && cat.IsSuppressedCookedPhantom(objectId, variation))
+                PhantomViolationStore.Record(objectId, variation);
 
             DiscoveredState.Instance.AddOne(objectId, variation);
         }
