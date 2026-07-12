@@ -302,6 +302,26 @@ remaining backlog.
   TempJob), accumulate `liveKeys` across all chunks **before** `PruneStaleNear` runs (it
   assumes a full pass), and handle world-unload mid-pass. Measure the current scan first; the
   simpler lever (raise the interval 3s→5–6s) may suffice. Requested 2026-06-28.
+- **Iter-32 (tentative; BUG) -- cooked dishes double-counted in discovery.** A cooked
+  dish counts as **two** discovered items (user-observed 2026-07-12): the `N` discovered
+  counter (and likely the catalog `M`) over-counts each dish by one. **Prime suspect:**
+  `ItemCatalog.AddCookedEntry` appends to the `accepted` list (`accepted.Add(od)`,
+  `ItemCatalog.cs:~655`) with **no dedup guard** on `(objectID, variation)` — the
+  name/icon/rarity/... caches are keyed by the packed `key`, so a repeat merely overwrites
+  them (harmless), but `accepted` grows a second entry, so both the catalog size and the
+  discovery tally count the dish twice and discovering it flips both rows (`N += 2`). Loop 2
+  already dedups the symmetric swap (`j >= i`, `ItemCatalog.cs:~349-353`), so a catalog-side
+  duplicate would have to come from two *distinct* ingredient pairs resolving to the **same**
+  `(baseFamily/tier objectID, variation)`; alternatively the double-count is discovery-side
+  (the discovery hook mirroring a dish under two keys). **Fix per the user's hypothesis:
+  deduplicate dishes** — a `HashSet<long> seenKeys` in `Bake()` (or inside `AddCookedEntry`)
+  keyed on `DiscoveredState.PackKey(objectID, variation)`, skipping an already-added entry so
+  `accepted` holds each dish once. **First diagnostic step (measure, don't guess):** a
+  throwaway bake probe (committed-then-reverted per the build-reverts-uncommitted-edits
+  discipline) that groups `accepted` by packed `(objectID, variation)` and logs any key with
+  count > 1 — confirms whether the duplication is catalog-side and which pairs collide — plus
+  a check of what variation(s) CK fires via `SetObjectAsDiscovered` when a dish is cooked.
+  Requested 2026-07-12.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
