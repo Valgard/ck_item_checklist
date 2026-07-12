@@ -32,8 +32,11 @@ Discovery is tracked **per world × per player**.
   undiscovered matches stay `???`.
 - **Per-row Level and Value** columns (sell value in Ancient Coins).
 - **Rarity colouring** of item names and icon borders (undiscovered rows too).
-- **Per-permutation cooked-food tracking** (~11,119 catalog entries; Mushroom
-  Soup ≠ Tomato Soup, across Base/Rare/Epic tiers).
+- **Per-permutation cooked-food tracking** — every ingredient combination is its
+  own dish (Mushroom Soup ≠ Tomato Soup) across the Base/Rare/Epic tiers Core
+  Keeper can actually cook: roughly **~6,000 cooked dishes** of the ~8,100
+  discoverable items in the catalog. Unreachable tier permutations (e.g. an Epic
+  variant a recipe can never produce) are excluded, so 100 % stays attainable.
 - **Creature collection** — tamed pets are tracked **per skin** (each colour
   variant is its own row with its own recoloured icon), and catchable critters
   and farm animals get rows too, under dedicated **Pets**, **Critters** and

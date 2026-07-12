@@ -1371,3 +1371,60 @@ the `producedBy` probe — measuring the actual emit calls — settled it. Guess
 would have written a *wrong* root-cause into the commit + docs. **Surfaced for follow-up
 (Iter-33):** Loop 2 emits all three tiers per variation, but CK gates the achievable tier on
 ingredient rarity, so some tier rows may be unreachable "phantoms" — not yet measured.
+
+**Iter-33 (cooked-food tier reachability — phantom epic rows) — DONE (2026-07-12, branch
+`iter-33`).** The Iter-32 follow-up: `ItemCatalog.Bake` Loop 2 emitted **all three** tiers
+(base/rare/epic) for **every** food variation, but CK gates the achievable tier on ingredient
+rarity — so most epic rows were unreachable "phantoms" stuck at `???` forever, making 100 %
+unattainable (the Iter-16.4 bug class). **Measured before deciding**, per the standing lesson.
+
+**Findings (all verified).** (1) **Cooking is the only source of cooked food** — a thorough
+data-check of the decompile + the unpacked `resources.assets` (the master `LootTableBank.asset`
+= 2813 loot entries, all 5 merchant inventories, start/dungeon inventory) found **zero**
+references to any of the 45 cooked-food IDs (base 9500-9514, rare 9550-9564, epic 9575-9589) in
+any loot / merchant / drop / reward; the only symbolic `ObjectID.Cooked*` in code is a Pug.Dev
+guard that *blocks* spawning them. Positive control: the same grep finds neighbouring loot IDs
+(9400-9406, 9600) but none in the cooked ranges. (2) **The tier is a Cooking-skill bonus roll**
+(`Pug.Other:324006` managed + `~412405` ECS, structurally identical), gated by a per-variation
+`flag` (deterministic): `flag = (an ingredient is a Rare-rarity Flower) OR (any ingredient is
+Legendary)` — the Rare check is `FlowerCD`-gated, the Legendary check type-agnostic (so a
+Rare-rarity *fish/meat* does NOT enable epic, only a Legendary one does). The base dish is the
+normal cook output; rare is reachable in both flag branches; **epic is reachable only when
+flag=true**; and `turnsIntoFood` never targets an epic ID, so epic is exclusively the flag-gated
+bonus. ⇒ **the phantom set = `(epicVersion, V)` for every variation with flag=false.**
+
+**Probe (throwaway, committed-then-reverted).** A bake probe mirroring CK's `flag` measured
+in-game (1.2.1.5): **variations=3003, epicPhantom(flag=false)=2145, epicReachable(flag=true)=858**,
+and the golden⇔flag cross-check came out **perfect** — `goldenBase&flagTrue=858`,
+`goldenBase&flagFalse=0`, all 858 flag=true variations golden-based. So a golden-ingredient
+variation ⟺ flag=true ⟺ epic-reachable, without exception (and 858 = Iter-32's 858 golden
+dup-keys — three independent measurements converge). No base/rare phantom (both always reachable);
+the roadmap's "golden flower may never yield base" worry dissolved — for golden variations
+`turnsIntoFood` is a Rare ID (Iter-32), so the emitted "base" IS the rare-tier normal output.
+
+**Fix (Variant A — don't emit phantoms).** `ItemCatalog` gained `CookedEpicReachable(variation)`
+(a faithful mirror of CK's `flag`); Loop 2 emits the epic tier only when it returns true, else
+records the key in a `suppressedCookedPhantoms` set. Catalog **10265 → 8120** (−2145); ~6,006
+cooked dishes remain, and 100 % is now attainable.
+
+**Safety net (durable + self-healing), added at the user's direction.** A suppressed phantom
+should never be discovered (it is unreachable). If one ever is — a future CK gate change or a new
+non-cooking source — it must be *heard*: `SaveManagerDiscoveryHook` routes a discovered suppressed
+phantom into `PhantomViolationStore.Record`, which persists it durably to
+`mods/ItemChecklist/phantom-violations.txt` (`API.ConfigFilesystem`, hand-ASCII, mirroring
+`PossessionStore`) with the decoded ingredients, deduped cross-session, and logs one WARNING.
+**Durable, not Player.log** (which rotates every launch → useless for a remote reporter). And
+because a real-time write can fail while the discovery hook fires only once per key, a
+**self-healing world-load re-check** (`ItemCatalog.SweepDiscoveredPhantoms`, fired at both
+bake-completion and discovery-snapshot-apply — NOT the possession scan) re-derives violations as
+`(discovered ∩ suppressed)` every load, so a lost write self-heals next load from CK's persisted
+discovery.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** Clean sandbox compile (`safetyCheck=True`, 0
+`CompileFailed`, 0 NRE) across all commits; `baked: 8120`; a throwaway injection proved the durable
+write (correct path / format / dedup); the self-heal sweep ran at both triggers and correctly
+recorded nothing (2145 suppressed × 415 discovered = 0 intersection — a true negative). Pure
+behavioural C# + one new file (`PhantomViolationStore.cs`); no prefab/art. **Process:** measure-first
+(brainstorm → spec → plan), hybrid inline-execution with a per-code-task adversarial review; the
+durability + self-heal halves were user-directed mid-flight (a brief drift toward a possession-scan
+trigger was corrected to the world-load anchors).

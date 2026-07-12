@@ -315,18 +315,23 @@ remaining backlog.
   the same baseFamily). Measured in-game (1.2.1.5): 11 affected families, 858 duplicate keys;
   `accepted` 11030→10172, catalog 11119→10265, `dupKeys` 858→0; a freshly cooked dish now
   raises `N` by 1 (was 2). Pure behavioural C#; no prefab/art touch.
-- **Iter-33 (tentative) -- cooked-food tier reachability / possible phantom rows.**
-  Surfaced during Iter-32 (user question 2026-07-12). Loop 2 emits **all three** tiers
-  (base/rare/epic) for **every** food variation, but CK's cook logic
-  (`Pug.Other:324035`) gates the tier on ingredient rarity: `flag = (an ingredient is a
-  Rare-rarity Flower or Legendary)` drives rare/epic. So a variation cooked with a golden
-  flower (flag=true) may never yield a *base* tier, and a no-golden variation may never
-  yield *epic* — if so, the catalog holds unreachable "phantom" tier rows that stay `???`
-  forever, making 100 % unreachable (the Iter-16.4 bug class). **Not yet measured** — needs
-  a diagnostic probe that, per variation, logs which tiers CK can actually produce (mirror
-  the `flag` + `num3/num4/num5` logic) before deciding whether the α-enumeration must be
-  tier-gated. Note: `GetFoodVariation` encodes ingredients only; the tier is a separate
-  objectID swap (`rareVersion`/`epicVersion`), so variation ≠ tier. Requested 2026-07-12.
+- **Iter-33 -- cooked-food tier reachability (phantom epic rows). DONE** (see
+  `docs/iteration-history.md`). Loop 2 emitted all three tiers (base/rare/epic) per food
+  variation, but CK gates the achievable tier on ingredient rarity (`flag`: a Rare-rarity
+  Flower or any Legendary ingredient — the Rare check is `FlowerCD`-gated, the Legendary check
+  type-agnostic), and cooking is the **only** source of cooked food (verified: 0 of the 45
+  cooked IDs in `LootTableBank.asset` / any merchant / drop). So epic is reachable only when
+  flag=true → **most epic rows were unreachable phantoms** stuck at `???`, making 100 %
+  unattainable (the Iter-16.4 bug class). Measured (throwaway probe, 1.2.1.5): 3003 variations,
+  **2145 phantom epics** (flag=false), 858 reachable (flag=true), golden-base ⟺ flag=true
+  **exactly** (0 anomalies; 858 = Iter-32's 858 golden dup-keys). Fix: `CookedEpicReachable`
+  mirrors CK's `flag`, gating Loop 2's epic emit; catalog **10265 → 8120** (−2145), ~6,006
+  cooked dishes remain, 100 % attainable. + a durable, self-healing safety net: if a suppressed
+  phantom is ever discovered (a future CK gate change / new source), `PhantomViolationStore`
+  persists it to `mods/ItemChecklist/phantom-violations.txt` + warns once, and a world-load
+  `SweepDiscoveredPhantoms` re-derives `discovered ∩ suppressed` so a failed real-time write
+  self-heals next load. Pure behavioural C# + one new file; no prefab/art. Requested + done
+  2026-07-12.
 - **Iter-34 (tentative) -- keybind rebind row missing under "Mods" in the controls menu.**
   User-reported 2026-07-12: ItemChecklist's toggle keybind (default F1) has **no rebind row
   under the "Mods" section** of Core Keeper's Controls settings, so the player cannot remap
