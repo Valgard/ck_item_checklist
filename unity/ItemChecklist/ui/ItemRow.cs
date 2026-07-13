@@ -26,6 +26,8 @@ namespace ItemChecklist.UI
         private int _objectId;
         private int _ckVariation;     // CK object variation (pets → 0, not skinIndex)
         private bool _nameKnown;      // tooltip allowed iff the row shows a real name
+        private string _displayName;  // Iter-35: the row's baked display name (fallback tooltip title)
+        private bool _nameIsFallback; // Iter-35: name is a derived fallback → CK's tooltip would show "missing: …"
         private TooltipSlot _tooltip; // shared helper (one per window), injected by Content
 
         public void SetTooltipHelper(TooltipSlot helper) => _tooltip = helper;
@@ -70,7 +72,7 @@ namespace ItemChecklist.UI
         // — so a known species' uncollected skin shows the name but the unknown icon + —.
         public void Bind(int objectId, Sprite iconSprite, string name, bool nameKnown,
             bool showDetails, Color rarityColor, Rarity rarity, int level, int sellValue,
-            int possessionCount, bool isPetSkin, int skinIndex)
+            int possessionCount, bool isPetSkin, int skinIndex, bool nameIsFallback = false)
         {
             if (label != null) label.Render(nameKnown ? name : "???");
 
@@ -160,6 +162,8 @@ namespace ItemChecklist.UI
             _objectId = objectId;
             _ckVariation = isPetSkin ? 0 : skinIndex;
             _nameKnown = nameKnown;
+            _displayName = name;
+            _nameIsFallback = nameIsFallback;
 
             // Iter-22: every row is hover-selectable (collider always enabled) so the
             // highlight appears on all rows. The TOOLTIP is gated on discovery in the
@@ -193,6 +197,11 @@ namespace ItemChecklist.UI
                     text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscovered"),
                     dontLocalize = true,
                 };
+            // Iter-35: foreign-mod items with no I2 term — CK's tooltip localiser renders
+            // "missing: Items/Mod:Name". Show our baked (derived) name instead, dontLocalize
+            // (matches the row label); description/stats are suppressed below.
+            if (_nameIsFallback)
+                return new TextAndFormatFields { text = _displayName, dontLocalize = true };
             if (_tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.TitleFor();
@@ -212,6 +221,9 @@ namespace ItemChecklist.UI
                         dontLocalize = true,
                     },
                 };
+            // Iter-35: no CK-resolvable description for a term-less foreign item (it would be
+            // "missing: Items/Mod:NameDesc") — show none, keeping the tooltip to just our name.
+            if (_nameIsFallback) return null;
             if (_tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.DescriptionFor();
@@ -220,7 +232,8 @@ namespace ItemChecklist.UI
         public override List<TextAndFormatFields> GetHoverStats(bool previewReinforced)
         {
             if (!ItemChecklistContent.PointerInViewport()) return null;
-            if (!_nameKnown || _tooltip == null) return null;
+            // Iter-35: suppress stats for a term-less foreign item (name-only tooltip).
+            if (!_nameKnown || _nameIsFallback || _tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.StatsFor();
         }

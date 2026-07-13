@@ -248,7 +248,7 @@ namespace ItemChecklist.UI
                 int owned = ItemChecklistMod.OwnedCount(entry.ObjectId, entry.Variation);
                 row.Bind(entry.ObjectId, entry.Icon, entry.DisplayName, nameKnown, showDetails,
                     rarityColor, entry.Rarity, entry.Level, entry.SellValue,
-                    owned, entry.IsPetSkin, entry.Variation);
+                    owned, entry.IsPetSkin, entry.Variation, entry.NameIsFallback);
             }
         }
 

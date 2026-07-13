@@ -57,11 +57,13 @@ namespace ItemChecklist
             public readonly bool IsCattle;      // Iter-16.3: cattle species row (drives the Cattle category + collection routing)
             public readonly bool IsColourVariant; // Iter-17: a colour-variant slot (cattle colour OR paintable variant) — name is
                                                   // species-gated (shown once ANY form of the item is discovered), unlike per-variation rows
+            public readonly bool NameIsFallback; // Iter-35: DisplayName is a derived fallback (foreign-mod item with no I2 term) —
+                                                 // CK's own tooltip would render "missing: …", so ItemRow's tooltip uses our name instead
 
             public Entry(int objectId, int variation, string displayName, Sprite icon,
                 string modOrigin, Rarity rarity, ObjectType objectType,
                 int level, int sellValue, bool isCraftable, bool isPetSkin = false,
-                bool isCattle = false, bool isColourVariant = false)
+                bool isCattle = false, bool isColourVariant = false, bool nameIsFallback = false)
             {
                 ObjectId = objectId;
                 Variation = variation;
@@ -76,6 +78,7 @@ namespace ItemChecklist
                 IsPetSkin = isPetSkin;
                 IsCattle = isCattle;
                 IsColourVariant = isColourVariant;
+                NameIsFallback = nameIsFallback;
             }
         }
 
@@ -205,6 +208,10 @@ namespace ItemChecklist
                 // First pass: collect localized + unlocalized names per accepted od.
                 var localizedNames   = new Dictionary<long, string>();  // key = PackKey(objId, variation)
                 var unlocalizedNames = new Dictionary<long, string>();
+                // Iter-35: keys whose display name is a derived fallback because CK could
+                // not localize it (foreign-mod items with no I2 term). Their Entry is
+                // flagged so ItemRow's tooltip uses our baked name, not CK's "missing: …".
+                var fallbackNameKeys = new HashSet<long>();
                 var accepted         = new List<ObjectDataCD>();
                 var iconCache        = new Dictionary<long, Sprite>();
                 var rarityCache      = new Dictionary<long, Rarity>();
@@ -307,9 +314,17 @@ namespace ItemChecklist
                     if (locDontLocalize && !string.IsNullOrEmpty(rawText))
                         locText = rawText;
 
-                    // PascalCaseSplitter fallback when both passes failed to produce a name.
+                    // Iter-35: CK could not localize a display name. Foreign-mod items with
+                    // no I2 term hit this — CK's own tooltip renders "missing: Items/Mod:Name",
+                    // and the old fallback showed the bare numeric objectID ("32773"). Derive a
+                    // readable name from the internal name instead (FallbackName: strip the
+                    // "Mod:" prefix + PascalCase-split → "Workbench Chest Extra"), and mark the
+                    // key so its Entry uses our baked name in the tooltip too (see ItemRow).
                     if (string.IsNullOrEmpty(locText))
-                        locText = PascalCaseSplitter.Split(od.objectID.ToString());
+                    {
+                        locText = FallbackName(od);
+                        fallbackNameKeys.Add(DiscoveredState.PackKey((int)od.objectID, od.variation));
+                    }
                     if (string.IsNullOrEmpty(rawText))
                         rawText = PascalCaseSplitter.Split(od.objectID.ToString());
 
@@ -516,7 +531,8 @@ namespace ItemChecklist
                         modOrigin, rarityCache[key], objectTypeCache[key],
                         levelCache[key], sellValueCache[key], craftableCache[key],
                         isPetSkin: false, isCattle: false,
-                        isColourVariant: PugDatabase.HasComponent<PaintableObjectCD>(od)));
+                        isColourVariant: PugDatabase.HasComponent<PaintableObjectCD>(od),
+                        nameIsFallback: fallbackNameKeys.Contains(key)));
                 }
 
                 // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
@@ -547,6 +563,33 @@ namespace ItemChecklist
             {
                 baking = false;
             }
+        }
+
+        /// <summary>
+        /// Iter-35: a readable fallback name for an item whose display term CK cannot
+        /// resolve — foreign-mod items with no I2 term (CK's own tooltip shows
+        /// "missing: …", and the pre-Iter-35 fallback showed the bare numeric objectID).
+        /// Derives from the internal name (<c>ObjectProperties "name"</c>, e.g.
+        /// "ChestsGalore:WorkbenchChestExtra"): strip the "Mod:" prefix and any CoreLib
+        /// "$$N" suffix, then PascalCase-split → "Workbench Chest Extra". Falls back to
+        /// the numeric objectID only when no internal name exists. IB derives the same
+        /// internal name (<c>ObjectUtility.GetInternalName</c>) but uses it only for
+        /// sort / search — its visible fallback is the numeric "id:variation".
+        /// </summary>
+        private static string FallbackName(ObjectDataCD od)
+        {
+            if (API.Authoring.ObjectProperties.TryGetPropertyString(od.objectID, "name", out var internalName)
+                && !string.IsNullOrEmpty(internalName))
+            {
+                string tail = internalName;
+                int colon = tail.IndexOf(':');
+                if (colon >= 0 && colon + 1 < tail.Length) tail = tail.Substring(colon + 1);
+                int dollar = tail.IndexOf('$');
+                if (dollar >= 0) tail = tail.Substring(0, dollar);
+                if (!string.IsNullOrEmpty(tail))
+                    return PascalCaseSplitter.Split(tail);
+            }
+            return PascalCaseSplitter.Split(od.objectID.ToString());
         }
 
         /// <summary>
