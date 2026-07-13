@@ -1551,3 +1551,56 @@ prefab/art touch. **Process:** two throwaway probes, both of which overturned a 
 decompile/source hypothesis — the "measure first, in-game ground truth beats static analysis"
 lesson held for (by this project's count) the seventh and eighth time; the second probe
 specifically prevented shipping a filter that would have deleted the named "Chest Workbench".
+
+**Iter-36 (counter-mode toggle — discovery ↔ possession) — DONE (2026-07-13, branch
+`iter-36`).** A user-requested **display-source switch**: a setting flips the always-on
+HUD counter AND the window footer between the discovery count `N / M` and an "items
+owned" count `K / M`. No new tracking — both axes already existed; the change routes
+both counter surfaces through one mode-selected numerator.
+
+**Design (brainstormed; three decisions settled with the user).** (Q1) widget = a
+`.Choice<CounterMode>` with two options (Discovery/Possession) — clearer than a bool
+Toggle and extensible to a future "Both"; (Q2) scope = **both** the HUD and the window
+footer (one "what does the counter show" preference; both already share
+`ProgressFormat.Counter`); (Q3) denominator = `K / M` (owned-of-all, `M = Catalog.Count`
+unchanged in both modes — the toggle swaps only the numerator; 100 % = own one of every
+item). ItemChecklist is the **first `.Choice` consumer** here; the per-option loc follows
+the RKC pattern (a separate `ItemChecklist-Config/counterMode` namespace block, tokens =
+the enum's `ToString()`; display labels Discovered/Owned, EN+DE).
+
+**Implementation.** A nested `ModConfig.CounterMode { Discovery, Possession }` enum + a
+`SettingHandle<CounterMode>` bound via a 3-arg `ModConfig.Bind`, exposed live as
+`ModConfig.Mode` — **not** `CounterMode` (a nested type + a same-named member is `CS0102`;
+RKC dodges the same trap by naming its property `reductionFactor`, not `Reduction`).
+`ItemChecklistMod.OwnedCatalogCount()` is the possession numerator twin of
+`CollectedCatalogCount()`, tallied through the **same spoiler-gated `OwnedCount`
+chokepoint** (Iter-21), so `K ≤ N ≤ M` holds by construction and pet-skin / cattle-colour
+entries route correctly. `CurrentCounterNumerator()` selects the numerator by
+`ModConfig.Mode`; both `ItemChecklistHud.Refresh` and `ItemChecklistWindow.FormatTitle`
+route through it (single source of truth, no drift; denominator `Catalog.Count` unchanged
+per mode). Live refresh: `SettingHandle.OnChanged` repaints both surfaces immediately on a
+menu toggle (HUD = live surface; the footer is an open-snapshot surface, so it gains a new
+`ItemChecklistWindow.RefreshStatus()`), and the 3s-scan HUD nudge
+(`RefreshHudCounterIfChanged`, `s_lastHudCollected` → `s_lastHudCounter`) is made
+mode-aware — it tracks the *displayed* numerator, so a possession-mode owned-tally change
+repaints the HUD too. The `.Choice` is the first widget in the section (headline setting) +
+an extended section hint.
+
+**Process (hybrid, per the corrected model — subagent-driven by default, in-game inline).**
+brainstorm → spec (`docs/specs/2026-07-13-iter-36-counter-mode-toggle-design.md`,
+ADR-gated → discarded post-merge) → plan. The spec was **Codex-reviewed**, which caught a
+**P1**: the spec snippets referenced the nested enum unqualified in `ItemChecklistMod`
+(`CS0103`) — fixed by qualifying `ModConfig.CounterMode.*`, and that fix surfaced the
+further `CS0102` property/type collision (resolved by naming the property `Mode`). Code
+edits were made inline; a **subagent adversarial review** of the full diff returned **SHIP**
+(0 findings across compile / sandbox / logic / loc / spec). Two non-blocking, pre-existing
+Iter-16.4 observations were logged — one as tentative **Iter-37** (a redundant, harmless HUD
+repaint after a discovery change); the other (an extra per-3s O(catalog) dict pass in
+possession mode) dismissed as a non-issue (same complexity, no per-frame cost).
+
+**Verified in-game (1.2.1.5, fake-ID 9999997):** clean sandbox compile
+(`safetyCheck=True`, 0 `CompileFailed`, 0 NRE); the "Counter mode" choice renders localized
+as the first Mod-Settings row; toggling flips **both** the HUD and the window footer
+immediately; Discovery `N / M` ↔ Possession `K / M` with `M` constant; `K ≤ N`; the owned
+tally updates live ~3 s after a stock change. Pure behavioural C# + YAML; no prefab/art
+touch.

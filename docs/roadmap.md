@@ -377,49 +377,37 @@ remaining backlog.
   for legit standalone term-less foreign items of other mods. Verified in-game (1.2.1.5, fake-ID
   9999997): `safetyCheck=True`, `baked: 8116`, 0 `CompileFailed`/NRE, the 4 pages gone, named
   workbenches + all else intact. Requested + done 2026-07-13.
-- **Iter-36 (tentative) -- counter toggle: discovery count vs. in-possession count.**
-  User-requested 2026-07-12: the always-on HUD counter currently shows **how many items are
-  discovered** (`N / M`); add a **setting that switches the counter between that discovery
-  number and a "how many items you currently own" number**. Both axes already exist in the mod
-  — this is a **display-source switch**, not new tracking. Grounded facts (verified 2026-07-12):
-  - **Current counter = one source of truth.** Both the HUD (`ItemChecklistHud.Refresh`,
-    `ui/ItemChecklistHud.cs:76`) and the window footer (`ItemChecklistWindow.FormatTitle`,
-    `ui/ItemChecklistWindow.cs:215`) render `ProgressFormat.Counter(CollectedCatalogCount(),
-    total)`. `CollectedCatalogCount()` (`ItemChecklistMod.cs:123`) is the discovery numerator
-    `N`; `total` is `Catalog.Count` (`M`).
-  - **The possession numerator does NOT exist yet.** Possession is only exposed *per row*
-    (`ItemChecklistMod.OwnedCount(objectId, variation)`, `ItemChecklistMod.cs:66`,
-    **spoiler-gated behind discovery since Iter-21** → returns 0 for `???` rows), and the
-    In/Not-in-possession filter counts `OwnedCount >= 1` ad-hoc (`ItemListViewModel.cs:133`).
-    The clean implementation adds an **`OwnedCatalogCount()` twin of `CollectedCatalogCount()`**
-    — tally catalog entries with `OwnedCount(entry.ObjectId, entry.Variation) >= 1` — so the
-    possession numerator uses the exact same spoiler-gated chokepoint the rows/filter already do
-    (no drift; an undiscovered-but-world-scanned item is not counted, matching Iter-21).
-  - **Settings wiring is already in place** (ICL is a Mod Settings Menu consumer). Add the
-    widget to the existing builder in `ItemChecklistMod.Init` (`ItemChecklistMod.cs:227-232`,
-    `ModSettings.Section(this)....Slider(...).Toggle(...).Build()`) + a handle/property in
-    `ModConfig.cs`, read live in `ItemChecklistHud.Refresh` (and the footer, if in scope).
-  - **Live-refresh caveat.** The HUD re-renders on `DiscoveredState.Changed` + a post-
-    possession-scan nudge (Iter-16.4). A possession-mode counter must (a) also refresh when the
-    3s possession scan changes the owned tally (the Iter-16.4 nudge already fires; confirm it
-    covers the aggregate), and (b) re-render **immediately when the setting is toggled in-menu**
-    (the framework's config-changed path — verify how ModSettingsMenu signals a value change to
-    the consumer, or poll the handle in the HUD's `LateUpdate`).
-  - **Loc:** a new setting label + option labels go in `localization/localization.yaml`
-    (`ItemChecklist-Config` namespace, EN+DE).
-  **Open design questions (decide with the user before coding — do NOT assume):**
-  (1) **Widget shape** — a `.Toggle` (Discovery ↔ Possession, two states) vs. a `.Choice`
-      (Discovery / Possession / possibly "Both", e.g. `"N / M  ·  owned K"`). The request says
-      "umschalten" (toggle), so a 2-state Toggle is the literal reading — confirm whether a
-      third "both" option is wanted.
-  (2) **Scope** — does the switch affect **only the always-on HUD** (the request literally says
-      "der Zähler", which most naturally means the HUD readout) or **also the window footer**?
-      Both share `ProgressFormat.Counter`, so either is easy; it is a product decision.
-  (3) **Denominator in possession mode** — keep `M = Catalog.Count` (owned-of-all-items,
-      `K / M`) or use `M = CollectedCatalogCount()` (owned-of-discovered, `K / N`)? The
-      former is the more natural completionist reading; flag the choice.
-  **First step:** confirm (1)-(3) with the user, then build `OwnedCatalogCount()` + the widget.
-  Requested 2026-07-12.
+- **Iter-36 -- counter toggle: discovery count vs. in-possession count. DONE**
+  (see `docs/iteration-history.md`). A display-source switch (no new tracking): a
+  `.Choice<CounterMode>` setting (Discovery/Possession) flips **both** the always-on HUD
+  and the window footer between the discovery count `N / M` and an owned count `K / M` —
+  denominator `M = Catalog.Count` unchanged in both modes, so the toggle swaps only the
+  numerator (Q3). Settled with the user: (Q1) a 2-option Choice over a bool Toggle
+  (clearer, extensible to a future "Both"); (Q2) scope = HUD **and** footer.
+  `ItemChecklistMod.OwnedCatalogCount()` is the possession numerator twin of
+  `CollectedCatalogCount()`, tallied through the **same spoiler-gated `OwnedCount`
+  chokepoint** (Iter-21) so `K ≤ N ≤ M` by construction (pet-skin/cattle-colour entries
+  route correctly); `CurrentCounterNumerator()` selects by `ModConfig.Mode` and both
+  surfaces route through it (one source, no drift). Live refresh via
+  `SettingHandle.OnChanged` (immediate on menu toggle — repaints HUD + footer) + a
+  mode-aware 3s-scan HUD nudge (tracks the displayed numerator). First `.Choice` consumer
+  here (RKC-pattern per-option loc); the nested-enum `CS0102` trap avoided by naming the
+  property `Mode`. A Codex spec-review caught the `CS0103`/`CS0102` issues up front; a
+  subagent diff-review returned SHIP (2 non-blocking, pre-existing observations — one logged
+  as tentative Iter-37 below). Requested 2026-07-12, done 2026-07-13.
+- **Iter-37 (tentative) -- HUD counter: redundant repaint after a discovery change.**
+  Surfaced by the Iter-36 adversarial review (a non-blocking observation, deferred as
+  out of scope). The always-on HUD has two refresh paths: the direct
+  `DiscoveredState.Changed -> ItemChecklistHud.Refresh()` subscription (in `Awake`) and
+  the change-gated 3s-scan nudge `RefreshHudCounterIfChanged()` (gated on
+  `s_lastHudCounter`). The direct path repaints but does **not** update
+  `s_lastHudCounter`, so the next 3s scan sees the stale cache, finds the numerator
+  "changed", and repaints a **second** time -- one extra `PugText.Render`, harmless.
+  **Pre-existing since Iter-16.4** (then `s_lastHudCollected`); Iter-36 only inherits it.
+  Fix candidate: update `s_lastHudCounter` after the direct `Refresh()` render (or route
+  both paths through one change-gated helper) so the scan nudge does not re-fire.
+  Cosmetic (at most one redundant render every few seconds); purely a cleanup, not a
+  visible bug. Requested 2026-07-13.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
