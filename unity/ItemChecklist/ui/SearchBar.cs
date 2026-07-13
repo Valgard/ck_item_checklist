@@ -43,6 +43,7 @@ namespace ItemChecklist.UI
         protected override void LateUpdate()
         {
             base.LateUpdate();
+            Iter26FocusProbe.DetectFrame(this);   // THROWAWAY iter-26 focus-race probe — remove with the fix
             string current = GetInputText() ?? "";
             if (current == _lastPushed) return;
             _lastPushed = current;

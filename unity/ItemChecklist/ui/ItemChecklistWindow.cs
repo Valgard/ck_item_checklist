@@ -66,6 +66,7 @@ namespace ItemChecklist.UI
 
         public void ShowUI()
         {
+            Iter26FocusProbe.Record("Window.ShowUI (opened)");   // THROWAWAY iter-26 focus-race probe — remove with the fix
             root.SetActive(true);
             // Hide the game HUD (health/food/hotbar/buffs) while the checklist is up —
             // CK's own non-persisting menu-open mechanism (mirrors RadicalMenuController).
