@@ -439,6 +439,30 @@ remaining backlog.
   `iter-38` branch/worktree, then in-game-verify (clean sandbox compile, slider appears
   under Options -> Mod Settings, a changed value visibly shifts the scan cadence in the
   Iter-30 diagnostic log). Requested 2026-07-13.
+- **Iter-39 (tentative) -- "Craftable / Not craftable" filter misclassifies cooked
+  dishes.** User-observed 2026-07-13: cooked dishes (Gerichte) land in the **Not
+  craftable** bucket of the Iter-10 Craftable filter, although the player *does* make
+  them (by cooking). **Mechanism already read from the code (not yet in-game-confirmed):**
+  `ItemCatalog` derives `Entry.IsCraftable` at **both** bake sites purely as
+  `info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0`
+  (`ItemCatalog.cs:370` standard Loop-1, `:801` `AddCookedEntry`) -- i.e. strictly "has a
+  **workbench recipe**". Cooked food is not produced by a workbench recipe but by the
+  **Cooking Pot** combining an ingredient pair (`CookingIngredientCD` /
+  `ConvertCookedFoodsSystem`), so a cooked object carries an **empty
+  `requiredObjectsToCraft`** -> `IsCraftable = false` for **every** dish, matching the
+  symptom exactly. Cross-ref Iter-33: **cooking is the only source** of cooked food, so
+  "not craftable" is doubly wrong for them. **Open design question (settle with the user
+  before building):** what should the filter's "Craftable" mean -- the current "has a
+  workbench recipe", or the broader "the player can *produce* it" (which would fold in
+  cooked-via-cooking)? If the latter, the natural fix is to set `isCraftable: true` for
+  cooked-food entries at their Loop-2 emit (they are craftable by construction -- every
+  emitted `(objectID, variation)` corresponds to a real ingredient pair), leaving the
+  `requiredObjectsToCraft` derivation for all standard items untouched. **Verify first**
+  (standing lesson): confirm a sample dish reads `IsCraftable=false` in-game, and check
+  whether any *other* obtainable-but-recipeless rows are also misfiled by the same
+  `requiredObjectsToCraft` definition (pets/critters/cattle are creature families, not
+  "craftable", a separate question). Expected pure behavioural C#; no prefab/art touch.
+  Requested 2026-07-13.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
