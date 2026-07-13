@@ -157,24 +157,6 @@ namespace ItemChecklist
                 ? OwnedCatalogCount()
                 : CollectedCatalogCount();
 
-        // Iter-16.4/36: last counter numerator pushed to the always-on HUD. In possession mode
-        // the owned tally can change with NO DiscoveredState.Changed, so track the DISPLAYED
-        // number (mode-aware) — the 3s scan nudge then catches owned-tally changes too, and a
-        // pet-skin collect (also no Changed) still updates in discovery mode. -1 = "unknown" so
-        // the first scan (and a mode toggle, which resets it) always refreshes.
-        private static int s_lastHudCounter = -1;
-
-        // Iter-16.4/36: re-render the always-on HUD counter only when the displayed number
-        // actually changed — PugText.Render rebuilds glyph SpriteRenderers, so the 3s
-        // possession poll must not churn it every tick.
-        private static void RefreshHudCounterIfChanged()
-        {
-            int shown = CurrentCounterNumerator();
-            if (shown == s_lastHudCounter) return;
-            s_lastHudCounter = shown;
-            ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
-        }
-
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
         private const float PossessionRefreshSeconds = 3f;
@@ -267,12 +249,13 @@ namespace ItemChecklist
             ModConfig.Bind(radius, diag, counterMode);
 
             // Iter-36: re-render both counter surfaces immediately when the mode is toggled
-            // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Reset the HUD's
-            // change-gate so the next scan cannot skip a redundant-looking re-render.
+            // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Iter-37: the HUD goes
+            // through the numerator-gated RefreshIfChanged (a mode swap changes the numerator N↔K
+            // but never the denominator, and it syncs its own change-gate); the window footer is an
+            // open-snapshot surface, refreshed unconditionally.
             counterMode.OnChanged += _ =>
             {
-                s_lastHudCounter = -1;
-                ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
+                ItemChecklist.UI.ItemChecklistHud.Instance?.RefreshIfChanged();
                 ItemChecklist.UI.ItemChecklistWindow.Instance?.RefreshStatus();
             };
 
@@ -342,9 +325,10 @@ namespace ItemChecklist
                     _possessionTimer = PossessionRefreshSeconds;
                     bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
                     Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, allowPrune);
-                    // A scan may have newly collected a pet skin (no DiscoveredState.Changed
-                    // fires for that — CK has no per-skin discovery event), so nudge the HUD.
-                    RefreshHudCounterIfChanged();
+                    // A scan may have newly collected a pet skin / changed the owned tally (no
+                    // DiscoveredState.Changed fires for that — CK has no per-skin discovery event),
+                    // so nudge the HUD; RefreshIfChanged repaints only on an actual numerator change.
+                    ItemChecklist.UI.ItemChecklistHud.Instance?.RefreshIfChanged();
                 }
             }
             else

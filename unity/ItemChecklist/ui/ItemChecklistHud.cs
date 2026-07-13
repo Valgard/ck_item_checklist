@@ -32,13 +32,17 @@ namespace ItemChecklist.UI
         protected void Awake()
         {
             Instance = this;
-            DiscoveredState.Instance.Changed += Refresh;
+            // Iter-37: the discovery event is numerator-driven (like the scan), so it routes
+            // through the change-gated RefreshIfChanged — not an unconditional Refresh — which
+            // also skips the possession-mode repaint when a discovery leaves the owned tally K
+            // unchanged. The one-shot initial paint below is unconditional.
+            DiscoveredState.Instance.Changed += RefreshIfChanged;
             Refresh();
         }
 
         private void OnDestroy()
         {
-            DiscoveredState.Instance.Changed -= Refresh;
+            DiscoveredState.Instance.Changed -= RefreshIfChanged;
             if (Instance == this) Instance = null;
         }
 
@@ -61,10 +65,17 @@ namespace ItemChecklist.UI
             base.LateUpdate();
         }
 
-        /// <summary>Re-render the counter from the current catalog + state.
-        /// Cheap to call: runs only on discovery changes and the one-shot
-        /// post-bake refresh, never per frame (PugText.Render rebuilds glyph
-        /// SpriteRenderers).</summary>
+        // Iter-37: the numerator this HUD last painted, so the numerator-driven triggers can skip
+        // a no-op PugText.Render (which rebuilds glyph SpriteRenderers). -1 = nothing painted yet
+        // → the first Refresh always renders. The change-gate lives HERE, with the counter it
+        // describes, rather than as a static field + cross-class setter back in ItemChecklistMod.
+        private int _lastCounter = -1;
+
+        /// <summary>Re-render the counter from the current catalog + state. Cheap to call: runs on
+        /// discovery / scan / mode / bake changes, never per frame (PugText.Render rebuilds glyph
+        /// SpriteRenderers). This is the SINGLE render point — <see cref="RefreshIfChanged"/> and
+        /// every unconditional caller (bake / loc re-bake / the Awake initial paint) end here, and
+        /// it always leaves <see cref="_lastCounter"/> equal to what is on screen.</summary>
         public void Refresh()
         {
             if (counterText == null) return;
@@ -73,7 +84,18 @@ namespace ItemChecklist.UI
             // Iter-36: numerator = the mode-selected count (discovery N or possession K),
             // shared with the window footer via ItemChecklistMod.CurrentCounterNumerator so
             // the two surfaces never drift (ProgressFormat keeps the strings identical).
-            counterText.Render(ProgressFormat.Counter(ItemChecklistMod.CurrentCounterNumerator(), total));
+            int shown = ItemChecklistMod.CurrentCounterNumerator();
+            counterText.Render(ProgressFormat.Counter(shown, total));
+            _lastCounter = shown;
+        }
+
+        /// <summary>Iter-37: repaint only when the displayed numerator actually changed — the entry
+        /// point for the numerator-driven triggers (the recurring 3s possession scan, the discovery
+        /// event, and the mode toggle), none of which changes the denominator (Catalog.Count).
+        /// Denominator-changing callers (bake / loc re-bake) use <see cref="Refresh"/> directly.</summary>
+        public void RefreshIfChanged()
+        {
+            if (ItemChecklistMod.CurrentCounterNumerator() != _lastCounter) Refresh();
         }
     }
 }
