@@ -95,6 +95,18 @@ ControlMapper:
     hint: "Keybind name shown in the game Controls menu."
     en: "Item Checklist: Toggle"
     de: "Item-Checkliste: Umschalten"
+  # Section header + description for our own control-mapping category (Controls >
+  # Mods). CK derives these term keys as `ControlMapper/<Category>Category` and
+  # `.../<Category>Description` from the category name registered via
+  # `ControlMappingModule.AddNewCategory("ItemChecklist")` in ItemChecklistMod.EarlyInit.
+  ItemChecklistCategory:
+    hint: "Section header for the mod's controls (Controls > Mods)."
+    en: "Item Checklist"
+    de: "Item-Checkliste"
+  ItemChecklistDescription:
+    hint: "Section sub-title under the Item Checklist controls header."
+    en: "Item Checklist controls"
+    de: "Steuerung der Item-Checkliste"
 
 # Mod Settings Menu section (Options -> Mod Settings). The framework looks up each SETTING label by
 # `<ModId>-Config/<key>` and the section HINT by `<ModId>-Config/_hint`. Slider/Toggle values render

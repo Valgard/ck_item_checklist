@@ -196,16 +196,24 @@ namespace ItemChecklist
             CoreLibMod.LoadSubmodule(typeof(UserInterfaceModule));
             CoreLibMod.LoadSubmodule(typeof(ControlMappingModule));
 
-            // Register the toggle keybind (default F1). CoreLib's
-            // ControlMappingModule wires this into Rewired's UserData so the
-            // user can rebind it through the game's input-settings UI.
+            // Register the toggle keybind (default F1) under our OWN named
+            // control-mapping category, not CoreLib's shared "Mods" bucket.
+            // CoreLib suppresses the sub-section header for the "Mods" category
+            // (`_showActionCategoryName = categoryName != "Mods"`), so a
+            // `categoryId: -1` bind renders as a loose, header-less row at the
+            // top of Controls > Mods. A named category (like CoreLib's own
+            // "CoreLib" / PlacementPlus's "PlacementPlus") gets a header +
+            // description, localized via the `ControlMapper/<Category>Category`
+            // and `.../<Category>Description` terms (see localization.yaml).
+            // CoreLib migrates the persisted action to the new category on load.
+            int controlCategoryId = ControlMappingModule.AddNewCategory("ItemChecklist");
             ControlMappingModule.AddKeyboardBind(
                 keyBindName: ToggleActionName,
                 defaultKeyCode: KeyboardKeyCode.F1,
                 modifier: ModifierKey.None,
                 modifier2: ModifierKey.None,
                 modifier3: ModifierKey.None,
-                categoryId: -1);     // -1 = default "Mods" category
+                categoryId: controlCategoryId);
 
             // Rewired isn't initialized at EarlyInit; subscribe to the
             // rewiredStart hook so we grab the player handle as soon as it
