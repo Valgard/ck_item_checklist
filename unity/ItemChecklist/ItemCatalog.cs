@@ -219,6 +219,12 @@ namespace ItemChecklist
                 var levelCache       = new Dictionary<long, int>();
                 var sellValueCache   = new Dictionary<long, int>();
                 var craftableCache   = new Dictionary<long, bool>();
+
+                // Iter-35: CoreLib workbench-chain sets, so Loop 1 can drop internal "page"
+                // workbenches (see the exclusion there + BuildWorkbenchChainSets). chainReferenced
+                // = every objectID folded in via some non-root WorkbenchDefinition.relatedWorkbenches;
+                // chainHubs = referenced members that themselves fold others in (non-empty related).
+                BuildWorkbenchChainSets(out var chainReferenced, out var chainHubs);
                 // Iter-32: guard against adding the same (objectID, variation) to
                 // `accepted` twice. A golden-ingredient recipe turns straight into a
                 // Rare family (CookingIngredientCD.turnsIntoFood → a Rare ID) whose
@@ -339,6 +345,20 @@ namespace ItemChecklist
                             : $"{locText} {Loc.F("ItemChecklist-General/ColorSuffix", od.variation)}";
 
                     long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
+
+                    // Iter-35: drop CoreLib workbench-chain "pages" — internal, non-player-facing
+                    // workbench objects a base folds in via relatedWorkbenches (verified in-game:
+                    // the refs are a MESH, so the named base workbenches are referenced too — a
+                    // naive "is referenced" filter would wrongly drop "Chest Workbench"). A chain
+                    // member (referenced by a sibling) is a page when it is a LEAF (folds in
+                    // nothing → !chainHubs) OR is TERM-LESS (no display name → fell back). The named
+                    // bases are hubs WITH a name → kept. The term-less test is confined to chain
+                    // members, so a legit standalone term-less foreign item still gets its derived
+                    // name (it is never referenced as a workbench page).
+                    if (chainReferenced.Contains((int)od.objectID)
+                        && (!chainHubs.Contains((int)od.objectID) || fallbackNameKeys.Contains(key)))
+                        continue;
+
                     localizedNames[key]   = locText;
                     unlocalizedNames[key] = rawText;
                     accepted.Add(od);
@@ -562,6 +582,46 @@ namespace ItemChecklist
             finally
             {
                 baking = false;
+            }
+        }
+
+        /// <summary>
+        /// Iter-35: build the CoreLib workbench-chain sets used to drop internal "page"
+        /// workbenches. A mod's workbenches cross-reference each other via
+        /// <c>WorkbenchDefinition.relatedWorkbenches</c> so opening any shows the unified
+        /// crafting UI — verified in-game to be a MESH (the named base workbenches are also
+        /// referenced), NOT a clean parent→child tree. <paramref name="referenced"/> = every
+        /// objectID appearing in some non-root definition's relatedWorkbenches (a chain member);
+        /// <paramref name="hubs"/> = referenced members whose OWN relatedWorkbenches is non-empty
+        /// (they fold others in). The CoreLib root workbench is skipped (it aggregates ALL mod
+        /// workbenches via the bindToRootWorkbench flag, not relatedWorkbenches, so counting it
+        /// would drag every base into <paramref name="referenced"/>). Reads
+        /// <c>LoadedMod.Assets</c> — sandbox-verified (Iter-35b probe: safetyCheck=True).
+        /// </summary>
+        private static void BuildWorkbenchChainSets(out HashSet<int> referenced, out HashSet<int> hubs)
+        {
+            referenced = new HashSet<int>();
+            hubs = new HashSet<int>();
+            try
+            {
+                foreach (var mod in API.ModLoader.LoadedMods)
+                {
+                    foreach (var def in mod.Assets.OfType<CoreLib.Submodule.Entity.WorkbenchDefinition>())
+                    {
+                        string itemId = def.itemID;
+                        if (string.IsNullOrEmpty(itemId)) continue;
+                        if (itemId.StartsWith("CoreLib:RootModWorkbench", StringComparison.Ordinal)) continue;
+                        var related = def.relatedWorkbenches;
+                        if (related == null || related.Count == 0) continue;
+                        hubs.Add((int) API.Authoring.GetObjectID(itemId));
+                        foreach (var rel in related)
+                            referenced.Add((int) API.Authoring.GetObjectID(rel));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ItemChecklist] BuildWorkbenchChainSets threw (treating as no chains): " + ex.Message);
             }
         }
 
