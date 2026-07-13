@@ -1652,3 +1652,65 @@ Behaviour-neutral (identical numbers shown). Pure behavioural C# (net +38/−32 
 counter tracks discovery, the mode toggle flips both surfaces, the owned tally updates ~3 s after
 a stock change). **Process:** the dedup shape was the user's prompt mid-iter; the "one gate for
 everything" temptation was rejected on the denominator argument before any edit.
+
+**Iter-38 (possession-scan interval as a setting) — DONE (2026-07-13, branch `iter-38`).**
+A user-requested knob: expose the possession-scan cadence — the hardcoded `const float
+PossessionRefreshSeconds = 3f`, reset onto `_possessionTimer` each cycle in `Update()` — as an
+in-game Mod Settings control, so the player trades owned-tally freshness against per-scan overhead
+(the scan is ~1–10 ms post-Iter-27/28/31, so this is a freshness knob, not a perf necessity — the
+user-facing form of the "simpler lever" Iter-29 named, and it further obsoletes the Iter-29
+time-slicing idea).
+
+**Design change mid-iter: Slider → `.Choice<int>` (the user's call).** The roadmap had settled on
+a Slider (a 1:1 clone of the `anchorRadius` sibling); the user instead asked for a **discrete
+Choice of presets** — `{1, 2, 3, 5, 8, 10, 15, 20, 25, 30}` s, default 3 — so the steps are curated
+(no meaningless 17 s / 23 s). ItemChecklist is the **second `.Choice` consumer** (after Iter-36's
+`CounterMode`). Modelled as `Choice<int>` (not an enum): the value **is** the seconds, so the token
+`int.ToString()` is self-documenting (`5`, not an opaque `S5`), and there is no name↔seconds map to
+maintain. The framework's `SectionBuilder.Choice<T>` accepts any T (token = `value.ToString()`,
+persisted as a string `ConfigEntry` with an `AcceptableValueList`; an unknown/removed token falls
+back to the default), so `Choice<int>` needed no framework change.
+
+**Implementation (four edits, all pure behavioural C# + loc).** `ModConfig` gains a
+`SettingHandle<int> _scanIntervalHandle`, `const int DefaultScanInterval = 3` (the old constant
+relocated here), and a live-read `public static float ScanIntervalSeconds` (int→float widening;
+fallback = the default pre-Bind). `ModConfig.Bind` takes the 4th handle; `ItemChecklistMod.Init`
+registers `.Choice(out var scanInterval, "scanInterval", new[]{1,2,3,5,8,10,15,20,25,30}, 3)`
+between `anchorRadius` and `diagnostics` (AsDeclared sort → that IS render order). `Update()` now
+resets `_possessionTimer = ModConfig.ScanIntervalSeconds`, read **fresh each cycle**, so an in-menu
+change applies from the next scan. **No cold-start delay** regardless of the ceiling:
+`_possessionTimer` is a `float` field defaulting to `0f`, so `-= Time.deltaTime` → `≤ 0` fires the
+first scan on the first playable tick and *then* resets to the interval (confirmed in-game by the
+33 ms cold-start scan at `ents=0`, before chunks streamed). Loc: a `scanInterval` label block + an
+`ItemChecklist-Config/scanInterval` per-option block ("1s".."30s"); the label is "Scan interval"
+(the "s" on each value carries the unit, so "(seconds)" was dropped from the label at the user's
+request).
+
+**Loc gotcha — the one real finding (surfaced by the adversarial diff review, then self-verified
+against the generator source).** The per-option keys must be **unquoted** (`10:`, not `"10":`) —
+the `counterMode` precedent is unquoted, but I had initially quoted the numeric keys "so YAML would
+not coerce them to ints". Correct for a real YAML parser (PyYAML), **wrong for this pipeline**:
+`utils/LocalizationGenerator.cs`'s `LocYaml.Parse` is a hand-rolled line-parser that takes the leaf
+key as `body[..c].Trim()` and **never unquotes it** (only *values* go through `Unquote`). So `"10":`
+bakes the term `ItemChecklist-Config/scanInterval/"10"` (quotes included), while the runtime
+`SettingWidget` looks up `_def.Term + "/" + token` = `.../scanInterval/10` — a mismatch that
+silently falls back to the bare "10" (no "s"). Fixed by unquoting to match the precedent, verified
+by reproducing the parser's exact leaf-extraction in a probe (all 10 terms match the runtime
+tokens). The rest of the review returned **SHIP** (0 compile/sandbox/logic/scope findings).
+
+**Process (hybrid — inline edits + subagent adversarial review).** Design was pre-settled in the
+roadmap, so no brainstorm/spec; the Slider→Choice change arrived mid-turn and reshaped only the
+widget. The roadmap's line references (`:156`/`:237`/`:305`) had drifted since Iter-37 and were
+re-grounded against the live code before editing (the constant was `:162`, the builder block `:246`,
+the timer reset `:325`) — the standing "validate docs against reality" lesson. The framework's
+`Choice` mechanics + the option-label loc path were read from the `mod-settings-menu` source before
+writing, not guessed.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** `Successfully compiled ItemChecklist
+safetyCheck=True`, 0 `CompileFailed`, 0 NRE, `ItemCatalog baked: 8116 items` (unchanged — a
+settings-only change); `config.cfg` shows `scanInterval = 3` beside the other three keys (the Choice
+bound + persisted, no empty-values warning); the user confirmed the row renders and cycles
+"1s".."30s" under Options → Mod Settings; and the Iter-30 diag corroborated the cadence — a
+1s-interval window produced **19** scan lines (well above the ~6–10 a steady 3 s would give in the
+same window), each still ~2.2 ms (no perf regression). Pure behavioural C# + YAML; no prefab/art
+touch.

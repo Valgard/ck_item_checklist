@@ -413,37 +413,31 @@ remaining backlog.
   the owned tally is unchanged. Pure behavioural C#; no prefab/art touch. Verified in-game
   (1.2.1.5, fake-ID 9999997): `safetyCheck=True`, 0 `CompileFailed`, 0 NRE, `baked: 8116`.
   Requested + done 2026-07-13.
-- **Iter-38 (tentative) -- possession-scan interval as a setting.** User-requested
-  2026-07-13: expose the possession-scan cadence as a Mod Settings Menu slider so the
-  player can trade update freshness against per-scan overhead. Today the cadence is the
-  hardcoded `const float PossessionRefreshSeconds = 3f` (`ItemChecklistMod.cs:156`), reset
-  onto the countdown timer each cycle in `Update()` (`ItemChecklistMod.cs:305`); the scan is
-  ~1-10ms post-Iter-27/28/31, so raising it is purely a freshness knob, not a perf necessity.
-  This is the **user-facing form of the "simpler lever" Iter-29 named** ("raise the interval
-  3s->5-6s") -- and further obsoletes the Iter-29 time-slicing idea. **Design settled with
-  the user (build-ready):**
-  - **Slider**, not a Choice/preset or an added disable-toggle -- a 1:1 clone of the
-    `anchorRadius` sibling (`ItemChecklistMod.cs:237`, signature `(handle, key, min, max,
-    default, step, SliderDisplay)`). Key `scanInterval`, **range 1-30 s, step 1, default 3**
-    (default preserves current behaviour), `SliderDisplay.Number` (unit conveyed by the
-    label, slider values render without loc).
-  - `ModConfig` gains a `SettingHandle<float> _scanIntervalHandle`, a
-    `const float DefaultScanInterval = 3f` (the old constant relocates here), and a
-    live-read `ScanIntervalSeconds` property (fallback = default); `Bind(...)` takes the new
-    handle. `Update()` reads `ModConfig.ScanIntervalSeconds` when resetting `_possessionTimer`
-    -- so an in-menu change applies from the next cycle. **No cold-start delay** regardless of
-    the ceiling: `_possessionTimer` starts at `0f`, so the first scan still fires on the first
-    playable tick and only then resets to the interval.
-  - **Loc:** a `scanInterval:` block under `ItemChecklist-Config` in
-    `localization/localization.yaml` (EN "Scan interval (seconds)" / DE "Scan-Intervall
-    (Sekunden)").
-  - **Unchanged by design:** the 8s prune-grace and the ledger persistence (CK
-    `WriteCharacter` hook) -- this is purely a scan-frequency knob.
-  Pure behavioural C# + one loc block; no prefab/art touch (the Iter-23/34/35 shape).
-  Not ADR-worthy -> no committed spec. First step: build the four edits above on an
-  `iter-38` branch/worktree, then in-game-verify (clean sandbox compile, slider appears
-  under Options -> Mod Settings, a changed value visibly shifts the scan cadence in the
-  Iter-30 diagnostic log). Requested 2026-07-13.
+- **Iter-38 -- possession-scan interval as a setting. DONE** (see
+  `docs/iteration-history.md`). Exposes the possession-scan cadence (was the hardcoded
+  `const float PossessionRefreshSeconds = 3f`, reset onto `_possessionTimer` each cycle in
+  `Update()`) as an in-game Mod Settings control, so the player trades owned-tally freshness
+  against per-scan overhead (a freshness knob, not a perf necessity -- the user-facing form of
+  the "simpler lever" Iter-29 named). **The user changed the widget mid-iter from the planned
+  Slider to a `.Choice<int>`** of fixed presets **{1,2,3,5,8,10,15,20,25,30} s, default 3**
+  (curated steps, no meaningless in-between values) -- the second `.Choice` consumer after
+  Iter-36. Modelled as `Choice<int>` (not an enum): the value **is** the seconds, so the token
+  `int.ToString()` is more self-documenting than an `S5`-style enum token, and there's no
+  name<->seconds map to maintain. `ModConfig` gains `_scanIntervalHandle` + `DefaultScanInterval
+  = 3` + a live-read `ScanIntervalSeconds` (float; int->float) property; `Bind(...)` takes the
+  4th handle; `Update()` reads it **fresh each timer reset** (in-menu change applies from the
+  next cycle; **no cold-start delay** -- `_possessionTimer` starts at 0f so the first scan fires
+  immediately regardless of the ceiling). Per-option loc renders the presets as "1s".."30s"; the
+  label is "Scan interval" ("(seconds)" dropped -- the unit rides the values). **Loc gotcha
+  (recorded):** the per-option keys must be **unquoted** (`10:` not `"10":`) -- the mod's loc
+  generator (`utils/LocalizationGenerator.cs`) is a custom line-parser that does NOT unquote leaf
+  keys, so `"10":` bakes term `.../scanInterval/"10"` and mismatches the runtime lookup
+  `.../scanInterval/10` (silent fallback to the bare number). Pure behavioural C# + one loc block;
+  no prefab/art touch. Verified in-game (1.2.1.5, fake-ID 9999997): `safetyCheck=True`, 0
+  `CompileFailed`, 0 NRE, `baked: 8116`; `config.cfg` shows `scanInterval = 3` (Choice bound +
+  persisted); the row cycles "1s".."30s" (user-confirmed); the Iter-30 diag corroborated the
+  cadence (a 1s window produced ~19 scans vs the ~6-10 a steady 3s would). Requested + done
+  2026-07-13.
 - **Iter-39 (tentative) -- "Craftable / Not craftable" filter misclassifies cooked
   dishes.** User-observed 2026-07-13: cooked dishes (Gerichte) land in the **Not
   craftable** bucket of the Iter-10 Craftable filter, although the player *does* make
