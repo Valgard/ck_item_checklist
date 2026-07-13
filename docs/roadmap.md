@@ -395,19 +395,24 @@ remaining backlog.
   property `Mode`. A Codex spec-review caught the `CS0103`/`CS0102` issues up front; a
   subagent diff-review returned SHIP (2 non-blocking, pre-existing observations — one logged
   as tentative Iter-37 below). Requested 2026-07-12, done 2026-07-13.
-- **Iter-37 (tentative) -- HUD counter: redundant repaint after a discovery change.**
-  Surfaced by the Iter-36 adversarial review (a non-blocking observation, deferred as
-  out of scope). The always-on HUD has two refresh paths: the direct
-  `DiscoveredState.Changed -> ItemChecklistHud.Refresh()` subscription (in `Awake`) and
-  the change-gated 3s-scan nudge `RefreshHudCounterIfChanged()` (gated on
-  `s_lastHudCounter`). The direct path repaints but does **not** update
-  `s_lastHudCounter`, so the next 3s scan sees the stale cache, finds the numerator
-  "changed", and repaints a **second** time -- one extra `PugText.Render`, harmless.
-  **Pre-existing since Iter-16.4** (then `s_lastHudCollected`); Iter-36 only inherits it.
-  Fix candidate: update `s_lastHudCounter` after the direct `Refresh()` render (or route
-  both paths through one change-gated helper) so the scan nudge does not re-fire.
-  Cosmetic (at most one redundant render every few seconds); purely a cleanup, not a
-  visible bug. Requested 2026-07-13.
+- **Iter-37 -- HUD counter redundant repaint: dedup into a single change-gated render. DONE**
+  (see `docs/iteration-history.md`). Surfaced by the Iter-36 adversarial review. The always-on
+  HUD counter had **two refresh disciplines** bridged by a static cache in `ItemChecklistMod`:
+  an unconditional `Refresh()` on the direct `DiscoveredState.Changed` path + the mode toggle,
+  and a change-gated `RefreshHudCounterIfChanged()` for the 3s scan. The direct path repainted
+  without updating `s_lastHudCounter`, so the next scan saw a phantom change and fired a
+  redundant second `PugText.Render` (glyph-SR rebuild); pre-existing since Iter-16.4, inherited
+  by Iter-36. **Fix (dedup, at the user's prompt): consolidate ownership into `ItemChecklistHud`**
+  where the counter is displayed — the cache (`_lastCounter`) and both methods now live there.
+  `Refresh()` is the single unconditional render point (bake / loc re-bake / the `Awake` initial
+  paint — the **denominator**-changing triggers) and always leaves the cache equal to what is on
+  screen; `RefreshIfChanged()` is the **numerator**-gated entry for the recurring triggers (3s
+  scan, discovery event, mode toggle). `ItemChecklistMod` loses `s_lastHudCounter`,
+  `NoteHudCounterShown` and `RefreshHudCounterIfChanged` entirely. Behaviour-neutral (same numbers
+  shown); removes the redundant scan repaint **and** the possession-mode discovery repaint when
+  the owned tally is unchanged. Pure behavioural C#; no prefab/art touch. Verified in-game
+  (1.2.1.5, fake-ID 9999997): `safetyCheck=True`, 0 `CompileFailed`, 0 NRE, `baked: 8116`.
+  Requested + done 2026-07-13.
 - **Iter-38 (tentative) -- possession-scan interval as a setting.** User-requested
   2026-07-13: expose the possession-scan cadence as a Mod Settings Menu slider so the
   player can trade update freshness against per-scan overhead. Today the cadence is the

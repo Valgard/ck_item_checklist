@@ -1604,3 +1604,51 @@ as the first Mod-Settings row; toggling flips **both** the HUD and the window fo
 immediately; Discovery `N / M` ↔ Possession `K / M` with `M` constant; `K ≤ N`; the owned
 tally updates live ~3 s after a stock change. Pure behavioural C# + YAML; no prefab/art
 touch.
+
+**Iter-37 (HUD counter redundant repaint — dedup into a single change-gated render) — DONE
+(2026-07-13, branch `iter-37`).** A cleanup surfaced by the Iter-36 adversarial review (logged
+there as a non-blocking, pre-existing observation). The always-on HUD counter had **two
+refresh disciplines** bridged by a static cache in `ItemChecklistMod`:
+- an **unconditional** `ItemChecklistHud.Refresh()` on the direct `DiscoveredState.Changed`
+  subscription (`Awake`), the mode toggle, and the two bake hooks (world-load + loc-change);
+- a **change-gated** `RefreshHudCounterIfChanged()` (compares `s_lastHudCounter`) for the 3s
+  possession scan.
+
+The direct path repainted but never updated `s_lastHudCounter`, so the next 3s scan saw a
+phantom change and fired a **redundant second** `PugText.Render` (which rebuilds glyph
+SpriteRenderers). Harmless — at most one extra render every few seconds — and **pre-existing
+since Iter-16.4** (then `s_lastHudCollected`); Iter-36 only inherited it. The Iter-36 mode-toggle
+handler additionally *forced* the same redundant scan repaint by resetting the gate to `-1` right
+after its own direct `Refresh()`.
+
+**The design question (raised by the user mid-iter): shouldn't we deduplicate?** The naive dedup
+— route *every* refresh through the one change-gated helper — is a **latent bug**: the bake / loc
+re-bake paths change the **denominator** (`Catalog.Count`), which a numerator-only gate cannot
+detect, so gating them would leave a stale `N / M` after a re-bake. So the two disciplines are
+genuinely both needed; the real dedup is **cohesion**, not collapsing them.
+
+**Fix — consolidate ownership into `ItemChecklistHud`** (where the counter is displayed). The
+cache (`_lastCounter`, an instance field) and both refresh methods now live with the counter they
+describe, not as a static field + cross-class setter back in the mod:
+- `Refresh()` is the **single render point** and always leaves `_lastCounter` equal to what is on
+  screen. Its callers are the **denominator-changing / initial** triggers: the two bake hooks and
+  the `Awake` initial paint.
+- `RefreshIfChanged()` is the **numerator-gated** entry — repaint iff `CurrentCounterNumerator()`
+  differs from `_lastCounter`. Its callers are the recurring **numerator-driven** triggers: the 3s
+  scan, the `DiscoveredState.Changed` subscription, and the mode toggle.
+
+`ItemChecklistMod` loses `s_lastHudCounter`, `NoteHudCounterShown` **and**
+`RefreshHudCounterIfChanged` entirely — it now holds zero HUD display state, just supplies
+`CurrentCounterNumerator()` and the triggers. Because every unconditional `Refresh()` syncs the
+cache, no path can leave the gate stale, so the redundant follow-up repaint is structurally
+impossible. Two bonus removals fall out: the mode-toggle's `-1` reset is gone (its `RefreshIfChanged`
+paints + syncs in one step), and routing the **discovery event** through the gate also drops the
+**possession-mode** repaint when a discovery leaves the owned tally `K` unchanged.
+
+Behaviour-neutral (identical numbers shown). Pure behavioural C# (net +38/−32 across
+`ItemChecklistHud.cs` + `ItemChecklistMod.cs`); no prefab/art/loc touch. **Verified in-game
+(1.2.1.5, fake-ID 9999997):** `Successfully compiled ItemChecklist safetyCheck=True`, 0
+`CompileFailed`, 0 NRE, `ItemCatalog baked: 8116 items`; the user played without regression (HUD
+counter tracks discovery, the mode toggle flips both surfaces, the owned tally updates ~3 s after
+a stock change). **Process:** the dedup shape was the user's prompt mid-iter; the "one gate for
+everything" temptation was rejected on the denominator argument before any edit.
