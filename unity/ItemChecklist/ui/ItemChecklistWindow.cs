@@ -209,10 +209,10 @@ namespace ItemChecklist.UI
             // from the HUD counter (Iter-11.5). Null/empty catalog still yields "0 / 0".
             var catalog = ItemChecklistMod.Catalog;
             int total = (catalog == null) ? 0 : catalog.Count;
-            // Iter-16.4: numerator = collected catalog rows (not DiscoveredState.Count,
-            // which counts each pet species once while total counts every skin row →
-            // 100% unreachable). Consistent with the per-row tick + the Discovery filter.
-            return ProgressFormat.Counter(ItemChecklistMod.CollectedCatalogCount(), total);
+            // Iter-36: numerator = the mode-selected count (discovery N or possession K),
+            // shared with the HUD via ItemChecklistMod.CurrentCounterNumerator so the two
+            // surfaces never drift. Denominator total = Catalog.Count in both modes.
+            return ProgressFormat.Counter(ItemChecklistMod.CurrentCounterNumerator(), total);
         }
 
         private string FormatShown()
@@ -225,6 +225,14 @@ namespace ItemChecklist.UI
         {
             if (title != null) title.Render(FormatTitle());
             if (shownLabel != null) shownLabel.Render(FormatShown());
+        }
+
+        // Iter-36: external trigger to re-render the footer counter (used when the counter
+        // mode is toggled in-menu). No-op while the window is closed.
+        internal void RefreshStatus()
+        {
+            if (root == null || !root.activeSelf) return;
+            RenderStatus();
         }
 
         private void OnDiscoveryChanged()

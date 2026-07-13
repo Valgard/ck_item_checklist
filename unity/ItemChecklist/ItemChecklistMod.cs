@@ -133,21 +133,45 @@ namespace ItemChecklist
             return n;
         }
 
-        // Iter-16.4: last collected-catalog tally pushed to the always-on HUD, so a newly
-        // collected pet skin (which fires NO DiscoveredState.Changed — CK has no per-skin
-        // discovery event) still updates the HUD counter live. The window self-heals on its
-        // own (it rescans + RenderStatus on every open); only the always-on HUD needs this
-        // nudge. -1 = "unknown" so the first scan always refreshes.
-        private static int s_lastHudCollected = -1;
+        // Iter-36: the possession numerator K — how many catalog rows the player owns (>=1).
+        // Twin of CollectedCatalogCount, tallied through the SAME spoiler-gated OwnedCount
+        // chokepoint (Iter-21): an undiscovered item never counts (K <= N), pet skins / cattle
+        // colours route correctly, no drift with the rows/filter. O(catalog); refresh-only.
+        internal static int OwnedCatalogCount()
+        {
+            var cat = Catalog;
+            if (cat == null) return 0;
+            int n = 0;
+            for (int i = 0; i < cat.Count; i++)
+            {
+                var e = cat.GetByIndex(i);
+                if (OwnedCount(e.ObjectId, e.Variation) >= 1) n++;
+            }
+            return n;
+        }
 
-        // Iter-16.4: re-render the always-on HUD counter only when the collected tally
+        // Iter-36: single numerator source for BOTH counter surfaces (HUD + window footer),
+        // selected by ModConfig.Mode. Denominator (total = Catalog.Count) is unchanged per mode.
+        internal static int CurrentCounterNumerator()
+            => ModConfig.Mode == ModConfig.CounterMode.Possession
+                ? OwnedCatalogCount()
+                : CollectedCatalogCount();
+
+        // Iter-16.4/36: last counter numerator pushed to the always-on HUD. In possession mode
+        // the owned tally can change with NO DiscoveredState.Changed, so track the DISPLAYED
+        // number (mode-aware) — the 3s scan nudge then catches owned-tally changes too, and a
+        // pet-skin collect (also no Changed) still updates in discovery mode. -1 = "unknown" so
+        // the first scan (and a mode toggle, which resets it) always refreshes.
+        private static int s_lastHudCounter = -1;
+
+        // Iter-16.4/36: re-render the always-on HUD counter only when the displayed number
         // actually changed — PugText.Render rebuilds glyph SpriteRenderers, so the 3s
         // possession poll must not churn it every tick.
         private static void RefreshHudCounterIfChanged()
         {
-            int collected = CollectedCatalogCount();
-            if (collected == s_lastHudCollected) return;
-            s_lastHudCollected = collected;
+            int shown = CurrentCounterNumerator();
+            if (shown == s_lastHudCounter) return;
+            s_lastHudCounter = shown;
             ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
         }
 
@@ -229,15 +253,28 @@ namespace ItemChecklist
         {
             Debug.Log("[ItemChecklist] Init");
 
-            // Register the possession-tracking settings; ModConfig reads these live handles
-            // (replaces the former CoreLib API.Config surface). Section uses the default AsDeclared
-            // sort, so builder-call order IS render order: base radius, then the diagnostics toggle.
+            // Register the mod settings; ModConfig reads these live handles (replaces the former
+            // CoreLib API.Config surface). Section uses the default AsDeclared sort, so builder-call
+            // order IS render order: counter mode (Iter-36) first, then base radius, then diagnostics.
             ModSettings.Section(this)
-                .Hint("Possession tracking - how far from a workbench storage counts as yours, plus optional diagnostic logging.")
+                .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, and optional diagnostic logging.")
+                .Choice(out var counterMode, "counterMode",
+                    new[] { ModConfig.CounterMode.Discovery, ModConfig.CounterMode.Possession },
+                    ModConfig.CounterMode.Discovery)
                 .Slider(out var radius, "anchorRadius", 16f, 96f, 48f, 8f, SliderDisplay.Number)
                 .Toggle(out var diag, "diagnostics", false)
                 .Build();
-            ModConfig.Bind(radius, diag);
+            ModConfig.Bind(radius, diag, counterMode);
+
+            // Iter-36: re-render both counter surfaces immediately when the mode is toggled
+            // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Reset the HUD's
+            // change-gate so the next scan cannot skip a redundant-looking re-render.
+            counterMode.OnChanged += _ =>
+            {
+                s_lastHudCounter = -1;
+                ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();
+                ItemChecklist.UI.ItemChecklistWindow.Instance?.RefreshStatus();
+            };
 
             Catalog = new ItemCatalog();
             ItemCatalogLocChangeHook.Subscribe();

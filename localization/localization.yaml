@@ -110,12 +110,17 @@ ControlMapper:
 
 # Mod Settings Menu section (Options -> Mod Settings). The framework looks up each SETTING label by
 # `<ModId>-Config/<key>` and the section HINT by `<ModId>-Config/_hint`. Slider/Toggle values render
-# without loc, so (unlike a Choice) no per-option terms are needed.
+# without loc; the counterMode Choice's per-option labels live in a separate
+# `ItemChecklist-Config/counterMode` namespace block at the end of this file.
 ItemChecklist-Config:
   _hint:
     hint: "Section hint shown under the Item Checklist heading."
-    en: "Possession tracking - how far from a workbench storage counts as yours, plus optional diagnostic logging."
-    de: "Besitz-Tracking - wie weit von einer Werkbank Lager als deins zählt, plus optionales Diagnose-Protokoll."
+    en: "Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, and optional diagnostic logging."
+    de: "Zähler-Modus (HUD + Fenster-Fußzeile), plus Besitz-Tracking - wie weit von einer Werkbank Lager als deins zählt, und optionales Diagnose-Protokoll."
+  counterMode:
+    hint: "Choice label - what the discovery/possession counter (HUD + footer) shows."
+    en: "Counter mode"
+    de: "Zähler-Modus"
   anchorRadius:
     hint: "Slider label - base radius in tiles around a workbench within which storage counts as owned."
     en: "Base radius"
@@ -124,3 +129,9 @@ ItemChecklist-Config:
     hint: "Toggle label - possession-scan diagnostic logging to Player.log."
     en: "Diagnostic logging"
     de: "Diagnose-Protokoll"
+
+# Iter-36 Choice option labels for counterMode. Leaf = the enum token (CounterMode.<name>.ToString()),
+# resolving to the term `ItemChecklist-Config/counterMode/<token>` the SettingWidget looks up.
+ItemChecklist-Config/counterMode:
+  Discovery:  { en: "Discovered", de: "Entdeckt" }
+  Possession: { en: "Owned",      de: "Besitz" }

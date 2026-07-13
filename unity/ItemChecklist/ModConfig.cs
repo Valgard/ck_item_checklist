@@ -23,17 +23,26 @@ namespace ItemChecklist
     {
         private const float DefaultRadius = 48f;
 
+        /// <summary>Iter-36: what the HUD + window-footer counter shows.</summary>
+        public enum CounterMode { Discovery, Possession }
+
         private static SettingHandle<float> _radiusHandle;
         private static SettingHandle<bool> _diagHandle;
+        private static SettingHandle<CounterMode> _counterModeHandle;
 
-        public static void Bind(SettingHandle<float> radius, SettingHandle<bool> diagnostics)
+        public static void Bind(SettingHandle<float> radius, SettingHandle<bool> diagnostics,
+            SettingHandle<CounterMode> counterMode)
         {
             _radiusHandle = radius;
             _diagHandle = diagnostics;
+            _counterModeHandle = counterMode;
         }
 
         public static float AnchorRadius => _radiusHandle != null ? _radiusHandle.Value : DefaultRadius;
 
         public static bool Diagnostics => _diagHandle != null ? _diagHandle.Value : false;
+
+        // Iter-36: named `Mode` (NOT `CounterMode`) — a nested type + a same-named member is CS0102.
+        public static CounterMode Mode => _counterModeHandle != null ? _counterModeHandle.Value : CounterMode.Discovery;
     }
 }
