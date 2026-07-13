@@ -438,30 +438,27 @@ remaining backlog.
   persisted); the row cycles "1s".."30s" (user-confirmed); the Iter-30 diag corroborated the
   cadence (a 1s window produced ~19 scans vs the ~6-10 a steady 3s would). Requested + done
   2026-07-13.
-- **Iter-39 (tentative) -- "Craftable / Not craftable" filter misclassifies cooked
-  dishes.** User-observed 2026-07-13: cooked dishes (Gerichte) land in the **Not
-  craftable** bucket of the Iter-10 Craftable filter, although the player *does* make
-  them (by cooking). **Mechanism already read from the code (not yet in-game-confirmed):**
-  `ItemCatalog` derives `Entry.IsCraftable` at **both** bake sites purely as
-  `info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0`
-  (`ItemCatalog.cs:370` standard Loop-1, `:801` `AddCookedEntry`) -- i.e. strictly "has a
-  **workbench recipe**". Cooked food is not produced by a workbench recipe but by the
-  **Cooking Pot** combining an ingredient pair (`CookingIngredientCD` /
-  `ConvertCookedFoodsSystem`), so a cooked object carries an **empty
-  `requiredObjectsToCraft`** -> `IsCraftable = false` for **every** dish, matching the
-  symptom exactly. Cross-ref Iter-33: **cooking is the only source** of cooked food, so
-  "not craftable" is doubly wrong for them. **Open design question (settle with the user
-  before building):** what should the filter's "Craftable" mean -- the current "has a
-  workbench recipe", or the broader "the player can *produce* it" (which would fold in
-  cooked-via-cooking)? If the latter, the natural fix is to set `isCraftable: true` for
-  cooked-food entries at their Loop-2 emit (they are craftable by construction -- every
-  emitted `(objectID, variation)` corresponds to a real ingredient pair), leaving the
-  `requiredObjectsToCraft` derivation for all standard items untouched. **Verify first**
-  (standing lesson): confirm a sample dish reads `IsCraftable=false` in-game, and check
-  whether any *other* obtainable-but-recipeless rows are also misfiled by the same
-  `requiredObjectsToCraft` definition (pets/critters/cattle are creature families, not
-  "craftable", a separate question). Expected pure behavioural C#; no prefab/art touch.
-  Requested 2026-07-13.
+- **Iter-39 -- "Craftable / Not craftable" filter misclassifies cooked dishes. DONE**
+  (see `docs/iteration-history.md`). Cooked dishes (Gerichte) landed in the **Not
+  craftable** bucket, although the player produces them by cooking. Root cause (verified
+  statically, then in-game): `Entry.IsCraftable` is derived at both bake sites as
+  `requiredObjectsToCraft.Count > 0` -- strictly "has a **workbench recipe**". Cooked food
+  is produced by the **Cooking Pot** (`CookingIngredientCD` / `ConvertCookedFoodsSystem`),
+  not a workbench recipe, so its empty `requiredObjectsToCraft` filed **every** dish as not
+  craftable. **Design (settled with the user):** "Craftable" means *"the player can produce
+  it"* (broad); label kept, no loc change. **Fix:** unconditional `craftableCache[key] =
+  true` in `AddCookedEntry` (`ItemCatalog.cs:801`) -- the method is cooked-food-exclusive and
+  (Iter-33) every emitted `(objectID, variation)` is a reachable ingredient pair, so a dish
+  is craftable by construction; Loop-1 (`:370`), pets (`:474`) and cattle (`:525`) untouched.
+  **Measure-first (throwaway probe, committed-then-reverted):** confirmed all **6006** cooked
+  entries read `IsCraftable=false` pre-fix, and that **cooking is the only recipeless
+  station-production** -- the sibling not-craftable `ObjectType`s (PlaceablePrefab 364,
+  Valuable 126, Eatable 117, NonUsable 65, …) are all gathered/looted/foraged (the user
+  ruled farmed crops out of scope: gathering ≠ crafting, no clean signal). Verified in-game
+  (1.2.1.5, fake-ID 9999997): `safetyCheck=True`, 0 `CompileFailed`/NRE, `baked: 8116`
+  unchanged; the 6006 dishes moved to Craftable (**7300** craftable / **816** not craftable,
+  7300+816 = 8116), the residual 816 being exactly creatures + gathered/looted items. Pure
+  behavioural C# (one line + comment); no prefab/art/loc touch. Requested + done 2026-07-13.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered

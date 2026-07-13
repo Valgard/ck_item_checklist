@@ -1725,3 +1725,60 @@ anchor). Now a scan reads `… interval=3s dt=3,01s …`, so a changed setting i
 that failed to pick up the new value. Diag-only, default-off (zero overhead when off); the first line
 after enabling shows `dt=0` (no prior sample — same "first line is special" character as the cold-start
 `total` outlier). Pure behavioural C#; no prefab/art/loc touch.
+
+**Iter-39 (Craftable filter misclassifies cooked dishes) — DONE (2026-07-13, branch
+`iter-39`).** A user-reported bug: cooked dishes (Gerichte) sat in the **Not craftable**
+bucket of the Iter-10 Craftable filter, although the player produces them by cooking.
+
+**Root cause (read from the mod's own code, then confirmed in-game).** `ItemCatalog`
+derives `Entry.IsCraftable` at both bake sites as `info.requiredObjectsToCraft != null &&
+info.requiredObjectsToCraft.Count > 0` (`ItemCatalog.cs:370` standard Loop-1, `:801`
+`AddCookedEntry`) — strictly *"has a workbench recipe"*. Cooked food is produced by the
+**Cooking Pot** combining an ingredient pair (`CookingIngredientCD` /
+`ConvertCookedFoodsSystem`), never by a workbench recipe, so a cooked object carries an
+**empty `requiredObjectsToCraft`** → `IsCraftable = false` for every dish (cross-ref Iter-33:
+cooking is the *only* source of cooked food, so "not craftable" is doubly wrong). Unlike the
+usual CK-internals bug class, this was the mod's own classification code, so the mechanism
+was statically certain — but the sibling-completeness question still had to be measured.
+
+**Design (brainstormed, two decisions settled with the user).** (1) "Craftable" now means
+*"the player can produce it"* (broad), not "has a workbench recipe" (strict); the label stays
+**"Craftable"** — no loc change (renaming rejected as churn; keeping it strict = wontfix). (2)
+Verify with a throwaway bake probe before shipping, and raise any sibling producible-but-
+recipeless category before widening scope. Spec:
+`docs/specs/2026-07-13-iter-39-craftable-filter-cooked-food-design.md` (ADR-gated → discarded
+post-merge).
+
+**Measure-first probe (throwaway, committed-then-reverted, net-zero on `ItemCatalog.cs`).** A
+probe folded into `Bake` after the catalog is built logged, per `Entry`, the cooked-vs-not
+split and the non-cooked/non-creature not-craftable `ObjectType` histogram. In-game (1.2.1.5):
+**(a)** `cooked total=6006 notCraftable=6006` — every one of the 6006 cooked dishes read
+`IsCraftable=false` (symptom pinned; matches Iter-33's ~6006). **(b)** the sibling
+not-craftable set was **PlaceablePrefab 364 / Valuable 126 / Eatable 117 / NonUsable 65 /
+UniqueCraftingComponent 17 / CastingItem 4 / KeyItem 3 / Offhand 1 / RangeWeapon 1** — **all
+gathered/looted/mined/foraged**, none a recipeless *station* output. The gate's STOP condition
+(a brewing/alchemy-style sibling) was **not met**: smelting/casting/crafting all use
+`requiredObjectsToCraft` → already craftable; cooking is the only recipeless station-production.
+The one conceptual borderline — `Eatable` raw ingredients including **farmed crops** — the user
+**ruled out of scope** (farming/foraging is gathering, not crafting; CK's own crafting UI agrees;
+and there is no clean signal to separate a grown crop from a dropped/foraged raw eatable).
+
+**Fix.** Unconditional `craftableCache[key] = true` in `AddCookedEntry` (`ItemCatalog.cs:801`) —
+the method is cooked-food-exclusive and (Iter-33) every emitted `(objectID, variation)` is a
+real, reachable ingredient pair, so a cooked entry is craftable by construction, no ingredient
+check needed. Loop-1 (`:370`), pets (`:474`) and cattle (`:525`) untouched (gathered items /
+creatures are correctly not craftable). Gating on `HasComponent<CookedFoodAuthoring>` was
+rejected as tautological here; broadening the Loop-1 derivation was rejected as needless
+standard-path risk.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** `Successfully compiled ItemChecklist
+safetyCheck=True`, 0 `CompileFailed`, 0 NRE, `ItemCatalog baked: 8116 items` **unchanged** (a
+classification-only change — catalog size is not affected). The user confirmed the filter split
+**7300 craftable / 816 not craftable** (7300 + 816 = 8116): the 6006 dishes moved from
+not-craftable (6822 → 816) to craftable (1294 → 7300), and the residual 816 reconciles exactly
+as 698 gathered/looted non-creature rows + 63 pet skins + 30 cattle colours + 25 critters — i.e.
+only creatures + gathered items remain not-craftable, no collateral. Pure behavioural C# (one
+line + a comment); no prefab/art/loc touch. **Process:** the measure-first probe was diagnostically
+decisive twice — it empirically confirmed the static root cause (all 6006 false) *and* proved
+cooking is the sole recipeless station-production, converting a plausible static assumption into a
+verified one before the fix shipped.
