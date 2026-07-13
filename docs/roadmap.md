@@ -291,17 +291,26 @@ remaining backlog.
   host-overrun 4 vs 626. The "outside-base spike" itself was **not ItemChecklist** — isolation
   (disable via `state.json`) confirmed *Enemy Health Bars* (per-enemy rendering); the first-pass
   ComputeBuffer-GC theory was a red herring (those warnings fire only at process shutdown).
-- **Iter-29 (tentative; largely obsoleted by Iter-31 — the workbench-anchor fix shrank the
-  ledger and killed the remote churn, so the scan is now ~1ms outside base / ~4–5ms at base
-  with no felt hitch; kept only as a nice-to-have) -- chunk / time-slice the possession scan.** The 3s
-  `PossessionScanner.Scan` iterates the full ~2000-entity loaded-world set on a single tick;
-  a ~9.6ms scan on one frame every 3s is a felt micro-hitch even "under budget". Spread one
-  pass across several ticks so no single tick does the whole scan. **Not a regression** (1.0.2
-  had the identical scan and was smooth) — a nice-to-have smoothness pass. Real complexity to
-  weigh: hold the entity snapshot across frames (Persistent allocator + disposal, not
-  TempJob), accumulate `liveKeys` across all chunks **before** `PruneStaleNear` runs (it
-  assumes a full pass), and handle world-unload mid-pass. Measure the current scan first; the
-  simpler lever (raise the interval 3s→5–6s) may suffice. Requested 2026-06-28.
+- **Iter-29 -- chunk / time-slice the possession scan. WON'T FIX** (closed 2026-07-13).
+  The idea: the 3s `PossessionScanner.Scan` iterates the full loaded-world set on a single
+  tick, and a ~9.6ms scan on one frame every 3s is a felt micro-hitch even "under budget";
+  spreading one pass across several ticks would smooth it. **Closed as won't-fix — the
+  premise no longer holds and the two cheaper levers already shipped:**
+  - **Iter-31 removed the cost.** The workbench-anchor fix shrank the ledger and killed the
+    remote churn, so the scan is now **~1ms outside base / ~4–5ms at base with no felt
+    hitch** — well under the 16.7ms frame budget. Iter-27's bulk `ToComponentDataArray`
+    reads had already halved the loop (MAX 21.5→9.6ms); together there is no measurable
+    micro-hitch left to slice away.
+  - **Iter-38 shipped the "simpler lever" as a real setting.** The fallback this entry itself
+    named (raise the interval) is now the player-facing `.Choice<int>` scan-interval preset
+    ({1,2,3,5,8,10,15,20,25,30}s), so anyone who wants an even smaller per-scan footprint can
+    raise the cadence — no time-slicing needed.
+  - **The remaining work is disproportionate.** Time-slicing would mean holding the entity
+    snapshot across frames (Persistent allocator + explicit disposal, not TempJob),
+    accumulating `liveKeys` across all chunks **before** `PruneStaleNear` runs (it assumes a
+    full pass), and handling world-unload mid-pass — real complexity for a smoothness pass
+    that is no longer felt. **Never a regression** (1.0.2 had the identical scan and was
+    smooth). Requested 2026-06-28, closed 2026-07-13.
 - **Iter-32 -- cooked dishes double-counted in discovery. DONE** (see
   `docs/iteration-history.md`). **Root-caused by measurement, not the roadmap's guess.** A
   golden-ingredient recipe's `CookingIngredientCD.turnsIntoFood` points straight at a
