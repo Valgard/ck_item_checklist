@@ -253,7 +253,9 @@ namespace ItemChecklist.Possession
                 Debug.Log($"[ItemChecklist] DIAG scan total={(dTEnd - dT0) * 1000f:F1}ms " +
                     $"(world={(dTWorld - dT0) * 1000f:F1} setup={(dTAnchors - dTWorld) * 1000f:F1} " +
                     $"loop={(dTLoop - dTAnchors) * 1000f:F1} build={(dTEnd - dTLoop) * 1000f:F1}) " +
+                    $"interval={ModConfig.ScanIntervalSeconds:F0}s dt={(_lastScanRt > 0f ? dT0 - _lastScanRt : 0f):F2}s " +
                     $"ledgerC={lc} pairs={lp} ents={ents.Length} near={dNear} anchors={anchors.Count}");
+                _lastScanRt = dT0;   // Iter-38.1: anchor the next scan's dt=
                 DiagDumpObjectsOnce();
             }
             return view;
@@ -267,6 +269,7 @@ namespace ItemChecklist.Possession
         // placeable that is obviously wild nature (leaking past the blacklist in a new biome)
         // is visible and its tag/ID can be added to PossessionClassifier.
         private static bool _diagObjectsDumped;
+        private static float _lastScanRt;   // Iter-38.1: realtime of the previous diag-logged scan, for the dt= cadence field
         private static readonly Dictionary<int, (int count, string sig)> _diagObjects = new();
 
         private static void DiagRecordPlaced(int id, ObjectInfo info)

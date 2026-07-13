@@ -1714,3 +1714,14 @@ bound + persisted, no empty-values warning); the user confirmed the row renders 
 1s-interval window produced **19** scan lines (well above the ~6–10 a steady 3 s would give in the
 same window), each still ~2.2 ms (no perf regression). Pure behavioural C# + YAML; no prefab/art
 touch.
+
+**Follow-up (iter-38.1): DIAG cadence fields.** The verification pain above — reading the cadence
+only by *counting* scan lines because Player.log carries no timestamps and the DIAG line omitted the
+frequency — motivated a small enhancement of the Iter-30 diagnostic. `PossessionScanner`'s DIAG scan
+line gained two fields: `interval={ScanIntervalSeconds:F0}s` (the configured value) and
+`dt={seconds-since-the-previous-diag-scan:F2}s` (the *realized* cadence, from a static `_lastScanRt`
+anchor). Now a scan reads `… interval=3s dt=3,01s …`, so a changed setting is **self-verifying**
+(configured vs. actual) instead of inferred from line counts — and a divergence would catch a timer
+that failed to pick up the new value. Diag-only, default-off (zero overhead when off); the first line
+after enabling shows `dt=0` (no prior sample — same "first line is special" character as the cold-start
+`total` outlier). Pure behavioural C#; no prefab/art/loc touch.
