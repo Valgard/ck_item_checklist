@@ -332,24 +332,30 @@ remaining backlog.
   `SweepDiscoveredPhantoms` re-derives `discovered ∩ suppressed` so a failed real-time write
   self-heals next load. Pure behavioural C# + one new file; no prefab/art. Requested + done
   2026-07-12.
-- **Iter-34 (tentative) -- keybind rebind row missing under "Mods" in the controls menu.**
-  User-reported 2026-07-12: ItemChecklist's toggle keybind (default F1) has **no rebind row
-  under the "Mods" section** of Core Keeper's Controls settings, so the player cannot remap
-  it from the menu (the bind still works and is technically rebindable — Iter-23 — but the UI
-  entry is absent). **Prüfen warum, dann fixen.** Context: the action is registered via CoreLib
-  `ControlMappingModule.AddKeyboardBind` in `IMod.EarlyInit`, with the display name coming from
-  the loc term `ControlMapper/ItemChecklist-ToggleChecklistPC` (Iter-11). **Not yet
-  investigated** — hypotheses to *verify*, not assume (the standing "measure, don't guess"
-  lesson): (a) CoreLib version/API drift — the mod pins `UserInterfaceModule` 4.0.4; the
-  `ControlMappingModule` registration may now need a category/section argument (or a separate
-  call) to surface the bind under the "Mods" header, or the API that populated it changed;
-  (b) the `ControlMapper/...` display-name term fails to resolve → CK's control menu creates
-  no visible row (parallels the Iter-25 missing-glyph / Iter-11 loc-term class); (c) a
-  registration-timing/order issue between `AddKeyboardBind` and when CK's Controls UI builds
-  its section list. **First step:** reproduce in-game, then read a **working reference mod that
-  DOES show a rebind row under "Mods"** (the project's standing "read the working mod before
-  decompile-guessing" rule) + inspect CoreLib `ControlMappingModule` — before touching code.
-  Requested 2026-07-12.
+- **Iter-34 -- keybind rebind row: give the mod its own control-mapping category. DONE**
+  (see `docs/iteration-history.md`). **Re-framed by the in-game screenshot:** the row was
+  never *missing* — it rendered as a loose, **header-less** row at the top of Controls > Mods,
+  not grouped under a mod-named heading like CoreLib's own "Core Library" or PlacementPlus's
+  "PlacementPlus". Root cause (verified against CoreLib **4.0.5's real source**, not the stale
+  4.0.4 decompile): the F1 toggle registered with `categoryId: -1`, CoreLib's default **"Mods"**
+  bucket, whose sub-section header CoreLib **deliberately suppresses** — `ControlMappingModule`
+  sets `_showActionCategoryName = categoryName != "Mods"` (the top-level tab is already "Mods").
+  A **named** category gets `true` → a header + a description (CK derives the terms as
+  `ControlMapper/<Category>Category` and `.../<Category>Description` via
+  `ControlMappingMenu.GetCategoryLabelLocaKey`). Fix: register the toggle under a named
+  **"ItemChecklist"** category (`ControlMappingModule.AddNewCategory` before `AddKeyboardBind`)
+  + two loc terms `ControlMapper/ItemChecklistCategory` ("Item Checklist" / "Item-Checkliste")
+  and `.../ItemChecklistDescription` ("Item Checklist controls" / "Steuerung der
+  Item-Checkliste"), EN+DE. CoreLib migrates the persisted action to the new category id (103)
+  on load. **Refuted en route** (the roadmap's own hypotheses): (a) *not* a CoreLib patch break
+  — `ControlMappingMenu.Initialize` + `_mappingLayoutData` still exist in 1.2.1.5 and the
+  Harmony injection is sound (no patch-fail logged); (b) *not* a loc-resolution failure — the
+  action term already rendered. Pure behavioural C# (one `AddNewCategory` call) + 2 loc terms;
+  no prefab/art. Verified in-game (1.2.1.5, fake-ID 9999997): `safetyCheck=True`, 0
+  `CompileFailed`, 0 NRE, `ItemChecklist` category id 103, header + description render localized
+  (user-confirmed screenshot). Also updated the shared CoreLib reference checkout from the
+  stale 4.0.4 decompile to CoreLib's real 4.0.5 source (GitHub tag `4.0.5`). Requested
+  2026-07-12, done 2026-07-13.
 - **Iter-35 (tentative) -- foreign-mod item shows raw objectID as name + missing loc term.**
   User-reported 2026-07-12 (screenshot): a discovered item from **another installed mod** —
   *ChestsGalore*'s `WorkbenchChestExtra`, **objectID 32773** — renders its **name as the raw

@@ -1428,3 +1428,55 @@ behavioural C# + one new file (`PhantomViolationStore.cs`); no prefab/art. **Pro
 (brainstorm → spec → plan), hybrid inline-execution with a per-code-task adversarial review; the
 durability + self-heal halves were user-directed mid-flight (a brief drift toward a possession-scan
 trigger was corrected to the world-load anchors).
+
+**Iter-34 (keybind rebind row — own control-mapping category) — DONE (2026-07-13, branch
+`iter-34`).** A user-reported "no rebind row under Mods" that the **in-game screenshot re-framed**
+before any code changed: the row was never missing — ItemChecklist's F1 toggle rendered as a
+loose, **header-less** row at the top of Controls > Mods, while CoreLib's own commands ("Core
+Library") and PlacementPlus's ("PlacementPlus") each sat under a mod-named section header. The
+user's diagnosis was exact: *not* mis-sorted — **missing the mod-name as a heading** (and a
+description).
+
+**Root cause (verified against CoreLib 4.0.5's REAL source).** The investigation first chased the
+roadmap's hypotheses — a broken Harmony patch or a failed loc term — and **refuted both**: in game
+1.2.1.5, `ControlMappingMenu.Initialize()` and its `_mappingLayoutData` field still exist
+(decompiled from the current `Pug.ControlMapping.dll`), CoreLib 4.0.5's `ControlMappingPatch`
+prefix (`[HarmonyPatch(typeof(ControlMappingMenu), "Initialize")]`) binds fine, and the Player.log
+logged no patch failure while the action term already rendered. The real cause is a single CoreLib
+line: `ControlMappingModule.AddNewCategory_Internal` sets `_showActionCategoryName = (categoryName
+!= "Mods")`. ItemChecklist registered its keybind with `categoryId: -1` — CoreLib's **default
+"Mods" bucket** — whose sub-section header is therefore **deliberately suppressed** (the top-level
+Controls tab is already named "Mods", so a redundant "Mods" sub-header is hidden). A mod that calls
+`AddNewCategory("<Name>")` gets `_showActionCategoryName = true` → CK's `ControlMappingMenu` renders
+a header + description via `GetCategoryLabelLocaKey(name, getName) = "ControlMapper/" + name +
+(getName ? "Category" : "Description")`. So CoreLib's "CoreLib" category shows "Core Library" /
+"Core Library Commands" and ItemChecklist's "Mods" bind showed nothing.
+
+**Fix.** `ItemChecklistMod.EarlyInit` now calls `int catId =
+ControlMappingModule.AddNewCategory("ItemChecklist")` before `AddKeyboardBind(..., categoryId:
+catId)`. Two new loc terms under `ControlMapper:` in `localization.yaml` — `ItemChecklistCategory`
+("Item Checklist" / "Item-Checkliste") and `ItemChecklistDescription` ("Item Checklist controls" /
+"Steuerung der Item-Checkliste"), EN+DE. The category description is a **category-level** label
+(like CoreLib's "Core Library Commands"), not an action description — future-proof if a second bind
+is ever added (the single current toggle happens to match, but the abstraction is the category).
+CoreLib migrates the persisted action to the new category on load (`ChangeActionCategory`);
+`KeyBindsCategories.json` gains `"ItemChecklist":[103,103]`. A pre-existing orphan action
+`ItemChecklist.Toggle` (an old dev-only name, id 1009) stays in the "Mods" bucket but does not
+render (no element map); it only affects this machine's persisted state, not a fresh install. Pure
+behavioural C# (one `AddNewCategory` call) + 2 loc terms; no prefab/art touch.
+
+**Reference maintenance (user-directed).** The shared decompile checkout's CoreLib reference was
+stale (4.0.4, `BUILD_FOR` game 1.2.1.1) while the runtime loads **4.0.5** (`BUILD_FOR` 1.2.1.3, on
+game 1.2.1.5). Since CoreLib is open source, the decompile was superseded by its **real 4.0.5
+source** — cloned from GitHub tag `4.0.5` into
+`~/Projects/checkouts/CoreKeeperDecompile/CoreLib-source-4.0.5/` (CoreLib also ships the identical
+source in its mod.io download at `…/mod.io/5289/mods/3177992_7845185/Scripts/`, which is how the
+exact runtime version was read during the investigation).
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** `Successfully compiled ItemChecklist
+safetyCheck=True`, 0 `CompileFailed`, 0 NRE; `Added New Category: ItemChecklist` + action enabled;
+the user confirmed (screenshot, EN) the toggle now sits under an "Item Checklist" header with the
+"Item Checklist controls" subtitle. **Process:** the whole diagnosis hinged on the in-game
+screenshot — the standing lesson (in-game ground truth beats static analysis) held yet again: the
+static mechanism looked correct at every step, and only the screenshot revealed the symptom was
+"header-less", not "missing".
