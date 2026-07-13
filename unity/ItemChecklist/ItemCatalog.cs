@@ -798,7 +798,16 @@ namespace ItemChecklist
             objectTypeCache[key] = info.objectType;
             levelCache[key]      = PugDatabase.TryGetComponent<LevelCD>(od, out var lvlCdCooked) ? lvlCdCooked.level : 0;
             sellValueCache[key]  = ComputeSellValue(od, info);
-            craftableCache[key]  = info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0;
+            // Iter-39: cooked dishes are produced by the Cooking Pot (an ingredient pair,
+            // CookingIngredientCD / ConvertCookedFoodsSystem), never by a workbench recipe, so
+            // requiredObjectsToCraft is empty → the generic derivation would file every dish as
+            // "not craftable". AddCookedEntry is cooked-food-exclusive, and Iter-33 proved every
+            // emitted (objectID, variation) is a real, reachable ingredient pair — so a cooked
+            // entry is craftable by construction (no ingredient check needed). "Craftable" here
+            // means "the player can produce it", which folds in cooking. Verified in-game (the
+            // Iter-39 probe): all 6006 cooked entries read IsCraftable=false before this line;
+            // cooking is the only recipeless station-production in the catalog.
+            craftableCache[key]  = true;
         }
 
         // Iter-33: faithful mirror of CK's cook-tier gate (Pug.Other:324037-324049).
