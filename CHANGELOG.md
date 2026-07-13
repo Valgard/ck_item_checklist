@@ -6,6 +6,48 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.1.0] - 2026-07-13
+
+A feature release: in-game mod settings, a discovered/owned counter toggle,
+and a batch of catalog-accuracy fixes.
+
+### Added
+
+- **Settings moved into the game's options menu.** The possession anchor
+  radius, the possession-scan interval, and the diagnostics toggle are now
+  live controls under **Options → Mod Settings** instead of hand-edited config
+  files.
+- **Switch the counter between discovered and owned.** A new setting flips
+  **both** the top-right HUD counter and the window footer between the
+  discovery count (`N / M`) and how many of every item you actually own
+  (`K / M`).
+- **Choose how often possession is scanned.** A scan-interval preset
+  (1–30 seconds) lets you trade how fresh the owned counts are against how
+  often the scan runs.
+- **The open key has its own rebinding section.** The checklist toggle now
+  appears under a named **"Item Checklist"** heading in Controls, instead of a
+  loose row with no label.
+
+### Changed
+
+- **New required dependency: Mod Settings Menu.** ItemChecklist now uses the
+  "Mod Settings Menu" mod for its in-game settings; it is added automatically
+  as a dependency on mod.io, so subscribing pulls it in.
+
+### Fixed
+
+- **Cooked dishes no longer count twice.** A cooked dish could add two to your
+  discovery total instead of one — it now counts once.
+- **100 % is attainable again.** "Epic" cooked-dish rows that can never
+  actually be cooked were being shown as undiscovered forever, making the total
+  impossible to complete. Those unreachable rows are no longer listed.
+- **Cooked dishes count as craftable.** The Craftable filter now includes
+  cooked dishes — you do produce them (by cooking), so they belong there.
+- **Items from other mods show a readable name.** A term-less item from another
+  mod used to show a raw number in the row and a `missing:` tooltip; it now
+  derives a readable name. Internal workbench "pages" that other mods fold into
+  a base workbench are hidden from the list.
+
 ## [1.0.3] - 2026-06-29
 
 A possession-accuracy and performance patch.
