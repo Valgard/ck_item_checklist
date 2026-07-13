@@ -356,30 +356,27 @@ remaining backlog.
   (user-confirmed screenshot). Also updated the shared CoreLib reference checkout from the
   stale 4.0.4 decompile to CoreLib's real 4.0.5 source (GitHub tag `4.0.5`). Requested
   2026-07-12, done 2026-07-13.
-- **Iter-35 (tentative) -- foreign-mod item shows raw objectID as name + missing loc term.**
-  User-reported 2026-07-12 (screenshot): a discovered item from **another installed mod** —
-  *ChestsGalore*'s `WorkbenchChestExtra`, **objectID 32773** — renders its **name as the raw
-  number "32773"** in the checklist row, while its Iter-22 hover tooltip shows CK's
-  missing-term placeholder **`missing: Items/ChestsGalore:WorkbenchChestExtra`**. Icon, owned
-  count and the discovery tick all resolve correctly — **only the name is broken.** This
-  confirms `ItemCatalog.Bake` (Loop 1 over `PugDatabase.objectsByType`) includes **other
-  mods' registered items** — correct for a completionist catalog — but their localized names
-  don't resolve. **Prüfen warum, dann fixen.** The bug is already half-localized by the two
-  disagreeing render paths: the **row label** (ICL's `GetObjectName` port, baked) falls back
-  to `objectID.ToString()`, whereas CK's **native tooltip** path falls back to `missing:
-  <term>` — so ICL's bake-time name resolution diverges from CK's own. **Not yet
-  investigated** — hypotheses to *verify*, not assume: (a) the term is **mod-namespaced**
-  (`Items/ChestsGalore:WorkbenchChestExtra`, note the `ChestsGalore:` segment) and ICL's
-  resolution / `GetObjectName(localize:true)` path mishandles that form; (b) ChestsGalore
-  simply ships **no term** for the item (a *foreign-mod* bug) → the real ICL fix is a **better
-  fallback than the raw objectID**: show the term tail, an "Unknown"/`???`-style placeholder,
-  or exclude un-nameable foreign items; (c) a **bake-timing** race — baked before the other
-  mod's I2 terms load (cf. the Iter-11 loc-term class + the language-change re-bake). **Design
-  question underneath it:** should ICL include foreign-mod items at all, and if so with what
-  name policy (include-with-fallback vs. exclude vs. a config toggle)? **First step:**
-  reproduce with ChestsGalore installed, dump what `GetObjectName(buf, true)` / `(buf, false)`
-  return for objectID 32773 at bake time vs. later, then decide the policy before coding.
-  Requested 2026-07-12.
+- **Iter-35 -- foreign-mod item shows raw objectID as name + "missing:" tooltip. DONE**
+  (see `docs/iteration-history.md`). **Two distinct display bugs, one root cause**, all settled
+  by an in-game bake probe (the standing lesson held twice more). A bake probe over the 16
+  foreign-mod items measured: **12 resolve normally**; **4 return `null` everywhere** — exactly
+  ChestsGalore's term-less `Workbench{Chest,DoubleChest}{Extra,Next}` variants (the screenshot's
+  named "Chest Workbench" is a *different* object, 32783, which resolves). **Hypothesis (c)
+  timing REFUTED** (identical across bakes + language toggles); **(b) confirmed + narrowed** —
+  these 4 ship no I2 term. Fix 1 (**derived name**): when `GetObjectName(true)` is empty,
+  `FallbackName` derives from the internal name (`ObjectProperties "name"` → strip `Mod:` prefix
+  + PascalCase → "Workbench Chest Extra") instead of the numeric objectID, flagging
+  `Entry.NameIsFallback`; `ItemRow`'s tooltip then shows that baked name `dontLocalize` (the `???`
+  pattern) + suppresses desc/stats, so **both** the row label and the "missing:" tooltip are
+  fixed from one name source. Fix 2 (**exclude the internal pages**, per the user): these 4 are
+  CoreLib workbench-chain "pages" a base folds in via `WorkbenchDefinition.relatedWorkbenches`. A
+  second probe REFUTED the naive "referenced → exclude" filter — the refs are a **MESH** (siblings
+  cross-reference the named bases too), so `BuildWorkbenchChainSets` drops a chain member only when
+  it is a **leaf** (folds in nothing) **OR term-less**, keeping the named hubs; the root is skipped
+  (aggregates via `bindToRootWorkbench`). Catalog **8120 → 8116** (−4). The derived-name net stays
+  for legit standalone term-less foreign items of other mods. Verified in-game (1.2.1.5, fake-ID
+  9999997): `safetyCheck=True`, `baked: 8116`, 0 `CompileFailed`/NRE, the 4 pages gone, named
+  workbenches + all else intact. Requested + done 2026-07-13.
 - **Iter-36 (tentative) -- counter toggle: discovery count vs. in-possession count.**
   User-requested 2026-07-12: the always-on HUD counter currently shows **how many items are
   discovered** (`N / M`); add a **setting that switches the counter between that discovery

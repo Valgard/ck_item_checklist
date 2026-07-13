@@ -1480,3 +1480,74 @@ the user confirmed (screenshot, EN) the toggle now sits under an "Item Checklist
 screenshot — the standing lesson (in-game ground truth beats static analysis) held yet again: the
 static mechanism looked correct at every step, and only the screenshot revealed the symptom was
 "header-less", not "missing".
+
+**Iter-35 (foreign-mod item name — derived name + chain-page exclusion) — DONE (2026-07-13,
+branch `iter-35`).** A user-reported "an item from another mod shows as the raw number 32773"
+that split into **two distinct display bugs sharing one root cause**, and — like Iter-32/34 —
+every framing shift came from **in-game measurement**, not decompile inference.
+
+**The two bugs (the user corrected my initial conflation).** *ChestsGalore*'s `WorkbenchChestExtra`
+(objectID 32773) rendered (1) its **row label** as the bare number "32773", and (2) its **Iter-22
+hover tooltip** as CK's `missing: Items/ChestsGalore:WorkbenchChestExtra`. Two different render
+paths: the row label is ICL's baked `localizedNames[key]`; the tooltip delegates to CK-native
+`SlotUIBase.GetHoverTitle()` via `TooltipSlot`. Both had to be fixed.
+
+**Decompile said "no term"; the screenshot said otherwise; the probe settled it.** The decompile
+chain looked conclusive — `GetObjectName(true)` → `LocalizationManager.GetTranslation("Items/" +
+name)` returns `null` for a missing term, and `PugText.ProcessText` renders a null as
+`"missing: " + term`. So hypothesis (b) "ChestsGalore ships no term". But the **user's screenshots**
+showed CK's own crafting UI resolving "Chest Workbench" / "Double Chest Workbench" fine — refuting
+"no terms". A **throwaway bake probe** (committed-then-reverted) dumping, per foreign-mod item at
+bake time, `GetObjectName(true/false)`, `dontLocalize`, `ObjectProperties "name"`, and
+`GetLocalizedTerm` for the internal / raw / numeric keys, measured the truth over 16 foreign items:
+- **12 resolve normally** (Double Chest, Magic Chest, the Large*Pouches, Beating Dummy, Root
+  Workbench, **Chest Workbench = 32783**, Double Chest Workbench, Magic Chest Workbench, and ICL's
+  own Caveling Divining Rod) — ICL already displayed these correctly.
+- **4 return `null` everywhere** — exactly the `WorkbenchChestExtra` (32773), `WorkbenchChestNext`
+  (32777), `WorkbenchDoubleChestExtra` (32774), `WorkbenchDoubleChestNext` (32771) variants.
+- The screenshot's "Chest Workbench" is objectID **32783** (`WorkbenchChest`) — a **different**
+  object from the buggy 32773. CK resolves 32783 because it *has* a term; 32773 has none.
+- **Timing (c) refuted:** the 32773 line was bit-identical across 3 bakes at t=92/181/184 s
+  (spanning two in-game language toggles) — the term is unresolvable at *every* point, not a race.
+- **The internal name IS available:** `ObjectProperties "name"` = "ChestsGalore:WorkbenchChestExtra"
+  (ItemBrowser's `GetInternalName` source — but IB uses it only for sort/search; IB's *visible*
+  fallback is the numeric "id:variation", so ICL goes one better).
+
+**Fix 1 — derived name (both render paths, one source).** `ItemCatalog.FallbackName`: when
+`GetObjectName(true)` is empty, derive the name from the internal name (strip the `Mod:` prefix +
+any CoreLib `$$N` suffix, then PascalCase-split → "Workbench Chest Extra") instead of the numeric
+objectID; record the key in `fallbackNameKeys` → `Entry.NameIsFallback`. `ItemRow.GetHoverTitle`
+returns that baked name `dontLocalize` for a `NameIsFallback` row (the same pattern the `???` rows
+already use) instead of delegating to CK's "missing:" path, and `GetHoverDescription`/`GetHoverStats`
+return null so no "missing:" leaks. One name feeds both label and tooltip.
+
+**Fix 2 — exclude the internal chain pages (user-requested refinement).** The user asked what these
+"Extra/Next" items even are: CoreLib workbench-chain **pages**. A base workbench folds in
+continuation objects via `WorkbenchDefinition.relatedWorkbenches` (`includeCraftedObjectsFromBuildings`)
+to present one unified crafting UI (the I/II/III tabs) — the Next/Extra are machinery, not
+collectibles, hence unnamed. The user wanted to exclude *only* the chain, not all term-less items
+(which could filter a legit foreign item). A **second verification probe** dumped the actual
+`relatedWorkbenches` graph and **REFUTED the naive "referenced → exclude" filter**: the refs are a
+**MESH** — ChestsGalore's siblings cross-reference each other, so `WorkbenchMagicChest` and
+`WorkbenchDoubleChest` list the **named bases** `WorkbenchChest`/`WorkbenchDoubleChest` as related.
+A "member of any relatedWorkbenches" filter would have dropped "Chest Workbench" (excludeSet came
+out as 6 IDs, including the 2 named bases). The precise, verified rule (`BuildWorkbenchChainSets` +
+a Loop-1 `continue`): a **chain member** (referenced by some non-root `relatedWorkbenches`) is
+dropped when it is a **leaf** (its own `relatedWorkbenches` empty → folds in nothing) **OR is
+term-less** (per the user, to also catch a hypothetical middle page). The named bases are hubs
+*with* a name → kept; the CoreLib root workbench is skipped (it aggregates via the
+`bindToRootWorkbench` flag, not `relatedWorkbenches`). The term-less test is confined to chain
+members, so a legit standalone term-less foreign item of another mod is untouched and still gets
+its derived name (Fix 1). Verified exclude-set = exactly `{32771, 32773, 32774, 32777}`; reading
+`LoadedMod.Assets.OfType<WorkbenchDefinition>()` is sandbox-safe (`WorkbenchDefinition` is in the
+already-referenced `CoreLib` assembly, namespace `CoreLib.Submodule.Entity`).
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** `Successfully compiled ItemChecklist
+safetyCheck=True`, 0 `CompileFailed`, 0 NRE, 0 `BuildWorkbenchChainSets threw`; catalog **8120 →
+8116** (the 4 pages gone); the user confirmed the label + tooltip fix on the term-less items and
+that the named workbenches (Chest/Double Chest/Magic Chest/Root Workbench) + all other foreign
+items are intact. Two clean commits (derived name; chain-page exclusion). Pure behavioural C#; no
+prefab/art touch. **Process:** two throwaway probes, both of which overturned a plausible
+decompile/source hypothesis — the "measure first, in-game ground truth beats static analysis"
+lesson held for (by this project's count) the seventh and eighth time; the second probe
+specifically prevented shipping a filter that would have deleted the named "Chest Workbench".
