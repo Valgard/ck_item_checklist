@@ -159,7 +159,6 @@ namespace ItemChecklist
 
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
-        private const float PossessionRefreshSeconds = 3f;
         private float _possessionTimer;
         // Prune grace: chunks stream in asynchronously after a world load/teleport, so
         // the self-heal prune must stay off until the world has been continuously
@@ -237,16 +236,19 @@ namespace ItemChecklist
 
             // Register the mod settings; ModConfig reads these live handles (replaces the former
             // CoreLib API.Config surface). Section uses the default AsDeclared sort, so builder-call
-            // order IS render order: counter mode (Iter-36) first, then base radius, then diagnostics.
+            // order IS render order: counter mode (Iter-36) first, then base radius, then scan
+            // interval (Iter-38), then diagnostics.
             ModSettings.Section(this)
-                .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, and optional diagnostic logging.")
+                .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging.")
                 .Choice(out var counterMode, "counterMode",
                     new[] { ModConfig.CounterMode.Discovery, ModConfig.CounterMode.Possession },
                     ModConfig.CounterMode.Discovery)
                 .Slider(out var radius, "anchorRadius", 16f, 96f, 48f, 8f, SliderDisplay.Number)
+                .Choice(out var scanInterval, "scanInterval",
+                    new[] { 1, 2, 3, 5, 8, 10, 15, 20, 25, 30 }, 3)
                 .Toggle(out var diag, "diagnostics", false)
                 .Build();
-            ModConfig.Bind(radius, diag, counterMode);
+            ModConfig.Bind(radius, diag, counterMode, scanInterval);
 
             // Iter-36: re-render both counter surfaces immediately when the mode is toggled
             // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Iter-37: the HUD goes
@@ -322,7 +324,7 @@ namespace ItemChecklist
                 _possessionTimer -= Time.deltaTime;
                 if (_possessionTimer <= 0f)
                 {
-                    _possessionTimer = PossessionRefreshSeconds;
+                    _possessionTimer = ModConfig.ScanIntervalSeconds;
                     bool allowPrune = _possessionPlayableTime > PossessionPruneGraceSeconds;
                     Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, allowPrune);
                     // A scan may have newly collected a pet skin / changed the owned tally (no
