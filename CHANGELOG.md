@@ -6,6 +6,17 @@ without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the version `upload.sh`
 publishes.
 
+## [1.2.0] - 2026-07-14
+
+Adds an in-game master toggle to enable or disable the whole mod without
+uninstalling — a follow-up to the 1.1.0 settings work.
+
+### Added
+
+- **Enable or disable the whole mod in-game.** A master **Enabled** toggle
+  (**Options → Mod Settings**) turns Item Checklist off — HUD counter, the F1
+  window, and background scanning all stop — without uninstalling. Applies live.
+
 ## [1.1.0] - 2026-07-13
 
 A feature release: in-game mod settings, a discovered/owned counter toggle,

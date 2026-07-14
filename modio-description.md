@@ -30,10 +30,14 @@ Press **F1** to open it. Discovery and possession are tracked per world × per p
   search** in your game's language.
 - **Per-row Level & Value**, rarity colouring, and per-permutation cooked-food
   tracking (~11,100 entries).
+- **In-game settings** under Options → Mod Settings — a master Enabled toggle,
+  the discovered/owned counter mode, the possession scan interval, and the base
+  anchor radius.
 - **English & German**, following your in-game language live.
 
 ## Requirements
-Requires **CoreLib**.
+Requires **CoreLib** and **Mod Settings Menu** (both pulled in automatically when
+you subscribe).
 
 ## Known limitations
 Per-colour possession is counted for placeable furniture only (not floor or wall
