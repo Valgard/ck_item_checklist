@@ -88,12 +88,15 @@ reference; keep these in mind when writing mod code):**
   Persist via `API.ConfigFilesystem` (hand-ASCII), not file I/O.
 
 **Other:**
-- **Possession settings via Mod Settings Menu** — `ModConfig.AnchorRadius`
-  (Slider 16-96, default 48), `.ScanIntervalSeconds` (Choice of preset seconds
-  {1,2,3,5,8,10,15,20,25,30}, default 3; Iter-38 — read live each cycle in `Update()`) and
-  `.Diagnostics` (Toggle, default off) are live
-  in-game settings under Options → Mod Settings, registered in
-  `ItemChecklistMod.Init` and read live each scan/save. `ModConfig`
+- **Mod Settings (via Mod Settings Menu)** — five live in-game settings under
+  Options → Mod Settings, registered in `ItemChecklistMod.Init` (that call order
+  is the render order) and read live: `ModConfig.Enabled` (Toggle, default on —
+  master switch; when off the mod is fully inert: no possession scan, window won't
+  open, HUD hidden), `.Mode` (Choice `CounterMode` {Discovery, Possession},
+  Iter-36 — what the HUD + footer counter shows), `.AnchorRadius` (Slider 16-96,
+  default 48), `.ScanIntervalSeconds` (Choice of preset seconds
+  {1,2,3,5,8,10,15,20,25,30}, default 3; Iter-38 — read live each cycle in
+  `Update()`) and `.Diagnostics` (Toggle, default off). `ModConfig`
   (`unity/ItemChecklist/ModConfig.cs`, root `ItemChecklist` namespace) is the mod's
   config adapter — renamed from `PossessionConfig` so every mod exposes a uniform
   root-namespace `ModConfig`. This replaced the former

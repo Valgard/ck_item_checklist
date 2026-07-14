@@ -366,7 +366,7 @@ tree):
 ```
 unity/ItemChecklist/
   ItemChecklistMod.cs             IMod bootstrap (EarlyInit/Init/Update/Shutdown)
-  ModConfig.cs                    Mod Settings Menu config adapter (AnchorRadius + Diagnostics; ex-possession/PossessionConfig)
+  ModConfig.cs                    Mod Settings Menu config adapter (Enabled, Mode, AnchorRadius, ScanIntervalSeconds, Diagnostics; ex-possession/PossessionConfig)
   ItemCatalog.cs                  catalog bake + lookup
   ItemCatalogLocChangeHook.cs     Harmony patch — re-bake on language change
   ItemCatalogWorldLoadHook.cs     Harmony patch — kick bake on world load (OnOccupied)

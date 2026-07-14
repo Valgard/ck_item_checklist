@@ -20,6 +20,16 @@ tag here AND in this mod's `ModManifest.json` `modDependencies` entry.
 After this one-time edit, regular builds via `../utils/build.sh` work
 as usual — the change stays uncommitted in the SDK repo by design.
 
+## Second dependency: Mod Settings Menu
+
+Since the 1.1.0 settings work this mod also depends on the **Mod Settings
+Menu** framework mod, which drives the in-game settings: the runtime asmdef
+references `ModSettingsMenu` and `unity/ItemChecklist.asset`'s `dependencies`
+list declares it (`required: 1`), alongside CoreLib. It is a sibling framework
+mod rather than a public Unity Package, so its assembly must be resolvable in
+the SDK clone at build time — see the parent `CLAUDE.md` for the shared
+build/link system.
+
 ## Note on ModManifest vs .asset
 
 The runtime mod's CoreLib dependency is declared in
