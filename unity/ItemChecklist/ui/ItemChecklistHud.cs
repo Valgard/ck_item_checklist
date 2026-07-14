@@ -59,7 +59,8 @@ namespace ItemChecklist.UI
                 // open; shown only while actually playing in a world.
                 bool show = WorldState.IsInPlayableWorld
                             && !Manager.ui.isAnyInventoryShowing
-                            && !Manager.menu.IsAnyMenuActive();
+                            && !Manager.menu.IsAnyMenuActive()
+                            && ItemChecklist.ModConfig.Enabled;
                 if (hudRoot.activeSelf != show) hudRoot.SetActive(show);
             }
             base.LateUpdate();

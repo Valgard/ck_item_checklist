@@ -32,19 +32,26 @@ namespace ItemChecklist
         /// <summary>Iter-36: what the HUD + window-footer counter shows.</summary>
         public enum CounterMode { Discovery, Possession }
 
+        private static SettingHandle<bool> _enabledHandle;
         private static SettingHandle<float> _radiusHandle;
         private static SettingHandle<bool> _diagHandle;
         private static SettingHandle<CounterMode> _counterModeHandle;
         private static SettingHandle<int> _scanIntervalHandle;
 
-        public static void Bind(SettingHandle<float> radius, SettingHandle<bool> diagnostics,
-            SettingHandle<CounterMode> counterMode, SettingHandle<int> scanInterval)
+        public static void Bind(SettingHandle<bool> enabled, SettingHandle<float> radius,
+            SettingHandle<bool> diagnostics, SettingHandle<CounterMode> counterMode,
+            SettingHandle<int> scanInterval)
         {
+            _enabledHandle = enabled;
             _radiusHandle = radius;
             _diagHandle = diagnostics;
             _counterModeHandle = counterMode;
             _scanIntervalHandle = scanInterval;
         }
+
+        /// <summary>Master switch (default true). When false the mod is fully inert:
+        /// no possession scan, the window won't open, the HUD is hidden.</summary>
+        public static bool Enabled => _enabledHandle != null ? _enabledHandle.Value : true;
 
         public static float AnchorRadius => _radiusHandle != null ? _radiusHandle.Value : DefaultRadius;
 

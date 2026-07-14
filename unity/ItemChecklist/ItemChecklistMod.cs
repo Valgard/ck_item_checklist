@@ -240,6 +240,7 @@ namespace ItemChecklist
             // interval (Iter-38), then diagnostics.
             ModSettings.Section(this)
                 .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging.")
+                .Toggle(out var enabled, "enabled", true)
                 .Choice(out var counterMode, "counterMode",
                     new[] { ModConfig.CounterMode.Discovery, ModConfig.CounterMode.Possession },
                     ModConfig.CounterMode.Discovery)
@@ -248,7 +249,7 @@ namespace ItemChecklist
                     new[] { 1, 2, 3, 5, 8, 10, 15, 20, 25, 30 }, 3)
                 .Toggle(out var diag, "diagnostics", false)
                 .Build();
-            ModConfig.Bind(radius, diag, counterMode, scanInterval);
+            ModConfig.Bind(enabled, radius, diag, counterMode, scanInterval);
 
             // Iter-36: re-render both counter surfaces immediately when the mode is toggled
             // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Iter-37: the HUD goes
@@ -315,6 +316,15 @@ namespace ItemChecklist
 
         public void Update()
         {
+            if (!ModConfig.Enabled)
+            {
+                // Fully inert: close the window if open, and skip scan + HUD work.
+                if (ItemChecklist.UI.ItemChecklistWindow.Instance != null
+                    && ItemChecklist.UI.ItemChecklistWindow.Instance.Root.activeSelf)
+                    Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false);
+                return;
+            }
+
             // Iter-20: throttled possession refresh while playing. The prune is only
             // allowed once the world has been playable past the grace window (chunks
             // streamed); leaving the playable world re-arms it.

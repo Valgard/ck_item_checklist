@@ -117,6 +117,10 @@ ItemChecklist-Config:
     hint: "Section hint shown under the Item Checklist heading."
     en: "Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging."
     de: "Zähler-Modus (HUD + Fenster-Fußzeile), plus Besitz-Tracking - wie weit von einer Werkbank Lager als deins zählt, wie oft gescannt wird, und optionales Diagnose-Protokoll."
+  enabled:
+    hint: "Master on/off toggle label."
+    en: "Enabled"
+    de: "Aktiviert"
   counterMode:
     hint: "Choice label - what the discovery/possession counter (HUD + footer) shows."
     en: "Counter mode"
