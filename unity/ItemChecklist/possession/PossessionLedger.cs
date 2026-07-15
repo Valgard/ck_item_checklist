@@ -24,6 +24,21 @@ namespace ItemChecklist.Possession
 
         public void SetCarried(Dictionary<int, int> carried) => _carried = carried ?? new Dictionary<int, int>();
 
+        // Iter-41: parallel per-tile REMEMBERED aux breakdown (PackKey(id, secondDim) → count):
+        // pet skins in stored/carried inventories, penned/caged cattle colours, placed
+        // paintable-furniture colours. Same remember+prune model as _containers; _auxCarried
+        // is the live (carried + active pet) portion, never persisted.
+        private readonly Dictionary<long, Dictionary<long, int>> _auxContainers =
+            new Dictionary<long, Dictionary<long, int>>();
+        private Dictionary<long, int> _auxCarried = new Dictionary<long, int>();
+
+        public void SetCarriedAux(Dictionary<long, int> aux) => _auxCarried = aux ?? new Dictionary<long, int>();
+        public void SetLiveAux(long key, Dictionary<long, int> aux) => _auxContainers[key] = aux;
+
+        // Iter-41: drop a live tile's remembered aux when it was re-observed this scan WITHOUT
+        // aux (a mobile cattle moved off a tile still kept live by a co-located chest/placeable).
+        public void ClearAux(long key) => _auxContainers.Remove(key);
+
         public void SetLiveContainer(long key, Dictionary<int, int> contents) => _containers[key] = contents;
 
         // Iter-28: set once a ledger has had its pre-existing world-nature entries evicted
@@ -62,7 +77,9 @@ namespace ItemChecklist.Possession
         {
             float r2 = radius * radius;
             List<long> drop = null;
-            foreach (var key in _containers.Keys)
+            var keys = new HashSet<long>(_containers.Keys);
+            keys.UnionWith(_auxContainers.Keys);              // Iter-41: aux-only tiles (penned cattle) too
+            foreach (var key in keys)
             {
                 if (liveKeys.Contains(key)) continue;
                 float dx = KeyX(key) - px, dz = KeyZ(key) - pz;
@@ -70,17 +87,8 @@ namespace ItemChecklist.Possession
                 if (!coveredByLoadedAnchor(key)) continue;       // Iter-41: no loaded workbench covers it → keep remembered
                 (drop ??= new List<long>()).Add(key);
             }
-            if (drop != null) foreach (var k in drop) _containers.Remove(k);
+            if (drop != null) foreach (var k in drop) { _containers.Remove(k); _auxContainers.Remove(k); }
         }
-
-        // Iter-16.1: same totals/remembered build, plus the live per-pet-skin counts.
-        public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins)
-            => BuildView(liveKeys).WithPetSkins(petSkins);
-
-        // Iter-17: + the live per-colour cattle counts (same live-only model as pet skins).
-        public PossessionView BuildView(HashSet<long> liveKeys, Dictionary<long, int> petSkins,
-            Dictionary<long, int> colourCounts)
-            => BuildView(liveKeys).WithPetSkins(petSkins).WithColourCounts(colourCounts);
 
         public PossessionView BuildView(HashSet<long> liveKeys)
         {
@@ -105,7 +113,15 @@ namespace ItemChecklist.Possession
             foreach (var id in anyItem)
                 if (!liveItems.Contains(id)) remembered.Add(id);
 
-            return new PossessionView(totals, remembered);
+            // Iter-41: aux = live carried/active + all remembered aux containers (same merge
+            // as totals). A base-stored/penned/painted entity whose tile is not loaded this
+            // snapshot keeps its last-seen aux count → stable while away.
+            var aux = new Dictionary<long, int>(_auxCarried);
+            foreach (var pair in _auxContainers)
+                foreach (var kv in pair.Value)
+                    aux[kv.Key] = (aux.TryGetValue(kv.Key, out var a) ? a : 0) + kv.Value;
+
+            return new PossessionView(totals, remembered, aux);
         }
 
         // --- Persistence (storage containers only; carried is never persisted) ---

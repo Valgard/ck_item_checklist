@@ -114,8 +114,8 @@ namespace ItemChecklist.Possession
             using var xforms = objQuery.ToComponentDataArray<LocalTransform>(Allocator.TempJob);
 
             var carried = new Dictionary<int, int>();
-            var petSkins = new Dictionary<long, int>();   // Iter-16.1: live per-(objectId, skinIndex)
-            var colourCounts = new Dictionary<long, int>();   // Iter-17: live per-(id, colour) — cattle + placed paintable furniture
+            var carriedAux = new Dictionary<long, int>();      // Iter-41: live carried + active-pet skins/colours
+            var auxScan = new Dictionary<long, Dictionary<long, int>>();  // per-tile remembered aux (pets/cattle/paint)
             var liveKeys = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
@@ -137,7 +137,7 @@ namespace ItemChecklist.Possession
 
                 if (od.objectID == ObjectID.Player)
                 {
-                    if (em.HasComponent<ContainedObjectsBuffer>(e)) AddBuffer(em, e, carried, petSkins);
+                    if (em.HasComponent<ContainedObjectsBuffer>(e)) AddBuffer(em, e, carried, carriedAux);
                     // Iter-16.1: the active/summoned pet is a live entity, NOT in the
                     // player's ContainedObjectsBuffer — count it explicitly so it isn't
                     // undercounted (the Iter-20-deferred Terrier 7-vs-8 bug).
@@ -153,7 +153,7 @@ namespace ItemChecklist.Possession
                             int skin = InventoryHandler.TryGetExtraInventoryData<PetSkinCD>(
                                 pcd.inventoryAuxDataIndex, out var sd) ? sd.skinIndex : 0;
                             long pk = DiscoveredState.PackKey((int)pod.objectID, skin);
-                            petSkins[pk] = (petSkins.TryGetValue(pk, out var pc) ? pc : 0) + 1;
+                            carriedAux[pk] = (carriedAux.TryGetValue(pk, out var pc) ? pc : 0) + 1;
                         }
                     }
                     playerPos = new Vector2(pos.x, pos.z);
@@ -177,8 +177,9 @@ namespace ItemChecklist.Possession
                 // per-colour, not "remembered" — mirrors pet skins. Verified in-game (1.2.1.4).
                 if (em.HasComponent<CattleCD>(e))
                 {
-                    long ck = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
-                    colourCounts[ck] = (colourCounts.TryGetValue(ck, out var cc) ? cc : 0) + 1;
+                    long cckey = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
+                    var a = TileAux(auxScan, key);
+                    a[cckey] = (a.TryGetValue(cckey, out var cc) ? cc : 0) + 1;
                     continue;
                 }
 
@@ -220,13 +221,22 @@ namespace ItemChecklist.Possession
                 if (owned && od.variation != 0)
                 {
                     long cck = DiscoveredState.PackKey(id, od.variation);
-                    colourCounts[cck] = (colourCounts.TryGetValue(cck, out var pcc) ? pcc : 0) + 1;
+                    var a = TileAux(auxScan, key);
+                    a[cck] = (a.TryGetValue(cck, out var pcc) ? pcc : 0) + 1;
                 }
-                if (isContainer) AddBuffer(em, e, tile, petSkins);
+                if (isContainer) AddBuffer(em, e, tile, TileAux(auxScan, key));
             }
 
 
             foreach (var kv in scan) { ledger.SetLiveContainer(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
+            foreach (var kv in auxScan) { ledger.SetLiveAux(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
+
+            // Iter-41: a live tile re-observed WITHOUT aux this scan must drop any stale remembered
+            // aux — a mobile penned cattle that moved off a tile still kept live by a co-located
+            // chest/placeable (whose non-container path never refreshes that tile's aux). Only LIVE
+            // (observed) tiles are reconciled, so remembered-away aux is preserved. Prevents a
+            // per-colour over-count that would not self-heal.
+            foreach (var key in liveKeys) if (!auxScan.ContainsKey(key)) ledger.ClearAux(key);
 
             // Self-heal: drop remembered containers inside the load bubble that we did NOT
             // re-observe AND that a loaded workbench anchor covers (so they should have been
@@ -237,16 +247,31 @@ namespace ItemChecklist.Possession
                 ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys,
                     key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2));
 
-            // Iter-16.1: any skin currently owned (carried/container/active) is collected
-            // forever (persistent ledger; drives the row's collected flag in T6).
+            // Iter-16.1: any skin currently owned (carried/active/container) is collected
+            // forever. Iterate the live carried aux + every scanned tile's aux.
             if (pets != null)
-                foreach (var kv in petSkins)
-                    if (kv.Value > 0)
-                        pets.MarkCollected(DiscoveredState.KeyObjectId(kv.Key), DiscoveredState.KeyVariation(kv.Key));
+            {
+                void MarkFrom(Dictionary<long, int> a)
+                {
+                    foreach (var kv in a)
+                        if (kv.Value > 0)
+                        {
+                            int oid = DiscoveredState.KeyObjectId(kv.Key);
+                            int sub = DiscoveredState.KeyVariation(kv.Key);
+                            // Iter-41: aux now also carries cattle/paint keys; only pet-skin keys
+                            // belong in the PetCollection ledger (cattle/paint use CK discovery).
+                            if (ItemChecklistMod.Catalog != null && ItemChecklistMod.Catalog.IsPetSkinEntry(oid, sub))
+                                pets.MarkCollected(oid, sub);
+                        }
+                }
+                MarkFrom(carriedAux);
+                foreach (var kv in auxScan) MarkFrom(kv.Value);
+            }
 
             ledger.SetCarried(carried);
+            ledger.SetCarriedAux(carriedAux);
             float dTLoop = diag ? Time.realtimeSinceStartup : 0f;
-            var view = ledger.BuildView(liveKeys, petSkins, colourCounts);
+            var view = ledger.BuildView(liveKeys);
             if (diag)
             {
                 float dTEnd = Time.realtimeSinceStartup;
@@ -305,7 +330,7 @@ namespace ItemChecklist.Possession
         }
 
         private static void AddBuffer(EntityManager em, Entity e, Dictionary<int, int> totals,
-            Dictionary<long, int> petSkins)
+            Dictionary<long, int> aux)
         {
             var buf = em.GetBuffer<ContainedObjectsBuffer>(e);
             for (int j = 0; j < buf.Length; j++)
@@ -331,7 +356,7 @@ namespace ItemChecklist.Possession
                 {
                     int skin = InventoryHandler.TryGetExtraInventoryData<PetSkinCD>(item, out var sd) ? sd.skinIndex : 0;
                     long pk = DiscoveredState.PackKey(id, skin);
-                    petSkins[pk] = (petSkins.TryGetValue(pk, out var pc) ? pc : 0) + 1;
+                    aux[pk] = (aux.TryGetValue(pk, out var pc) ? pc : 0) + 1;
                 }
                 // `amount` is double-purposed: stack size for stackable items, but
                 // DURABILITY for equipment (tools/armor). So a single full-durability
@@ -351,6 +376,12 @@ namespace ItemChecklist.Possession
         private static Dictionary<int, int> Tile(Dictionary<long, Dictionary<int, int>> scan, long key)
         {
             if (!scan.TryGetValue(key, out var d)) { d = new Dictionary<int, int>(); scan[key] = d; }
+            return d;
+        }
+
+        private static Dictionary<long, int> TileAux(Dictionary<long, Dictionary<long, int>> auxScan, long key)
+        {
+            if (!auxScan.TryGetValue(key, out var d)) { d = new Dictionary<long, int>(); auxScan[key] = d; }
             return d;
         }
 
