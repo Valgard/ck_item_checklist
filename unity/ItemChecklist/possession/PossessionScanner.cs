@@ -235,8 +235,12 @@ namespace ItemChecklist.Possession
             // aux — a mobile penned cattle that moved off a tile still kept live by a co-located
             // chest/placeable (whose non-container path never refreshes that tile's aux). Only LIVE
             // (observed) tiles are reconciled, so remembered-away aux is preserved. Prevents a
-            // per-colour over-count that would not self-heal.
-            foreach (var key in liveKeys) if (!auxScan.ContainsKey(key)) ledger.ClearAux(key);
+            // per-colour over-count that would not self-heal. Gated on allowPrune for the same
+            // reason as PruneStaleNear below: during the post-load streaming grace a co-located
+            // creature may not have streamed in yet, and this is a DELETION path — deleting its
+            // remembered aux then would be the unsafe direction (a transient over-count is safer).
+            if (allowPrune)
+                foreach (var key in liveKeys) if (!auxScan.ContainsKey(key)) ledger.ClearAux(key);
 
             // Self-heal: drop remembered containers inside the load bubble that we did NOT
             // re-observe AND that a loaded workbench anchor covers (so they should have been
