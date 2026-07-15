@@ -228,12 +228,14 @@ namespace ItemChecklist.Possession
 
             foreach (var kv in scan) { ledger.SetLiveContainer(kv.Key, kv.Value); liveKeys.Add(kv.Key); }
 
-            // Self-heal: drop remembered containers inside the load bubble that we
-            // did NOT re-observe (destroyed / anchor removed). 180 < ImmediateLoadRadius
-            // (200), so an in-bubble container is loaded — BUT only once streaming has
-            // settled (allowPrune gates the post-load window; see the doc comment).
+            // Self-heal: drop remembered containers inside the load bubble that we did NOT
+            // re-observe AND that a loaded workbench anchor covers (so they should have been
+            // scanned). 180 < ImmediateLoadRadius (200) = definitely loaded; the anchor test
+            // (Iter-41) prevents pruning a base container whose workbench merely unloaded.
             const float LoadRadius = 180f;
-            if (allowPrune && havePlayer) ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys);
+            if (allowPrune && havePlayer)
+                ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys,
+                    key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2));
 
             // Iter-16.1: any skin currently owned (carried/container/active) is collected
             // forever (persistent ledger; drives the row's collected flag in T6).

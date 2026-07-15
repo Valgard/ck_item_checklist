@@ -49,11 +49,16 @@ namespace ItemChecklist.Possession
             if (dropKeys != null) foreach (var k in dropKeys) _containers.Remove(k);
         }
 
-        /// <summary>Self-healing: drop remembered containers that SHOULD be loaded
-        /// (within `radius` of the player, i.e. inside the load bubble) yet were not
-        /// observed this snapshot — they were destroyed, emptied away, or lost their
-        /// anchor. Collect-then-remove to avoid mutating during iteration.</summary>
-        public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys)
+        /// <summary>Self-healing: drop remembered containers that SHOULD be loaded AND observed
+        /// (within `radius` of the player = inside the load bubble, AND covered by a currently
+        /// loaded workbench anchor) yet were not seen this snapshot — genuinely destroyed.
+        /// Iter-41: the anchor-coverage test (`coveredByLoadedAnchor`) is what makes "should have
+        /// been observed" match Iter-31's actual observation rule; without it, a base container
+        /// whose workbench merely unloaded (while the container is still inside the 180-tile
+        /// window) was wrongly pruned, wiping the remembered ledger as the player walked away.
+        /// Collect-then-remove to avoid mutating during iteration.</summary>
+        public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys,
+            Func<long, bool> coveredByLoadedAnchor)
         {
             float r2 = radius * radius;
             List<long> drop = null;
@@ -61,7 +66,9 @@ namespace ItemChecklist.Possession
             {
                 if (liveKeys.Contains(key)) continue;
                 float dx = KeyX(key) - px, dz = KeyZ(key) - pz;
-                if (dx * dx + dz * dz <= r2) { if (drop == null) drop = new List<long>(); drop.Add(key); }
+                if (dx * dx + dz * dz > r2) continue;            // not definitely-loaded → keep remembered
+                if (!coveredByLoadedAnchor(key)) continue;       // Iter-41: no loaded workbench covers it → keep remembered
+                (drop ??= new List<long>()).Add(key);
             }
             if (drop != null) foreach (var k in drop) _containers.Remove(k);
         }
