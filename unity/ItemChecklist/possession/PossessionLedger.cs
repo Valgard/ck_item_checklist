@@ -124,25 +124,37 @@ namespace ItemChecklist.Possession
             return new PossessionView(totals, remembered, aux);
         }
 
-        // --- Persistence (storage containers only; carried is never persisted) ---
-        // Format: one line per container "x,z|id:count,id:count".
+        // --- Persistence (remembered storage + aux only; carried / live-aux never persisted) ---
+        // v3 line format: "x,z|<id:count,...>|<packedKey:count,...>" — segment 1 = container
+        // contents (id->count), segment 2 = the per-tile aux breakdown
+        // (PackKey(id, secondDim)->count: pet skins, cattle/paint colours). Either segment may
+        // be empty. Exactly two '|' per data line.
 
         // Iter-31: ledgers written before the workbench-anchor fix are polluted with remote
         // world-structure loot (camps/ruins anchored by their campfires/seed-extractors were
         // counted as bases). A version marker on line 1 lets LoadFrom discard any pre-fix file
         // exactly once; the base then re-scans and repopulates cleanly. The marker has no '|'
         // so the per-line parser skips it like any non-data line.
-        private const string VersionMarker = "#icl-ledger-v2";
+        private const string VersionMarker = "#icl-ledger-v3";
 
         public string Serialize()
         {
             var lines = new List<string> { VersionMarker };
-            foreach (var pair in _containers)
+            var keys = new HashSet<long>(_containers.Keys);
+            keys.UnionWith(_auxContainers.Keys);
+            foreach (var key in keys)
             {
-                if (pair.Value.Count == 0) continue;
-                var sb = new List<string>(pair.Value.Count);
-                foreach (var kv in pair.Value) sb.Add(kv.Key + ":" + kv.Value);
-                lines.Add(KeyX(pair.Key) + "," + KeyZ(pair.Key) + "|" + string.Join(",", sb));
+                _containers.TryGetValue(key, out var cont);
+                _auxContainers.TryGetValue(key, out var aux);
+                bool hasC = cont != null && cont.Count > 0;
+                bool hasA = aux != null && aux.Count > 0;
+                if (!hasC && !hasA) continue;
+                var cPart = new List<string>();
+                if (hasC) foreach (var kv in cont) cPart.Add(kv.Key + ":" + kv.Value);
+                var aPart = new List<string>();
+                if (hasA) foreach (var kv in aux) aPart.Add(kv.Key + ":" + kv.Value);
+                // Two '|': container segment | aux segment (either may be empty).
+                lines.Add(KeyX(key) + "," + KeyZ(key) + "|" + string.Join(",", cPart) + "|" + string.Join(",", aPart));
             }
             return string.Join("\n", lines);
         }
@@ -150,26 +162,39 @@ namespace ItemChecklist.Possession
         public void LoadFrom(string text)
         {
             _containers.Clear();
+            _auxContainers.Clear();
             if (string.IsNullOrEmpty(text)) return;
-            // Discard pre-v2 ledgers (polluted with remote world loot) — rebuild clean.
-            if (!text.StartsWith(VersionMarker)) return;
+            if (!text.StartsWith(VersionMarker)) return;   // discard pre-v3 → base re-scans clean
             foreach (var line in text.Split('\n'))
             {
-                if (line.Length == 0) continue;
-                int bar = line.IndexOf('|');
-                if (bar <= 0) continue;
-                var xz = line.Substring(0, bar).Split(',');
+                if (line.Length == 0 || line[0] == '#') continue;
+                var seg = line.Split('|');
+                if (seg.Length != 3) continue;             // v3 line has exactly two '|'
+                var xz = seg[0].Split(',');
                 if (xz.Length != 2 || !int.TryParse(xz[0], out int x) || !int.TryParse(xz[1], out int z)) continue;
-                var contents = new Dictionary<int, int>();
-                foreach (var pair in line.Substring(bar + 1).Split(','))
+                long key = Key(x, z);
+
+                var cont = new Dictionary<int, int>();
+                foreach (var pair in seg[1].Split(','))
                 {
                     int colon = pair.IndexOf(':');
                     if (colon <= 0) continue;
                     if (int.TryParse(pair.Substring(0, colon), out int id)
                         && int.TryParse(pair.Substring(colon + 1), out int cnt))
-                        contents[id] = cnt;
+                        cont[id] = cnt;
                 }
-                if (contents.Count > 0) _containers[Key(x, z)] = contents;
+                if (cont.Count > 0) _containers[key] = cont;
+
+                var aux = new Dictionary<long, int>();
+                foreach (var pair in seg[2].Split(','))
+                {
+                    int colon = pair.IndexOf(':');
+                    if (colon <= 0) continue;
+                    if (long.TryParse(pair.Substring(0, colon), out long pk)
+                        && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                        aux[pk] = cnt;
+                }
+                if (aux.Count > 0) _auxContainers[key] = aux;
             }
         }
     }
