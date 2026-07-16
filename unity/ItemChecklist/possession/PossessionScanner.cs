@@ -242,13 +242,28 @@ namespace ItemChecklist.Possession
             if (allowPrune)
                 foreach (var key in liveKeys) if (!auxScan.ContainsKey(key)) ledger.ClearAux(key);
 
-            // Self-heal: drop remembered containers inside the load bubble that we did NOT
-            // re-observe AND that a loaded workbench anchor covers (so they should have been
-            // scanned). 180 < ImmediateLoadRadius (200) = definitely loaded; the anchor test
-            // (Iter-41) prevents pruning a base container whose workbench merely unloaded.
-            const float LoadRadius = 180f;
+            // Self-heal: drop a remembered container/aux tile the player is close enough to that
+            // it is DEFINITELY still OBSERVABLE (within PruneRadius) yet was not seen this snapshot
+            // — genuinely destroyed/emptied. Iter-41 grounded PruneRadius in the CK code AND an
+            // in-game measurement (they disagree, and the smaller one governs):
+            //   • Hard load floor (decompile, Pug.Base PLAYER_DISTANCE_TO_LOAD/UNLOAD): the server
+            //     force-loads chunks within 200 tiles of the player and unloads past 300 — NOT
+            //     shrinkable by any setting (defaultSimDistance/SimulationDistance are dead) — so a
+            //     placed container within 200 is a live, queryable entity.
+            //   • BUT empirically (DIAG maxSeen/minGhost) base containers left the *observed* scan
+            //     set at ~91-115 — well below 200, matching no named constant (best explanation:
+            //     DOTS archetype-chunk unload granularity + camera-frame offset). The prune infers
+            //     "unobserved ⇒ destroyed", so it must stay below where observation is RELIABLE
+            //     (~91), NOT below the 200 load radius. The old 180 conflated "loaded" (200) with
+            //     "observed" (~91) and pruned loaded-but-unobserved containers in the 91-180 band
+            //     as the player walked away — the K collapse this iteration fixes.
+            // 48 sits well below BOTH (~91 observed dropout and the 200 hard floor) and far exceeds
+            // destruction range (you must stand next to a container to destroy it). It is
+            // INDEPENDENT of AnchorRadius (which only shares the 48 *default* and is user-settable
+            // to 96): the prune must stay under the observed-dropout regardless of AnchorRadius.
+            const float PruneRadius = 48f;   // the "loaded" half (player-near); the closure is the "anchor-covered" half
             if (allowPrune && havePlayer)
-                ledger.PruneStaleNear(playerPos.x, playerPos.y, LoadRadius, liveKeys,
+                ledger.PruneStaleNear(playerPos.x, playerPos.y, PruneRadius, liveKeys,
                     key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2));
 
             // Iter-16.1: any skin currently owned (carried/active/container) is collected

@@ -64,14 +64,18 @@ namespace ItemChecklist.Possession
             if (dropKeys != null) foreach (var k in dropKeys) _containers.Remove(k);
         }
 
-        /// <summary>Self-healing: drop remembered containers that SHOULD be loaded AND observed
-        /// (within `radius` of the player = inside the load bubble, AND covered by a currently
-        /// loaded workbench anchor) yet were not seen this snapshot — genuinely destroyed.
-        /// Iter-41: the anchor-coverage test (`coveredByLoadedAnchor`) is what makes "should have
-        /// been observed" match Iter-31's actual observation rule; without it, a base container
-        /// whose workbench merely unloaded (while the container is still inside the 180-tile
-        /// window) was wrongly pruned, wiping the remembered ledger as the player walked away.
-        /// Collect-then-remove to avoid mutating during iteration.</summary>
+        /// <summary>Self-heal: drop a remembered container/aux tile that WOULD be counted this scan
+        /// if a container were still there — i.e. it is DEFINITELY loaded (within `radius` of the
+        /// player) AND anchor-covered (`coveredByLoadedAnchor`: a loaded workbench anchor covers it,
+        /// the same WithinAnchor gate the scan uses) — yet nothing was observed there ⇒ destroyed/
+        /// emptied. BOTH halves are required (Iter-41): the small player `radius` guarantees the
+        /// chunk is loaded — distance beyond it is not enough because a container's chunk can unload
+        /// while a co-located workbench stays (mode 2, what wrecked the old 180) — and the anchor
+        /// cover guarantees a present container would have passed the scan's WithinAnchor gate — a
+        /// base container can be player-near yet lose cover when its workbench just crossed the ~91
+        /// observation dropout (mode 1). A real destruction is always both (you stand next to the
+        /// container; its workbench is co-located), so nothing legitimate is missed. Collect-then-
+        /// remove to avoid mutating during iteration.</summary>
         public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys,
             Func<long, bool> coveredByLoadedAnchor)
         {
@@ -83,8 +87,8 @@ namespace ItemChecklist.Possession
             {
                 if (liveKeys.Contains(key)) continue;
                 float dx = KeyX(key) - px, dz = KeyZ(key) - pz;
-                if (dx * dx + dz * dz > r2) continue;            // not definitely-loaded → keep remembered
-                if (!coveredByLoadedAnchor(key)) continue;       // Iter-41: no loaded workbench covers it → keep remembered
+                if (dx * dx + dz * dz > r2) continue;            // not player-near → chunk not guaranteed loaded → keep
+                if (!coveredByLoadedAnchor(key)) continue;       // loaded but no loaded anchor would observe it → not destroyed → keep
                 (drop ??= new List<long>()).Add(key);
             }
             if (drop != null) foreach (var k in drop) { _containers.Remove(k); _auxContainers.Remove(k); }
