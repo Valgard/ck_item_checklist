@@ -168,17 +168,23 @@ namespace ItemChecklist.Possession
                 long key = PossessionLedger.Key(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.z));
 
                 // Iter-16.3/17: a live cattle animal is a Creature ECS entity (not
-                // PlaceablePrefab), so it fails the furniture gate below. Near a clustered
-                // base anchor it is "in my pen" → count it. Iter-17: credited per
-                // (ADULT species, colour variation) so each of the species' 5 colour slots
-                // shows its own owned count (a baby calf ticks the adult at its colour). Wild
-                // animals roam far from any anchor → excluded by WithinAnchor above. The count
-                // is spoiler-gated on per-colour discovery (ItemChecklistMod.OwnedCount). Live
-                // per-colour, not "remembered" — mirrors pet skins. Verified in-game (1.2.1.4).
+                // PlaceablePrefab), so it fails the furniture gate below. Near a workbench anchor
+                // it is "in my pen" → count it, credited per (ADULT species, colour variation) so
+                // each of the species' 5 colour slots shows its own owned count (a baby calf ticks
+                // the adult at its colour). Wild animals roam far from any anchor → excluded by
+                // WithinAnchor above. Spoiler-gated on per-colour discovery (OwnedCount).
+                // Iter-41: a penned cow WANDERS, so keying its colour aux by its transient tile
+                // accumulated a stale entry per visited tile (a per-colour over-count in the
+                // 48..~91 ring, where old tiles are neither pruned nor reconciled). Key it by its
+                // NEAREST loaded ANCHOR tile instead — a stable per-pen location (anchors don't
+                // move) — so a moving cow maps to the SAME tile each scan (SetLiveAux replaces, no
+                // accumulation) while still riding the per-tile remember/persist/prune: the anchor
+                // tile stays remembered while away, and is reconciled/pruned once the pen empties
+                // and the player is near it.
                 if (em.HasComponent<CattleCD>(e))
                 {
                     long cckey = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
-                    var a = TileAux(auxScan, key);
+                    var a = TileAux(auxScan, NearestAnchorTile(anchors, pos.x, pos.z, key));
                     a[cckey] = (a.TryGetValue(cckey, out var cc) ? cc : 0) + 1;
                     continue;
                 }
@@ -402,6 +408,23 @@ namespace ItemChecklist.Possession
         {
             if (!auxScan.TryGetValue(key, out var d)) { d = new Dictionary<long, int>(); auxScan[key] = d; }
             return d;
+        }
+
+        // Iter-41: tile of the anchor nearest to (x,z), used to give a WANDERING penned cow a
+        // STABLE per-pen aux tile (its own tile changes every scan → per-tile accumulation). The
+        // cattle branch only runs after WithinAnchor passed, so `anchors` is non-empty there;
+        // `fallback` (the cow's own tile) is a defensive default only.
+        private static long NearestAnchorTile(List<Vector2> anchors, float x, float z, long fallback)
+        {
+            long best = fallback;
+            float bestD = float.MaxValue;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                float dx = anchors[i].x - x, dz = anchors[i].y - z;
+                float d = dx * dx + dz * dz;
+                if (d < bestD) { bestD = d; best = PossessionLedger.Key(Mathf.RoundToInt(anchors[i].x), Mathf.RoundToInt(anchors[i].y)); }
+            }
+            return best;
         }
 
         private static void AddOne(Dictionary<int, int> tile, int id)
