@@ -1372,3 +1372,29 @@ source). **Both halves of that theory were wrong** — and how they were caught 
 Lesson: don't promote a GC/leak warning to "the gameplay lag" without checking its **log
 position**; and isolate a render mod by **disable + subjective smoothness**, not by a GC count.
 (Prove your own innocence first: `grep -rn ComputeBuffer unity/` — ItemChecklist's is zero.)
+
+### Possession scan: "loaded" ≠ "observed" — the prune must key off the observation boundary (Iter-41)
+
+For any spatial "is it still there?" self-heal (`PruneStaleNear`), the load radius is the **wrong**
+threshold. Ground truth from the decompile: the player carries
+`KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250, ImmediateLoadRadius=200 }`
+(`Pug.Base` `PLAYER_DISTANCE_TO_LOAD=200/…START=250/…UNLOAD=300`; `defaultSimDistance`/
+`SimulationDistance` are dead → the bubble is **not shrinkable by any setting**). So CK force-loads
+chunks within ~200 of the player. **But** the mod's scan resolves the **ServerWorld**, and base
+placed-object entities empirically leave the *observed* scan set at only **~91–115** — well below
+200 (best explanation: DOTS ArchetypeChunk unload granularity, so a container can leave the query
+while its co-located workbench stays; possibly a camera-frame offset). The Iter-41 bug was exactly
+this conflation: the prune ran at `LoadRadius = 180` (chosen "< 200 = loaded"), so it deleted
+loaded-**but-unobserved** base containers in the 91–180 band as the player walked away, wiping the
+remembered ledger (Possession `K` collapsed 385→40).
+
+**Rule:** a "not observed ⇒ destroyed" prune must fire only where a present object *would* be
+observed = **loaded AND would-pass-the-scan's-gate**. The Iter-41 airtight form: prune a remembered
+tile iff `dist(player) ≤ 48` (loaded — small, below the ~91 dropout AND the 200 floor; also above
+destruction range) **AND** `coveredByLoadedAnchor` (the same `WithinAnchor(anchors, …)` gate the
+scan uses) **AND** `∉ liveKeys`. Diagnose with the DIAG `maxSeen`/`minGhost` probe + a prune-off
+control run (if `K` is then stable, the prune is the sole cause). Full CK constants + file:line in
+the `reference_ck_entity_load_observe_radii` memory. Corollary: **mobile** entities (penned cattle)
+must not be keyed by their transient tile — key by the nearest **anchor** tile (stable) or they
+accumulate a stale aux entry per tile visited in the 48–~91 ring (a self-healing per-colour
+over-count).

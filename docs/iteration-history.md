@@ -1782,3 +1782,92 @@ line + a comment); no prefab/art/loc touch. **Process:** the measure-first probe
 decisive twice — it empirically confirmed the static root cause (all 6006 false) *and* proved
 cooking is the sole recipeless station-production, converting a plausible static assumption into a
 verified one before the fix shipped.
+
+**Iter-41 (possession counter `K / M` location-independence) — DONE (2026-07-17, branch
+`iter-41`).** A user-reported bug (2026-07-15): in the Iter-36 **Possession** counter mode the
+owned numerator `K` (HUD + window footer) **decreased as the player walked away from base** and
+recovered on return — it should be location-independent. Design spec:
+`docs/specs/2026-07-16-iter-41-possession-location-independence-design.md`.
+
+**Contract (brainstormed, settled with the user): `K` = "own ≥1 right now, wherever it is
+stored"** — current possession, location-independent. Rejected *ever-owned* (a released last copy
+would stay counted) and *live-only* (the drop is by-design). Reinforced by a CK fact: an unloaded
+chunk is frozen (no simulation/automation, single-player), so a base container's contents cannot
+change while the player is away — the "remembered" value is the true last state, never stale.
+
+**Root cause — measured, not guessed (the standing lesson, and it bit twice).** With
+`ModConfig.Diagnostics` on, Possession mode, a base→far→base walk: HUD `K` = **385 → 40 → 385**,
+and the DIAG `ledgerC` (remembered container count) collapsed **402 → 0 → 402** tracking
+`anchors`/`near`. The sole remover of `_containers` during play is `PruneStaleNear` → the prune was
+wiping the remembered ledger. **Two false-diagnoses, each overturned by the next measurement:**
+(1) the roadmap's "prime suspect" (live-only pet/cattle/paint axes) was *not* the dominant cause —
+the baseline (normal containers) drifted massively. (2) A first fix — an anchor-coverage gate on
+`PruneStaleNear` (still radius 180) — only *partially* helped (`K` 385 → ~190–286): `ledgerC`
+still fell 402 → ~200 because base containers unload while the base **workbench** stays loaded
+(anchors 45–46 while `near`/`ledgerC` dropped). The `180 < ImmediateLoadRadius (200)` premise
+**conflated "loaded" with "observed"**.
+
+**The code-grounded reconciliation (user-directed research).** The old comment's "200" traces to
+the player's `KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250, ImmediateLoadRadius=200 }`
+(`Pug.ECS.Conversion.decompiled.cs:4985-4990`; named constants `Pug.Base.decompiled.cs:13282-13292`
+`PLAYER_DISTANCE_TO_LOAD=200` …; `defaultSimDistance`/`SimulationDistance` are dead → the bubble is
+not shrinkable by any setting). A measurement build (prune OFF as a control: `K` stayed constant
+→ proving the prune is the sole cause) logged the effective boundary: base containers leave the
+**observed** scan set at **~91–115** — well below the 200 chunk-load floor, matching no named
+constant (best explanation: DOTS ArchetypeChunk unload granularity + camera-frame offset). So
+**loaded (≤200) ≠ reliably observed (~91)**; the prune infers "unobserved ⇒ destroyed", so it must
+stay below the observation boundary, not the load radius. Distilled in the
+`reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
+
+**The fix — an airtight, two-condition self-heal prune.** A remembered tile is pruned iff it
+**would be counted this scan if a container were still there** — i.e. `dist(tile, player) ≤ 48`
+(**loaded**: a small player radius, safely below the ~91 observed-dropout AND the 200 floor; also
+far above destruction range — you must stand next to a container to destroy it) **AND**
+`coveredByLoadedAnchor(tile)` (**would-be-observed**: within `AnchorRadius` of a loaded anchor —
+byte-for-byte the same `WithinAnchor` gate the scan uses) **AND** `∉ liveKeys`. Both halves are
+required: the radius guards *mode 2* (a container's chunk unloads while its co-located workbench
+stays), the anchor cover guards *mode 1* (a player-near base container whose workbench just crossed
+the ~91 dropout). A real destruction is always both (you stand next to it; its workbench is
+co-located), so nothing legitimate is missed. The player-radius is unavoidable because "is it
+loaded" is a player-relative fact (CK's load bubble is centred on the player); the anchor scan
+itself has no mod radius but is transitively player-bounded (it only sees loaded entities).
+
+**Part B — remember the live-only axes.** Pet-skin (`CountSkin`) and cattle/paint-colour
+(`CountColour`) counts were rebuilt live each scan and never remembered, so base-stored pets,
+penned/caged animals and placed painted furniture dropped from `K` when the base unloaded —
+independent of the prune. Fix: a parallel per-tile **remembered aux store** on the ledger
+(`_auxContainers` + live `_auxCarried`), unified into one packed `PackKey(id, secondDim)→count`
+dict on `PossessionView` (`_aux`; pet IDs vs cattle/paint IDs are disjoint, so one dict serves both
+`CountSkin`/`CountColour`). Stored pets/caged cattle (container contents), placed painted furniture
+and penned cattle are remembered per-tile; carried + the active/summoned pet stay live (added on
+top like `_carried`). `BuildView` merges live + all remembered aux; `PruneStaleNear` prunes both
+dicts on the union of tile keys. Two review-caught fixes: a `ClearAux` reconcile drops stale aux on
+a live tile re-observed without aux this scan (a mobile cow that left a tile still kept live by a
+co-located placeable — gated on `allowPrune` for streaming safety), and `MarkFrom` is gated on
+`IsPetSkinEntry` so cattle/paint keys don't pollute the persistent `PetCollection`.
+
+**Part C — persistence.** Ledger schema **v3**: the serialized per-tile line gains a second
+`|`-segment for the aux data (`x,z|<id:count,…>|<packedKey:count,…>`), marker `#icl-ledger-v2` →
+`#icl-ledger-v3`; `LoadFrom` discards any pre-v3 file once (the Iter-31 migration pattern) and the
+base re-scans clean. `PossessionStore` is format-agnostic — untouched; the FNV save-skip still
+holds (Serialize stays deterministic for an unchanged ledger).
+
+**Mobile-cattle over-count (found by the final whole-branch review).** After the prune narrowed to
+48, a **wandering** penned cow keyed its colour aux by its *transient* tile → a stale entry per
+visited tile in the 48–~91 ring (neither pruned — player >48 — nor reconciled), inflating
+`CountColour` (display-only, `K` unaffected, self-healing on the next close visit). Fixed by keying
+penned-cattle colour aux by the cow's **nearest loaded anchor tile** (a stable per-pen location),
+so a moving cow maps to the same tile each scan (`SetLiveAux` replaces, no accumulation) while
+still riding the per-tile remember/persist/prune unchanged.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** `safetyCheck=True`, 0 `CompileFailed`/NRE,
+`ItemCatalog baked: 8116` unchanged; **`K` constant ~385** across base→far→base (was 385→40→385),
+**`ledgerC` constant 402–403 even with the base fully unloaded** (`anchors=0`, 50 far scans all at
+403 — was 0..402); self-heal confirmed (destroying a base chest drops `K` correctly, so the prune
+still removes real destructions); v2→v3 migration discards the old ledger once and repopulates.
+Reviews: per-task (T1/T2/T3) + two whole-branch passes, all SHIP; the measurement/research
+overturned two plausible hypotheses before the fix shipped. **Process:** brainstorm → spec → plan →
+hybrid subagent-driven execution (subagent code edits + inline in-game verification); the user's
+deep questioning drove the airtight two-condition synthesis and the code-grounded load-radius
+research (session `1fb12129` + a decompile research agent). Pure behavioural C# + one loc-free
+schema bump; no prefab/art/loc touch.

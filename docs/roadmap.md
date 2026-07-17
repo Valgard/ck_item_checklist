@@ -481,42 +481,25 @@ remaining backlog.
   `OwnedCount` chokepoint); and the "remembered from afar" case (the ledger keeps out-of-range
   tiles, so a shown location can be stale until revisited). Likely a row action / hover line
   rather than a new window.
-- **Iter-41 (tentative) -- possession counter `K / M` drifts when leaving the base.** In the
-  Iter-36 **Possession** counter mode, the owned numerator `K` (HUD + window footer, via
-  `ItemChecklistMod.OwnedCatalogCount` → `CurrentCounterNumerator`) **decreases as the player
-  walks away from their base** and recovers on return. It should be **location-independent** --
-  keeping "own ≥1 of every item" stable from anywhere is exactly what the Iter-20 persistence
-  layer (the per-`(x,z)` `PossessionLedger`, persisted via `PossessionStore`, with `BuildView`'s
-  "remembered" merge for containers not loaded this snapshot) was built for. Reported 2026-07-15.
-
-  **Investigate (measure first -- do NOT ship the first plausible cause; enable the Iter-30
-  `ModConfig.Diagnostics` dump and walk a base→far→base loop watching ledger size + the numerator):**
-  - **Live-only possession axes -- the prime suspect.** `OwnedCount` reads three different
-    sources: normal rows via `PossessionView.Count` (carried + **remembered** containers →
-    should be stable), but **pet-skin rows via `CountSkin`, and cattle / paintable-colour slots
-    via `CountColour`, which the scanner fills LIVE-ONLY** (`petSkins` / `colourCounts` are
-    rebuilt each scan from currently-loaded entities and are deliberately never "remembered" --
-    see the `PossessionView` / `PossessionScanner` comments). So a catalog row owned *only* as a
-    penned animal, a stored/summoned pet, or placed painted furniture silently drops out of `K`
-    the moment the base unloads.
-  - **`PruneStaleNear` vs. the workbench anchor (possible data loss, not just display).**
-    `PruneStaleNear` deletes remembered containers within `LoadRadius = 180` of the player that
-    were not re-observed this snapshot, on the assumption "in-load-bubble + unseen = destroyed".
-    But Iter-31 made observation depend on a **loaded workbench anchor**: if the base workbench
-    (or its chunk) unloads while a base container is still inside the player's 180-tile prune
-    window, that container is pruned **and the loss is written to disk** (`PossessionStore`), so
-    `K` would not fully recover on return. Confirm whether the base can actually sit in that
-    window (workbench + containers are co-located, so it may be a narrow chunk-boundary race, or
-    it may not occur at all).
-  - **Baseline first.** Confirm that normal, container-stored totals really *are* stable across
-    the walk. If even those drift, the bug is in the remembered-merge / prune path, not the
-    live-only axes -- and the fix target changes.
-
-  Design question for the pick-up brainstorm: should live entities (penned cattle, summoned /
-  stored pets, painted furniture) be **remembered** like container contents -- e.g. an
-  "ever-owned near base" flag in the spirit of `PetCollection` -- or is the Possession counter's
-  contract "owned *right now, in the loaded world*"? The correct fix shape depends on that call,
-  so settle it before coding.
+- **Iter-41 -- possession counter `K / M` location-independence. DONE** (see
+  `docs/iteration-history.md`). The Iter-36 Possession `K` dropped as the player left base and
+  recovered on return. **Root cause measured + code-grounded, overturning the roadmap's own
+  "prime suspect":** the baseline (normal containers) drifted too -- `PruneStaleNear` was wiping
+  the *remembered* ledger. The old `LoadRadius = 180` (picked as "< ImmediateLoadRadius 200")
+  **conflated "loaded" with "observed"**: CK force-loads chunks within `PLAYER_DISTANCE_TO_LOAD =
+  200` of the player (`Pug.Base`; not shrinkable by any setting), but base entities leave the
+  *observed* scan set at ~91-115 (DOTS ArchetypeChunk granularity -- a prune-off control confirmed
+  the prune is the sole cause). **Fix (airtight, two conditions):** prune a remembered tile iff
+  `dist(player) <= 48` (loaded) **AND** `coveredByLoadedAnchor` (would-be-observed -- the same
+  `WithinAnchor` gate the scan uses) **AND** `notin liveKeys`. **Part B:** the live-only axes
+  (pet skins / cattle / paint colours) are now **remembered** in a per-tile aux store
+  (`_auxContainers`/`_auxCarried`, unified into one `PossessionView._aux`), persisted via **ledger
+  schema v3** (v2->v3 discard migration). Contract settled with the user: `K` = "own >=1 right now,
+  wherever stored". A mobile-cattle per-colour over-count (found by the final review) fixed by
+  keying penned-cattle aux to the nearest-anchor tile. Verified in-game (1.2.1.5): `K` constant
+  ~385, `ledgerC` 402-403 with the base fully unloaded, self-heal intact. The CK load-vs-observe
+  distinction lives in the `reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
+  Reported 2026-07-15, done 2026-07-17.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
