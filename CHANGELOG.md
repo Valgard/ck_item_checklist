@@ -5,6 +5,19 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.2.1] - 2026-07-17
+
+Fixes the **Owned** counter drifting as you move away from your base.
+
+### Fixed
+
+- **The Owned counter now stays stable everywhere.** With the counter set to
+  **Owned** (Options → Mod Settings → Counter mode), the count no longer drops
+  as you walk away from your base and jump back up when you return — it reflects
+  "own at least one of every item, wherever it's stored" from anywhere in the world.
+- **Stored pets, penned/caged animals and placed painted furniture stay counted
+  while you're away too**, the same way chest-stored items already did.
+
 ## [1.2.0] - 2026-07-14
 
 Adds an in-game master toggle to enable or disable the whole mod without
