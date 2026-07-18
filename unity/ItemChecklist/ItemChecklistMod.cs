@@ -393,6 +393,13 @@ namespace ItemChecklist
                 Object.Instantiate(hudPrefab, Manager.ui.chestInventoryUI.transform.parent);
             }
 
+            // Iter-40: auto-untrack when the tracked item is no longer stored anywhere
+            // (taken from all its chests). TrackedItemTiles is the live truth each frame,
+            // so this needs no separate invalidation. (The TrackerHud render is added in
+            // Task 3; here we only keep the tracked state honest.)
+            if (ItemTracker.IsActive && TrackedItemTiles().Count == 0)
+                ItemTracker.Clear();
+
             // Deferred language-change re-bake (set by ItemCatalogLocChangeHook;
             // run here, post-DoLocalizeAll, to avoid the mid-localize GetObjectName NRE).
             ItemCatalogLocChangeHook.ProcessPending();
@@ -403,6 +410,7 @@ namespace ItemChecklist
             // Independent of the discovery-snapshot cache below (that can miss).
             if (activeGuid != s_ledgerGuid)
             {
+                ItemTracker.Clear();   // Iter-40: tracking is session-only — reset on any character/world switch
                 SavePossessionLedger();   // backstop: persist the outgoing char on switch
                 if (string.IsNullOrEmpty(activeGuid))
                 {

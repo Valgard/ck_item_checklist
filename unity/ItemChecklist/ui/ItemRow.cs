@@ -25,6 +25,9 @@ namespace ItemChecklist.UI
         // virtuals (called by UIMouse on the selected row) describe THIS item.
         private int _objectId;
         private int _ckVariation;     // CK object variation (pets → 0, not skinIndex)
+        private int _entryVariation;  // Iter-40: the ENTRY variation (skinIndex/colour), unlike
+                                      // _ckVariation which is 0 for pets — used for the tracked
+                                      // identity + spoiler gate (OwnedCount expects it).
         private bool _nameKnown;      // tooltip allowed iff the row shows a real name
         private string _displayName;  // Iter-35: the row's baked display name (fallback tooltip title)
         private bool _nameIsFallback; // Iter-35: name is a derived fallback → CK's tooltip would show "missing: …"
@@ -161,6 +164,7 @@ namespace ItemChecklist.UI
             // variation 0 — the `skinIndex` param is a skin selector, not a CK variation.
             _objectId = objectId;
             _ckVariation = isPetSkin ? 0 : skinIndex;
+            _entryVariation = skinIndex;   // Content passes entry.Variation as skinIndex
             _nameKnown = nameKnown;
             _displayName = name;
             _nameIsFallback = nameIsFallback;
@@ -236,6 +240,21 @@ namespace ItemChecklist.UI
             if (!_nameKnown || _nameIsFallback || _tooltip == null) return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.StatsFor();
+        }
+
+        // Iter-40: left-click a trackable row toggles locating it (HUD arrows to its
+        // containers). UIMouse dispatches OnLeftClicked to the hover-selected row (the
+        // same path the mod's buttons use). Only trackable rows respond — a ??? or a
+        // carried-only / unowned row is inert. Guard on the viewport so a click on a
+        // collider clipped outside the list does nothing (mirrors the hover overrides).
+        public override void OnLeftClicked(bool mod1, bool mod2)
+        {
+            base.OnLeftClicked(mod1, mod2);
+            if (!ItemChecklistContent.PointerInViewport()) return;
+            if (!ItemChecklistMod.IsTrackable(_objectId, _entryVariation)) return;
+            ItemTracker.Toggle(_objectId, _entryVariation);
+            // Re-render visible rows so the tracked highlight (Task 4) updates at once.
+            GetComponentInParent<ItemChecklistContent>()?.RefreshVisible();
         }
 
         // Iter-22: drive the highlight per-frame from selection state — NOT from the
