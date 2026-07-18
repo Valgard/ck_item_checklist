@@ -128,6 +128,35 @@ namespace ItemChecklist.Possession
             return new PossessionView(totals, remembered, aux);
         }
 
+        // --- Iter-40: reverse-index (location surfacing) ---
+        // The objectId→count collapse in BuildView throws away location; these read
+        // the same remembered _containers the other way. Tiles are packed long keys
+        // (decode with KeyX/KeyZ) — NOT ValueTuple, which is unproven sandbox surface.
+        // Remembered (currently-unloaded) tiles are included: an unloaded chunk is
+        // frozen in SP, so a remembered tile is the true last state (Iter-41). Carried
+        // is tile-less and intentionally absent.
+
+        /// <summary>Every container tile currently holding <paramref name="objectId"/>
+        /// (count >= 1), as packed (x,z) keys. Empty when nothing is stored.</summary>
+        public List<long> TilesHolding(int objectId)
+        {
+            var keys = new List<long>();
+            foreach (var pair in _containers)
+                if (pair.Value.TryGetValue(objectId, out var c) && c >= 1)
+                    keys.Add(pair.Key);
+            return keys;
+        }
+
+        /// <summary>How many container tiles hold <paramref name="objectId"/> — the
+        /// allocation-free count used by the trackable gate and the tooltip hint.</summary>
+        public int CountTilesHolding(int objectId)
+        {
+            int n = 0;
+            foreach (var pair in _containers)
+                if (pair.Value.TryGetValue(objectId, out var c) && c >= 1) n++;
+            return n;
+        }
+
         // --- Persistence (remembered storage + aux only; carried / live-aux never persisted) ---
         // v3 line format: "x,z|<id:count,...>|<packedKey:count,...>" — segment 1 = container
         // contents (id->count), segment 2 = the per-tile aux breakdown

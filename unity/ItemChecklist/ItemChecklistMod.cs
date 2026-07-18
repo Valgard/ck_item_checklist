@@ -7,6 +7,7 @@ using ItemChecklist.UI;
 using ModSettingsMenu.Settings;
 using PugMod;
 using Rewired;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace ItemChecklist
@@ -148,6 +149,38 @@ namespace ItemChecklist
                 if (OwnedCount(e.ObjectId, e.Variation) >= 1) n++;
             }
             return n;
+        }
+
+        // Iter-40: a row is trackable iff it is discovered/owned AND the player owns >=1
+        // of it in a STORED container (a locatable tile). Owned-only-carried has no tile
+        // (-> "you are carrying it"), owned==0 has nothing to locate. Reuses the Iter-21
+        // spoiler chokepoint (OwnedCount), so an undiscovered ??? row is never trackable.
+        internal static bool IsTrackable(int objectId, int variation)
+            => OwnedCount(objectId, variation) >= 1
+               && s_ledger != null
+               && s_ledger.CountTilesHolding(objectId) > 0;
+
+        // Iter-40: container-tile count for the tooltip hint ("in N chests"). 0 if no ledger.
+        internal static int CountTilesHolding(int objectId)
+            => s_ledger != null ? s_ledger.CountTilesHolding(objectId) : 0;
+
+        // Iter-40: the tracked item's holding tiles as packed (x,z) keys (empty if nothing
+        // tracked / no ledger). Read fresh each frame by Update -> TrackerHud (the arrows
+        // follow the possession scan, giving free self-correction).
+        internal static System.Collections.Generic.List<long> TrackedItemTiles()
+            => (ItemTracker.IsActive && s_ledger != null)
+                ? s_ledger.TilesHolding(ItemTracker.TrackedId)
+                : new System.Collections.Generic.List<long>();
+
+        // Iter-40: local player's world position (null on the main menu / world-load
+        // screen). Mirrors caveling-divining-rod's TryGetLocalPlayerPosition; WorldPosition
+        // is sandbox-safe (that published mod relies on it).
+        internal static float3? TryGetPlayerWorldPos()
+        {
+            var p = Manager.main?.player;
+            if (p == null) return null;
+            var v = p.WorldPosition;
+            return new float3(v.x, v.y, v.z);
         }
 
         // Iter-36: single numerator source for BOTH counter surfaces (HUD + window footer),
