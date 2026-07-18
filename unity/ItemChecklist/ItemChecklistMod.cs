@@ -45,6 +45,10 @@ namespace ItemChecklist
         // HideAllInventoryAndCraftingUI — the opposite of an always-on HUD).
         private static GameObject hudPrefab;
 
+        // Iter-40: tracker arrow HUD prefab, captured in ModObjectLoaded, instantiated
+        // lazily in Update (same non-modal pattern as the counter HUD).
+        private static GameObject trackerHudPrefab;
+
         // Iter-20: current possession snapshot, read by ItemChecklistContent.Rebind
         // per visible row. Refreshed on open + a throttled interval; the per-(x,z)
         // ledger is loaded/saved around character (GUID) activation.
@@ -321,6 +325,8 @@ namespace ItemChecklist
                     UserInterfaceModule.RegisterModUI(go);
                 else if (go.name == "ItemChecklistHUD")
                     hudPrefab = go;
+                else if (go.name == "ItemChecklistTracker")
+                    trackerHudPrefab = go;
                 else
                     // Building-block prefab (Dropdown.prefab + its variants):
                     // nested into the window, never opened on its own. Logged
@@ -393,12 +399,41 @@ namespace ItemChecklist
                 Object.Instantiate(hudPrefab, Manager.ui.chestInventoryUI.transform.parent);
             }
 
-            // Iter-40: auto-untrack when the tracked item is no longer stored anywhere
-            // (taken from all its chests). TrackedItemTiles is the live truth each frame,
-            // so this needs no separate invalidation. (The TrackerHud render is added in
-            // Task 3; here we only keep the tracked state honest.)
-            if (ItemTracker.IsActive && TrackedItemTiles().Count == 0)
-                ItemTracker.Clear();
+            // Iter-40: instantiate the tracker HUD once the UIManager hierarchy exists
+            // (same lazy pattern as the counter HUD above).
+            if (trackerHudPrefab != null
+                && ItemChecklist.UI.TrackerHud.Instance == null
+                && Manager.ui != null
+                && Manager.ui.chestInventoryUI != null)
+            {
+                Object.Instantiate(trackerHudPrefab, Manager.ui.chestInventoryUI.transform.parent);
+            }
+
+            // Iter-40: drive the tracker arrows. TrackedItemTiles is the live truth each
+            // frame, so the arrows follow the possession scan (free self-correction), and
+            // an item taken from all its chests auto-untracks.
+            if (ItemTracker.IsActive)
+            {
+                var tiles = TrackedItemTiles();
+                if (tiles.Count == 0)
+                {
+                    ItemTracker.Clear();
+                    ItemChecklist.UI.TrackerHud.Instance?.Hide();
+                }
+                else if (ItemChecklist.UI.TrackerHud.Instance != null)
+                {
+                    var player = TryGetPlayerWorldPos();
+                    if (player.HasValue)
+                    {
+                        var targets = new System.Collections.Generic.List<float3>(tiles.Count);
+                        foreach (var key in tiles)
+                            targets.Add(new float3(
+                                ItemChecklist.Possession.PossessionLedger.KeyX(key), 0f,
+                                ItemChecklist.Possession.PossessionLedger.KeyZ(key)));
+                        ItemChecklist.UI.TrackerHud.Instance.Render(player.Value, targets);
+                    }
+                }
+            }
 
             // Deferred language-change re-bake (set by ItemCatalogLocChangeHook;
             // run here, post-DoLocalizeAll, to avoid the mid-localize GetObjectName NRE).
