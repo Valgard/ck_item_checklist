@@ -43,9 +43,16 @@ namespace ItemChecklist.UI
         public BoxCollider hoverCollider;
 
         // Iter-22: hover highlight — a SpriteRenderer child fully authored in the prefab
-        // (sprite + size + sorting + 9-slice + position, all Editor-owned). Code only
-        // toggles its visibility on select/deselect; it never touches the sprite.
+        // (sprite + size + sorting + 9-slice + position, all Editor-owned). Code only toggles
+        // its GO visibility on select/deselect; it never touches the sprite.
         public SpriteRenderer highlight;
+
+        // Iter-40: tracked "toggled" marker — a SEPARATE SpriteRenderer child mirroring
+        // `highlight` (its own sprite/size/sorting, all Editor-owned), so the persistent tracked
+        // look is fully independent of the transient hover look (no sprite sharing, no fallback
+        // to the "selected" sprite). Code only toggles its GO visibility for the tracked row.
+        // Editor-wired (a duplicate of HoverHighlight with its own sprite).
+        public SpriteRenderer toggledHighlight;
 
         // Ancient Coin icon, resolved once from the game database and shared by
         // every row (the coin shown beside sell values).
@@ -257,19 +264,38 @@ namespace ItemChecklist.UI
             GetComponentInParent<ItemChecklistContent>()?.RefreshVisible();
         }
 
-        // Iter-22: drive the highlight per-frame from selection state — NOT from the
-        // OnSelected/OnDeselected one-shots — so it stays correct in every case,
-        // including when the cursor moves onto an open popup over an already-selected
-        // row (whose full-width collider would otherwise leak the highlight behind the
-        // popup). Shows for EVERY selected row (discovered or not); the tooltip is the
-        // only discovery-gated part (in the hover overrides above).
+        // Iter-22/40: drive both highlight markers per-frame from selection/tracking state —
+        // NOT the OnSelected/OnDeselected one-shots — so they stay correct in every case (e.g.
+        // the cursor moving onto an open popup over an already-selected row, whose full-width
+        // collider would otherwise leak the highlight behind the popup). Code only toggles GO
+        // visibility; the sprites are Editor-owned. Both GOs default inactive (prefab
+        // m_IsActive 0), so SetActive is the toggle mechanism.
         protected override void LateUpdate()
         {
             base.LateUpdate();
-            if (highlight == null) return;
-            bool show = Manager.ui.currentSelectedUIElement == this
-                        && ItemChecklistContent.PointerInViewport();
-            if (highlight.enabled != show) highlight.enabled = show;
+            bool tracked = ItemTracker.Matches(_objectId, _entryVariation);
+
+            // Hover "selected" marker — transient, on the hover-selected row. Shows for EVERY
+            // selected row (discovered or not; the tooltip is the only discovery-gated part, in
+            // the hover overrides above). On a row that is ALSO tracked, both markers show and
+            // overlap — the Selected marker renders ABOVE the Toggled one (HoverHighlight
+            // sortingOrder 53 > ToggledHighlight 52).
+            if (highlight != null)
+            {
+                bool hover = Manager.ui.currentSelectedUIElement == this
+                             && ItemChecklistContent.PointerInViewport();
+                if (highlight.gameObject.activeSelf != hover) highlight.gameObject.SetActive(hover);
+            }
+
+            // Tracked "toggled" marker — persistent, on the tracked row only. Its own SR/sprite
+            // (mirrors HoverHighlight); code only toggles GO visibility, never the sprite.
+            // Evaluated per-frame so it clears when tracking ends and follows the tracked item
+            // as the pool recycles rows on scroll.
+            if (toggledHighlight != null)
+            {
+                if (toggledHighlight.gameObject.activeSelf != tracked)
+                    toggledHighlight.gameObject.SetActive(tracked);
+            }
         }
     }
 }

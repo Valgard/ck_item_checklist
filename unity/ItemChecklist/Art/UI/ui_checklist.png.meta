@@ -127,7 +127,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 2
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -149,7 +149,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 12
-        y: 24
+        y: 42
         width: 6
         height: 4
       alignment: 0
@@ -171,7 +171,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 20
-        y: 24
+        y: 42
         width: 6
         height: 4
       alignment: 0
@@ -193,7 +193,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 28
-        y: 20
+        y: 38
         width: 2
         height: 8
       alignment: 0
@@ -215,7 +215,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 32
-        y: 22
+        y: 40
         width: 6
         height: 6
       alignment: 0
@@ -237,7 +237,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 40
-        y: 26
+        y: 44
         width: 2
         height: 2
       alignment: 0
@@ -259,7 +259,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 44
-        y: 22
+        y: 40
         width: 6
         height: 6
       alignment: 0
@@ -281,7 +281,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 52
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -303,7 +303,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 62
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -325,7 +325,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 72
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -347,7 +347,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 82
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -369,7 +369,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 92
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -391,7 +391,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 102
-        y: 22
+        y: 40
         width: 6
         height: 6
       alignment: 0
@@ -413,7 +413,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 110
-        y: 20
+        y: 38
         width: 8
         height: 8
       alignment: 0
@@ -435,7 +435,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 120
-        y: 22
+        y: 40
         width: 6
         height: 6
       alignment: 0
@@ -457,7 +457,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 2
-        y: 10
+        y: 28
         width: 8
         height: 8
       alignment: 0
@@ -479,7 +479,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 12
-        y: 10
+        y: 28
         width: 8
         height: 8
       alignment: 0
@@ -497,11 +497,33 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Option Background 8x8
+      name: ItemRow Entry Toggled
       rect:
         serializedVersion: 2
         x: 22
-        y: 10
+        y: 26
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 4, y: 4, z: 4, w: 4}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 65fb7d3d213d050ddb35a3de71ab66d1
+      internalID: 1707791142
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Option Background 8x8
+      rect:
+        serializedVersion: 2
+        x: 34
+        y: 28
         width: 8
         height: 8
       alignment: 0
@@ -522,8 +544,8 @@ TextureImporter:
       name: Option Panel
       rect:
         serializedVersion: 2
-        x: 32
-        y: 10
+        x: 44
+        y: 28
         width: 8
         height: 8
       alignment: 0
@@ -544,8 +566,8 @@ TextureImporter:
       name: Rarity Border
       rect:
         serializedVersion: 2
-        x: 42
-        y: 10
+        x: 54
+        y: 28
         width: 8
         height: 8
       alignment: 0
@@ -566,8 +588,8 @@ TextureImporter:
       name: Scrollbar Background
       rect:
         serializedVersion: 2
-        x: 52
-        y: 10
+        x: 64
+        y: 28
         width: 4
         height: 8
       alignment: 0
@@ -588,8 +610,8 @@ TextureImporter:
       name: Scrollbar Handler
       rect:
         serializedVersion: 2
-        x: 58
-        y: 10
+        x: 70
+        y: 28
         width: 4
         height: 8
       alignment: 0
@@ -610,8 +632,8 @@ TextureImporter:
       name: Scrollbar Highlight
       rect:
         serializedVersion: 2
-        x: 64
-        y: 10
+        x: 76
+        y: 28
         width: 4
         height: 8
       alignment: 0
@@ -632,8 +654,8 @@ TextureImporter:
       name: Scrollbar Selector
       rect:
         serializedVersion: 2
-        x: 70
-        y: 10
+        x: 82
+        y: 28
         width: 4
         height: 8
       alignment: 0
@@ -654,8 +676,8 @@ TextureImporter:
       name: Tracker Arrow
       rect:
         serializedVersion: 2
-        x: 76
-        y: 6
+        x: 88
+        y: 24
         width: 7
         height: 12
       alignment: 0
@@ -676,8 +698,8 @@ TextureImporter:
       name: Unknown Object
       rect:
         serializedVersion: 2
-        x: 85
-        y: 2
+        x: 97
+        y: 20
         width: 16
         height: 16
       alignment: 0
@@ -698,7 +720,7 @@ TextureImporter:
       name: Window
       rect:
         serializedVersion: 2
-        x: 103
+        x: 2
         y: 2
         width: 16
         height: 16
@@ -747,6 +769,7 @@ TextureImporter:
       Icon Sort Desc 6x6: -944694907
       Icon Sort Desc 8x8: -1910095811
       Icon filter: -41939125
+      ItemRow Entry Toggled: 1707791142
       Option Background 8x8: -761834842
       Option Panel: -637329406
       Rarity Border: 742996088
