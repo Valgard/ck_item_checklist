@@ -15,28 +15,31 @@ namespace ItemChecklist.UI
     {
         public GameObject hudRoot;   // Editor-wired: the child GO toggled by the visibility gate.
 
+        // Iter-40: the arrow sprite, Editor-wired in the prefab to the ui_checklist
+        // "Tracker Arrow" sub-sprite (runtime-pooled SpriteRenderers can't be
+        // individually prefab-wired, so one shared serialized reference feeds them all).
+        public Sprite arrowSprite;
+
         public static TrackerHud Instance { get; private set; }
 
         private const float RingRadius = 1.4f;          // world units on the uiCamera HUD plane
         private const float ArrowScale = 1.0f;
         private const float ArriveHideDistance = 1.5f;  // hide a target's arrow within ~1.5 tiles
 
+        // Iter-40: the sprite is authored pointing a certain way; if in-game the arrows
+        // are rotated off, set this (e.g. -90 for an up-pointing sprite). Calibrated in-game.
+        private const float ArrowRotationOffsetDeg = 0f;
+
         private readonly List<SpriteRenderer> _arrowPool = new List<SpriteRenderer>(8);
-        private Sprite _arrowSprite;
         private int _hudLayer;
 
         protected void Awake()
         {
             Instance = this;
             _hudLayer = LayerMask.NameToLayer("HUD");
-            var bundle = ItemChecklistMod.AssetBundle;
-            if (bundle != null)
-                _arrowSprite = bundle.LoadAsset<Sprite>("tracker_arrow")
-                    ?? bundle.LoadAsset<Sprite>("Assets/ItemChecklist/Art/tracker_arrow.png")
-                    ?? bundle.LoadAsset<Sprite>("tracker_arrow.png");
-            if (_arrowSprite == null)
-                Debug.LogError("[ItemChecklist] tracker_arrow sprite not found in AssetBundle. " +
-                               "Arrows will be blank — check the sprite name / .meta (textureType:8).");
+            if (arrowSprite == null)
+                Debug.LogError("[ItemChecklist] TrackerHud.arrowSprite is not wired in the prefab. " +
+                               "Arrows will be blank — assign the ui_checklist 'Tracker Arrow' sub-sprite.");
         }
 
         private void OnDestroy() { if (Instance == this) Instance = null; }
@@ -88,7 +91,7 @@ namespace ItemChecklist.UI
                 float bearing = math.atan2(delta.z, delta.x);
                 sr.transform.localPosition = new Vector3(
                     math.cos(bearing) * RingRadius, math.sin(bearing) * RingRadius, 0f);
-                sr.transform.localRotation = Quaternion.Euler(0, 0, math.degrees(bearing));
+                sr.transform.localRotation = Quaternion.Euler(0, 0, math.degrees(bearing) + ArrowRotationOffsetDeg);
                 sr.transform.localScale = new Vector3(ArrowScale, ArrowScale, 1f);
                 Color c = sr.color; c.a = 1f; sr.color = c;   // no radar fade — full opacity
             }
@@ -109,7 +112,7 @@ namespace ItemChecklist.UI
                 go.transform.SetParent(hudRoot.transform, false);
                 go.layer = _hudLayer;   // HUD layer (27) — uiCamera draws it during plain gameplay
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = _arrowSprite;
+                sr.sprite = arrowSprite;
                 _arrowPool.Add(sr);
             }
         }

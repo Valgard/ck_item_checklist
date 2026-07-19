@@ -651,10 +651,32 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Unknown Object
+      name: Tracker Arrow
       rect:
         serializedVersion: 2
         x: 76
+        y: 6
+        width: 7
+        height: 12
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d270e10cfc849041dbbba4d840d7723c
+      internalID: -626287603
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Unknown Object
+      rect:
+        serializedVersion: 2
+        x: 85
         y: 2
         width: 16
         height: 16
@@ -676,7 +698,7 @@ TextureImporter:
       name: Window
       rect:
         serializedVersion: 2
-        x: 94
+        x: 103
         y: 2
         width: 16
         height: 16
@@ -732,6 +754,7 @@ TextureImporter:
       Scrollbar Handler: 1522153644
       Scrollbar Highlight: 383107104
       Scrollbar Selector: 1612575814
+      Tracker Arrow: -626287603
       Unknown Object: 60782178
       Window: -1497309375
   mipmapLimitGroupName: 
