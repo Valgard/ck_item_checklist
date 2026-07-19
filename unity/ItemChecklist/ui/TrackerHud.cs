@@ -8,9 +8,12 @@ namespace ItemChecklist.UI
     /// containers — one SpriteRenderer per target tile, on a ring around the player-sprite
     /// origin, rotated to its XZ-plane bearing. Copy-adapt of caveling-divining-rod's
     /// ArrowRingRenderer (itself the structural twin of ItemChecklistHud, Iter-11.5).
-    /// KEY DIVERGENCE from the divining-rod: NO radar distance-fade — the tracked target is
-    /// intentional and may be far across the map, so arrows stay fully visible at any
-    /// distance; an arrow hides only when the player is essentially on its tile.</summary>
+    /// KEY DIVERGENCE from the divining-rod: NO radar distance-fade AND no arrive-hide —
+    /// per user in-game feedback the arrow must stay visible at ANY distance, including
+    /// right on the chest (the player still wants to see it point at the exact tile);
+    /// and it mirrors the divining-rod ring: the POSITION sits at a fixed ring radius (never
+    /// touched by scale) while the SIZE lerps with distance INDEPENDENTLY (near normal, far
+    /// smaller) — keeping position and scale orthogonal is what makes it read right.</summary>
     public class TrackerHud : UIelement
     {
         public GameObject hudRoot;   // Editor-wired: the child GO toggled by the visibility gate.
@@ -22,13 +25,30 @@ namespace ItemChecklist.UI
 
         public static TrackerHud Instance { get; private set; }
 
-        private const float RingRadius = 1.4f;          // world units on the uiCamera HUD plane
-        private const float ArrowScale = 1.0f;
-        private const float ArriveHideDistance = 1.5f;  // hide a target's arrow within ~1.5 tiles
+        // Iter-40 (CDR parity): the POSITION ring radius, never touched by scale. Calibrated in-game
+        // to 1.4 world units — a tighter ring hugging the player (CDR uses 4; the user prefers closer).
+        private const float RingRadius = 1.4f;
+
+        // Iter-40 (CDR parity): distance scale-lerp, INDEPENDENT of position. near = 1.0 (normal,
+        // the cap), far = 0.6, lerped over ScaleRefDistance tiles and saturated beyond (CDR values).
+        private const float ScaleNear = 1.0f;
+        private const float ScaleFar = 0.6f;
+        private const float ScaleRefDistance = 30f;
 
         // Iter-40: the sprite is authored pointing a certain way; if in-game the arrows
         // are rotated off, set this (e.g. -90 for an up-pointing sprite). Calibrated in-game.
         private const float ArrowRotationOffsetDeg = 0f;
+
+        // Iter-40 (ground-truth fix 2026-07-20): the ring-centre offset from the HUD anchor,
+        // matching CK's FIXED camera look-offset so the ring sits exactly on the player-sprite.
+        // CK renders the player a little above screen centre; the HUD anchor (hudRoot) sits at
+        // world origin = screen centre, so a constant nudge aligns them. uiCamera world units;
+        // calibrated in-game. (Why constant, not projected: measured only two cameras — the
+        // game world is XZ, the HUD is the uiCamera's XY plane; they are separate coordinate
+        // spaces with no clean WorldToViewportPoint between them — the uiCamera maps the
+        // player's world-Y≈0 to a constant vp.y=0.5 and cannot see the game-world position.)
+        private const float PlayerHudOffsetX = 0f;
+        private const float PlayerHudOffsetY = 0.6f;
 
         private readonly List<SpriteRenderer> _arrowPool = new List<SpriteRenderer>(8);
         private int _hudLayer;
@@ -56,6 +76,7 @@ namespace ItemChecklist.UI
                     !Manager.ui.isAnyInventoryShowing &&
                     !Manager.menu.IsAnyMenuActive() &&
                     ModConfig.Enabled &&
+                    ModConfig.LocateEnabled &&
                     ItemTracker.IsActive;
                 if (hudRoot.activeSelf != show) hudRoot.SetActive(show);
             }
@@ -69,6 +90,14 @@ namespace ItemChecklist.UI
         {
             if (hudRoot == null || !hudRoot.activeSelf) return;
             EnsurePoolSize(targets.Count);
+
+            // Iter-40: the ring centres on the player-sprite via a constant offset (see
+            // PlayerHudOffsetX/Y) — NOT a per-frame camera projection (measured impossible:
+            // game-world XZ and HUD XY are separate spaces). hudRoot@origin already renders
+            // ~on the player; this nudge absorbs CK's fixed camera look-offset so the arrow's
+            // distance-from-player stays constant regardless of the target bearing.
+            Vector3 ringCenter = new Vector3(PlayerHudOffsetX, PlayerHudOffsetY, 0f);
+
             for (int i = 0; i < _arrowPool.Count; i++)
             {
                 var sr = _arrowPool[i];
@@ -78,21 +107,19 @@ namespace ItemChecklist.UI
                     continue;
                 }
                 float3 delta = targets[i] - playerWorldPos;
-                // CK is XZ-plane (y is height, ~0 for ground); distance uses length(delta)
-                // since y==0, bearing MUST be atan2(delta.z, delta.x) (empirically verified,
-                // divining-rod 2026-06-07). HUD-Y is sin(bearing), not delta.z.
+                // CK is XZ-plane (y is height, ~0 for ground) — bearing MUST be
+                // atan2(delta.z, delta.x) (empirically verified, divining-rod 2026-06-07);
+                // HUD-Y is sin(bearing), not delta.z.
                 float distance = math.length(delta);
-                if (distance <= ArriveHideDistance)   // arrived: on the tile -> hide this arrow
-                {
-                    if (sr.gameObject.activeSelf) sr.gameObject.SetActive(false);
-                    continue;
-                }
                 if (!sr.gameObject.activeSelf) sr.gameObject.SetActive(true);
                 float bearing = math.atan2(delta.z, delta.x);
-                sr.transform.localPosition = new Vector3(
+                // Iter-40: POSITION = player-centered ring, fixed radius, never touched by scale.
+                sr.transform.localPosition = ringCenter + new Vector3(
                     math.cos(bearing) * RingRadius, math.sin(bearing) * RingRadius, 0f);
                 sr.transform.localRotation = Quaternion.Euler(0, 0, math.degrees(bearing) + ArrowRotationOffsetDeg);
-                sr.transform.localScale = new Vector3(ArrowScale, ArrowScale, 1f);
+                // SIZE lerps with distance, INDEPENDENTLY of position (near = 1.0, far = 0.6).
+                float scale = math.lerp(ScaleNear, ScaleFar, math.saturate(distance / ScaleRefDistance));
+                sr.transform.localScale = new Vector3(scale, scale, 1f);
                 Color c = sr.color; c.a = 1f; sr.color = c;   // no radar fade — full opacity
             }
         }

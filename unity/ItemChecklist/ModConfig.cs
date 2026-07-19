@@ -23,7 +23,12 @@ namespace ItemChecklist
     /// objects (with tags + IsWorldNature verdict) is written to Player.log — to diagnose a recurring
     /// stutter or spot wild nature leaking past the blacklist in a new biome. Default false; zero
     /// overhead when false. Read once per scan/save into a local, so toggling it in-menu takes effect
-    /// on the next scan.</para></summary>
+    /// on the next scan.</para>
+    ///
+    /// <para><b>LocateEnabled</b> (default true): master switch for the Iter-40 "locate item" HUD
+    /// arrow tracker. When false, the tracker HUD is hidden and rows are not trackable (an
+    /// already-tracked item is cleared) — the player who never wants the arrows can turn the
+    /// whole feature off.</para></summary>
     internal static class ModConfig
     {
         private const float DefaultRadius = 48f;
@@ -37,16 +42,18 @@ namespace ItemChecklist
         private static SettingHandle<bool> _diagHandle;
         private static SettingHandle<CounterMode> _counterModeHandle;
         private static SettingHandle<int> _scanIntervalHandle;
+        private static SettingHandle<bool> _locateEnabledHandle;
 
         public static void Bind(SettingHandle<bool> enabled, SettingHandle<float> radius,
             SettingHandle<bool> diagnostics, SettingHandle<CounterMode> counterMode,
-            SettingHandle<int> scanInterval)
+            SettingHandle<int> scanInterval, SettingHandle<bool> locateEnabled)
         {
             _enabledHandle = enabled;
             _radiusHandle = radius;
             _diagHandle = diagnostics;
             _counterModeHandle = counterMode;
             _scanIntervalHandle = scanInterval;
+            _locateEnabledHandle = locateEnabled;
         }
 
         /// <summary>Master switch (default true). When false the mod is fully inert:
@@ -63,5 +70,9 @@ namespace ItemChecklist
         // Iter-38: possession-scan cadence (seconds), a discrete Choice of int presets. Returns a
         // float so Update reads it straight into the timer; falls back to the default pre-Bind.
         public static float ScanIntervalSeconds => _scanIntervalHandle != null ? _scanIntervalHandle.Value : DefaultScanInterval;
+
+        // Iter-40 (refined): master switch for the "locate item" HUD arrow tracker (default true).
+        // Read live (pre-Bind default true, matching the other "on by default" toggles).
+        public static bool LocateEnabled => _locateEnabledHandle != null ? _locateEnabledHandle.Value : true;
     }
 }

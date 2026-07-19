@@ -160,7 +160,8 @@ namespace ItemChecklist
         // (-> "you are carrying it"), owned==0 has nothing to locate. Reuses the Iter-21
         // spoiler chokepoint (OwnedCount), so an undiscovered ??? row is never trackable.
         internal static bool IsTrackable(int objectId, int variation)
-            => OwnedCount(objectId, variation) >= 1
+            => ModConfig.LocateEnabled
+               && OwnedCount(objectId, variation) >= 1
                && s_ledger != null
                && s_ledger.CountTilesHolding(objectId) > 0;
 
@@ -274,7 +275,7 @@ namespace ItemChecklist
             // Register the mod settings; ModConfig reads these live handles (replaces the former
             // CoreLib API.Config surface). Section uses the default AsDeclared sort, so builder-call
             // order IS render order: counter mode (Iter-36) first, then base radius, then scan
-            // interval (Iter-38), then diagnostics.
+            // interval (Iter-38), then the locate-items toggle (Iter-40), then diagnostics.
             ModSettings.Section(this)
                 .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging.")
                 .Toggle(out var enabled, "enabled", true)
@@ -284,9 +285,15 @@ namespace ItemChecklist
                 .Slider(out var radius, "anchorRadius", 16f, 96f, 48f, 8f, SliderDisplay.Number)
                 .Choice(out var scanInterval, "scanInterval",
                     new[] { 1, 2, 3, 5, 8, 10, 15, 20, 25, 30 }, 3)
+                .Toggle(out var locateEnabled, "locateEnabled", true)
                 .Toggle(out var diag, "diagnostics", false)
                 .Build();
-            ModConfig.Bind(enabled, radius, diag, counterMode, scanInterval);
+            ModConfig.Bind(enabled, radius, diag, counterMode, scanInterval, locateEnabled);
+
+            // Iter-40 (refined): turning the locate feature off clears any active tracking and
+            // hides the tracker HUD immediately — mirrors the master-switch Update() early-out
+            // pattern, but as an immediate menu-toggle reaction instead of waiting for the next tick.
+            locateEnabled.OnChanged += v => { if (!v) { ItemTracker.Clear(); ItemChecklist.UI.TrackerHud.Instance?.Hide(); } };
 
             // Iter-36: re-render both counter surfaces immediately when the mode is toggled
             // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Iter-37: the HUD goes

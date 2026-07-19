@@ -133,6 +133,10 @@ ItemChecklist-Config:
     hint: "Choice label - seconds between possession scans (update freshness vs. per-scan overhead); the unit is conveyed by the per-option 'Ns' values."
     en: "Scan interval"
     de: "Scan-Intervall"
+  locateEnabled:
+    hint: "Toggle label - show HUD arrows to where a tracked item is stored."
+    en: "Locate items"
+    de: "Items orten"
   diagnostics:
     hint: "Toggle label - possession-scan diagnostic logging to Player.log."
     en: "Diagnostic logging"
