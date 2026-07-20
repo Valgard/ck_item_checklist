@@ -5,12 +5,14 @@ using UnityEngine;
 
 namespace ItemChecklist
 {
-    // THROWAWAY Iter-26 passive focus-race logger — remove before the fix commit.
+    // Iter-26 passive focus-race diagnostic — a KEPT, default-OFF tool gated on
+    // ModConfig.Diagnostics (folded into the Iter-30 diagnostic-log surface). Remove
+    // once the focus-race fix lands and the tool is no longer needed.
     //
-    // The bug is intermittent (timing race, 0 exceptions). This logs to Player.log
-    // ONLY on the bug edge: SearchBar caret ON while Manager.input.activeInputField
-    // is NOT the SearchBar (keystrokes routed nowhere → typing dead). On the edge it
-    // dumps a ring buffer of the recent input-routing events so the culprit is visible.
+    // The bug is intermittent (timing race, 0 exceptions). When Diagnostics is on it
+    // logs to Player.log ONLY on the bug edge: SearchBar caret ON while
+    // Manager.input.activeInputField is NOT the SearchBar (keystrokes routed nowhere →
+    // typing dead). On the edge it dumps a ring buffer of recent input-routing events.
     //
     // IMPORTANT (learned the hard way): Harmony can only patch trusted GAME-DLL types
     // (Pug.Other: InputManager, TextInputField…), NOT the mod's own Roslyn-compiled
