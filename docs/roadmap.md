@@ -468,19 +468,25 @@ remaining backlog.
   unchanged; the 6006 dishes moved to Craftable (**7300** craftable / **816** not craftable,
   7300+816 = 8116), the residual 816 being exactly creatures + gathered/looted items. Pure
   behavioural C# (one line + comment); no prefab/art/loc touch. Requested + done 2026-07-13.
-- **Iter-40 (tentative) -- locate an owned item in the base.** For a discovered/owned item,
-  surface WHERE it is stored -- the world tile(s) / container(s) holding it -- so the player can
-  walk to it instead of hunting through chests. The data already exists: the Iter-20 possession
-  ledger records per-`(x,z)`-tile container contents (`x,z|id:count`, persisted per character),
-  so this is a **UI / surfacing** iteration, not new tracking. Motivated by having to manually
-  grep the ledger to find the Caveling Divining Rod at tile `(28,1)` (2026-07-14). Open design
-  questions for the brainstorm when picked up: how to present the location (CK shows the player no
-  absolute coordinates by default -- relative-to-Core? a compass / HUD ping / marker toward the
-  nearest holding container? a map pin?); nearest container vs. all holding tiles; carried vs.
-  stored (carried needs no locating); spoiler-gate to discovered/owned rows (reuse the Iter-21
-  `OwnedCount` chokepoint); and the "remembered from afar" case (the ledger keeps out-of-range
-  tiles, so a shown location can be stale until revisited). Likely a row action / hover line
-  rather than a new window.
+- **Iter-40 -- locate an owned item in the base. DONE** (see `docs/iteration-history.md`).
+  A UI/surfacing feature (not new tracking): for a discovered + owned + stored item, a HUD shows a
+  directional arrow per holding container so the player walks straight to it. Left-click a
+  trackable row toggles tracking; a tooltip affordance line advertises it ("Click to locate (in N
+  chests)" / "stop locating" / "You are carrying it"); the tracked row gets its own
+  `ToggledHighlight` SR; a rebindable cancel hotkey (Iter-34 category, unbound default) stops
+  tracking. Data from the Iter-20 possession ledger via a `PossessionLedger.TilesHolding` /
+  `CountTilesHolding` reverse index; `TrackerHud` copy-adapted from **caveling-divining-rod**'s
+  `ArrowRingRenderer` + a new HUD prefab + a Tracker Arrow sheet sprite. **Key discovery:** CK's
+  game world (XZ) and HUD (uiCamera XY) are separate coordinate spaces with no clean projection —
+  the first `WorldToScreenPoint` attempt made the arrow vanish (diagnosed via runtime `CAMDIAG`);
+  the ring instead sits at world origin + a constant `PlayerHudOffsetY=0.6`, and the fix was
+  back-ported to CDR. Spoiler-gated (Iter-21 `OwnedCount`), carried-only shows "You are carrying
+  it" (no arrow), auto-untrack when the item leaves all chests, no radar-fade (arrows visible at
+  any distance). In-game fixes: `ClearUnboundCancelDefault` strips CoreLib's forced `keyCode=None`
+  map (CK renders it as literal "None") so the Controls row shows blank; the HUD visibility gate
+  uses `WorldState.IsInPlayableWorld` (no arrows over teleport / Save-&-Quit load screens — the
+  Iter-11.6/15 bug class, caught by the whole-branch review). Catalog unchanged (8116). Requested
+  2026-07-14, done 2026-07-20.
 - **Iter-41 -- possession counter `K / M` location-independence. DONE** (see
   `docs/iteration-history.md`). The Iter-36 Possession `K` dropped as the player left base and
   recovered on return. **Root cause measured + code-grounded, overturning the roadmap's own

@@ -1871,3 +1871,74 @@ hybrid subagent-driven execution (subagent code edits + inline in-game verificat
 deep questioning drove the airtight two-condition synthesis and the code-grounded load-radius
 research (session `1fb12129` + a decompile research agent). Pure behavioural C# + one loc-free
 schema bump; no prefab/art/loc touch.
+
+**Iter-40 (locate an owned item — HUD directional tracker) — DONE (2026-07-20, branch
+`iter-40`).** A UI/surfacing feature (not new tracking): for a discovered + owned + stored item,
+a HUD shows a directional arrow per holding container so the player walks straight to it instead
+of hunting through chests. Left-click a trackable row toggles tracking; a tooltip affordance line
+advertises it; the tracked row gets its own highlight; a rebindable cancel hotkey stops tracking.
+The data source is the Iter-20 possession ledger (per-`(x,z)`-tile container contents) — Iter-40
+only adds a reverse index + a HUD. Design spec (ADR-gated → discarded post-merge):
+`docs/specs/2026-07-18-iter-40-locate-owned-item-design.md`.
+
+**Architecture (five parts).** (A) `PossessionLedger.TilesHolding(objectId)` /
+`CountTilesHolding` — a reverse index over the ledger's `_containers` dict (keyed by packed
+`long` tile, sign-correct for negative coords). (B) session-only `ItemTracker` state in
+`ItemChecklistMod` (`Toggle`/`Matches`/`Clear`/`IsActive`, cleared on any character/world switch).
+(C) `TrackerHud` — copy-adapted from the sibling **caveling-divining-rod**'s `ArrowRingRenderer`
+— plus a new `ItemChecklistTracker` HUD prefab and a Tracker Arrow sprite in the `ui_checklist`
+sheet (Editor-authored). (D) `ItemRow.OnLeftClicked` trigger + `LocateHintLine()` tooltip
+affordance + a `ToggledHighlight` SpriteRenderer + the Iter-34-category cancel hotkey. (E) edge
+cases — Iter-21 spoiler-gate (trackability routes through `OwnedCount`), carried-only ("You are
+carrying it", no arrow), self-correction + auto-untrack (the live `TrackedItemTiles()` drives the
+arrows each frame, so an item taken from all its chests auto-untracks), and **no radar-fade / no
+arrive-hide** (per in-game feedback the arrows stay full-visibility at any distance).
+
+**The hard-won discovery — CK has two separate coordinate spaces, no clean projection.** The
+first attempt centred the arrow ring on the player via camera projection (`WorldToScreenPoint` →
+`ScreenToWorldPoint`), and the arrow **vanished**. Runtime `CAMDIAG` logging (the ground-truth
+approach, not more static reasoning) revealed why: CK runs only two orthographic cameras — a Game
+Camera (XZ world) and a UI Camera (HUD XY) — and the UI camera maps the player's world-Y (≈0) to
+a constant viewport, so it **cannot see the game-world position**; the projection produced
+ring-centre ≈ the player's ~27-unit world position → off-screen. The fix dissolves the projection
+entirely: `hudRoot` sits at world origin, which the UI camera renders at ~screen-centre, and the
+game camera renders the player at ~screen-centre too — so the ring already sits on the player. The
+only residual (CK's fixed camera look-offset renders the player slightly above centre) is absorbed
+by a **constant** `PlayerHudOffsetY = 0.6` (uiCamera world units; both cameras size 8.44 → 1:1
+tile mapping). The same constant works for ICL and CDR (same camera), so **the fix was back-ported
+to caveling-divining-rod** in the same session.
+
+**Tracked-row highlight — a second SR, not a tint.** Settled with the user through several pivots
+to: a dedicated `ToggledHighlight` SpriteRenderer mirroring the Iter-22 `HoverHighlight` (own
+Editor-authored GO, explicit sprite — no fallback to the selected sprite), driven per-frame in
+`LateUpdate` via `ItemTracker.Matches`. Its sprite is a new **10×10 "ItemRow Entry Toggled"** in
+the sheet (4px L-corner brackets, 9-slice border `4,4,4,4`; the old 8×8 "Entry Toggled" kept
+untouched). Selected and Toggled are allowed to **overlap** on a tracked+hovered row, Selected
+above Toggled (sort orders 53 > 52). `utils/pixaki_to_sheet.py` gained RENAME + BORDER_OVERRIDE
+entries so the repacked sheet stays reproducible (core_keeper commit `6260fa2`).
+
+**Two in-game-caught fixes.** (1) The cancel hotkey showed the literal **"None"** in Controls
+instead of a blank field: CoreLib's `AddKeyboardBind` *always* creates an `ActionElementMap`, even
+for `defaultKeyCode: None`, and CK renders that map's `elementIdentifierName` ("None") — a truly
+unbound action has *no* map and renders blank (verified against `Pug.ControlMapping`: the menu
+setup loop only renders a slot when a map exists; `SingleActionMapping.Setup` renders
+`elementIdentifierName`). Fix: `ClearUnboundCancelDefault()` deletes the forced keyboard
+`None`-map from the player's live maps at each `rewiredStart`, guarded on
+`controllerType == Keyboard && keyCode == KeyCode.None` (a compile error caught that
+`ActionElementMap.keyCode` is `UnityEngine.KeyCode`, not Rewired's `KeyboardKeyCode`), so a real
+rebinding is never removed; idempotent since CoreLib re-seeds the default each launch. (2)
+Whole-branch review finding: the `TrackerHud` visibility gate used `isInGame && player != null`
+(the Iter-11.6/15 bug class — the player exists at `OnOccupied` while the load screen is up), so
+arrows could flash over a teleport / Save-&-Quit fade; swapped to `WorldState.IsInPlayableWorld`,
+matching the sibling `ItemChecklistHud`.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997):** `safetyCheck=True`, 0 `CompileFailed`/NRE,
+`ItemCatalog baked: 8116` unchanged (behaviour-only). The user confirmed all behaviours — arrows
+to each holding chest with distance scaling, the tooltip affordance (locate / stop / carried /
+no-line-on-`???`, umlaut "trägst" clean), the tracked-row highlight + Selected/Toggled overlap,
+the cancel hotkey clearing the arrows, and the Controls row now blank. **Known limit (spec-noted):**
+trackability keys on `(objectId, variation)` but the tile lookup / arrows / auto-untrack key on
+objectId only, so for a colour/skin variant the "in N chests" count can include tiles holding a
+sibling variation. **Process:** brainstorm → spec → plan → hybrid execution (subagent-friendly
+code edits + inline in-game calibration, which the camera / highlight / "None" loops all needed);
+one whole-branch review (1 Important finding, fixed). Pure behavioural C# + one sheet/loc touch.
