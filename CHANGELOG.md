@@ -5,6 +5,25 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.0] - 2026-07-20
+
+Adds a way to find **where an item is stored** in your base.
+
+### Added
+
+- **Locate an owned item.** Left-click any item row in the F1 checklist to track
+  it: a HUD arrow then points to each container in your base that holds it, so you
+  can walk straight to it instead of opening every chest. Left-click the row again
+  to stop. The row's tooltip shows the action ("Click to locate (in N chests)"),
+  and an item you are only carrying says so instead of pointing anywhere.
+- **A rebindable "stop locating" hotkey** under Options → Controls → Item Checklist
+  (unbound by default — assign any key) clears tracking without reopening the
+  checklist.
+
+The arrows stay visible at any distance and disappear on their own once the item
+is gone from all its containers. Only discovered items you actually own can be
+located.
+
 ## [1.2.1] - 2026-07-17
 
 Fixes the **Owned** counter drifting as you move away from your base.
