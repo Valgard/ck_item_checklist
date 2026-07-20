@@ -218,11 +218,34 @@ namespace ItemChecklist.UI
             return _tooltip.TitleFor();
         }
 
+        // Iter-40: the locate affordance line for the tooltip, or null if not applicable.
+        // Discovered + owned in a stored container -> "Click to locate (in N chests)" (or
+        // "Click to stop locating" when it is the tracked row); owned only carried ->
+        // "You are carrying it"; ??? or unowned -> null (no line, spoiler-safe). Our own
+        // dontLocalize term (CK's tooltip localiser doesn't see mod terms — Iter-35).
+        private TextAndFormatFields LocateHintLine()
+        {
+            if (!_nameKnown) return null;                                                 // ??? row: no hint
+            if (ItemChecklistMod.OwnedCount(_objectId, _entryVariation) < 1) return null; // nothing to locate
+            if (ItemChecklistMod.IsTrackable(_objectId, _entryVariation))
+            {
+                if (ItemTracker.Matches(_objectId, _entryVariation))
+                    return new TextAndFormatFields
+                    { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateStop"), dontLocalize = true };
+                int n = ItemChecklistMod.CountTilesHolding(_objectId);
+                return new TextAndFormatFields
+                { text = ItemChecklist.Loc.F("ItemChecklist-General/LocateHint", n), dontLocalize = true };
+            }
+            // owned but not in any stored container -> carried only
+            return new TextAndFormatFields
+            { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateCarried"), dontLocalize = true };
+        }
+
         public override List<TextAndFormatFields> GetHoverDescription()
         {
             if (!ItemChecklistContent.PointerInViewport()) return null;
             // Undiscovered: a small hint line under the placeholder title (still no real
-            // item info). Resolved via our term, passed dontLocalize.
+            // item info). Resolved via our term, passed dontLocalize. No locate hint (spoiler).
             if (!_nameKnown)
                 return new List<TextAndFormatFields>
                 {
@@ -232,12 +255,24 @@ namespace ItemChecklist.UI
                         dontLocalize = true,
                     },
                 };
-            // Iter-35: no CK-resolvable description for a term-less foreign item (it would be
-            // "missing: Items/Mod:NameDesc") — show none, keeping the tooltip to just our name.
-            if (_nameIsFallback) return null;
-            if (_tooltip == null) return null;
-            _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
-            return _tooltip.DescriptionFor();
+            // Base description: none for a term-less foreign item (Iter-35, no "missing:");
+            // otherwise CK's own description. Copy into a fresh list before appending so we
+            // never mutate a shared/cached CK list.
+            List<TextAndFormatFields> lines;
+            if (_nameIsFallback) lines = new List<TextAndFormatFields>();
+            else if (_tooltip == null) lines = new List<TextAndFormatFields>();
+            else
+            {
+                _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
+                var baseLines = _tooltip.DescriptionFor();
+                lines = baseLines != null
+                    ? new List<TextAndFormatFields>(baseLines)
+                    : new List<TextAndFormatFields>();
+            }
+            // Iter-40: append the locate affordance line.
+            var hint = LocateHintLine();
+            if (hint != null) lines.Add(hint);
+            return lines.Count > 0 ? lines : null;
         }
 
         public override List<TextAndFormatFields> GetHoverStats(bool previewReinforced)

@@ -32,6 +32,18 @@ ItemChecklist-General:
     hint: "Hover tooltip description line for an undiscovered (???) row. ASCII only."
     en: "Discover this item to reveal its details."
     de: "Entdecke dieses Item, um seine Details zu sehen."
+  LocateHint:
+    hint: "Tooltip line on a trackable owned row. {0} = number of chests. ASCII only."
+    en: "Click to locate (in {0} chests)"
+    de: "Klicken zum Orten (in {0} Kisten)"
+  LocateStop:
+    hint: "Tooltip line on the currently-tracked row. ASCII only."
+    en: "Click to stop locating"
+    de: "Klicken zum Beenden"
+  LocateCarried:
+    hint: "Tooltip line when the item is owned only in the carried inventory (no stored tile)."
+    en: "You are carrying it"
+    de: "Du trägst es bei dir"
 ItemChecklist-Sorters:
   Name:   { en: "Name",   de: "Name" }
   Rarity: { en: "Rarity", de: "Seltenheit" }
