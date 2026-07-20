@@ -22,6 +22,9 @@ Press **F1** to open it. Discovery and possession are tracked per world × per p
   get a row per colour, labelled with the real colour name.
 
 ## Everything you'd expect
+- **Locate an owned item** — left-click any row to track it and a HUD arrow points
+  to every container in your base that holds it, so you walk straight to it instead
+  of opening every chest. A rebindable *stop locating* hotkey clears it.
 - **Live HUD counter** — `N / M (p.p%)` discovered, top-right, updating as you play.
 - **Row-hover tooltips** — Core Keeper's native item tooltip on hover (spoiler-safe
   on undiscovered rows).
