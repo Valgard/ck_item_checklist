@@ -35,6 +35,7 @@ namespace ItemChecklist
 
         internal static void Dump(string header)
         {
+            if (!ModConfig.Diagnostics) return;   // fold into the existing diagnostic-log gate (Iter-30) — logs only when Diagnostics is on
             Debug.Log($"[ICL-DIAG26] ===== {header} =====");
             foreach (var e in s_events)
                 Debug.Log($"[ICL-DIAG26]   {e}");
@@ -48,6 +49,7 @@ namespace ItemChecklist
         // Silent unless an EDGE occurs: caret ON but activeInputField != SearchBar.
         internal static void DetectFrame(SearchBar sb)
         {
+            if (!ModConfig.Diagnostics) return;   // inert unless the Diagnostics toggle is on (Iter-30 gate); Record() stays ungated to keep the ring buffer warm
             bool active = ReferenceEquals(Manager.input.activeInputField, sb);
             bool caret = sb.characterMarkBlinker != null
                 && sb.characterMarkBlinker.gameObject.activeSelf;
