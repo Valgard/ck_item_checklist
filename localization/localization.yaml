@@ -119,6 +119,10 @@ ControlMapper:
     hint: "Section sub-title under the Item Checklist controls header."
     en: "Item Checklist controls"
     de: "Steuerung der Item-Checkliste"
+  ItemChecklist-CancelTrackingPC:
+    hint: "Keybind name shown in the game Controls menu (Iter-40 cancel-tracking)."
+    en: "Item Checklist: Stop locating"
+    de: "Item-Checkliste: Orten beenden"
 
 # Mod Settings Menu section (Options -> Mod Settings). The framework looks up each SETTING label by
 # `<ModId>-Config/<key>` and the section HINT by `<ModId>-Config/_hint`. Slider/Toggle values render

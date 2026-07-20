@@ -211,6 +211,7 @@ namespace ItemChecklist
         private static Player rewiredPlayer;
 
         private const string ToggleActionName = "ItemChecklist-ToggleChecklist";
+        private const string CancelTrackingActionName = "ItemChecklist-CancelTracking";
 
         // Last character name we applied a snapshot for. Reset when
         // Manager.main.player goes back to null (main menu) so the next
@@ -258,6 +259,19 @@ namespace ItemChecklist
                 modifier3: ModifierKey.None,
                 categoryId: controlCategoryId);
 
+            // Iter-40: a second bind under the SAME category — the "stop locating" hotkey.
+            // Unbound by default (KeyboardKeyCode.None) so it can never collide with a CK
+            // default; the player assigns it in Controls > Item Checklist. The F1 + click
+            // path is the always-available fallback. Display name term:
+            // ControlMapper/ItemChecklist-CancelTrackingPC (localization.yaml).
+            ControlMappingModule.AddKeyboardBind(
+                keyBindName: CancelTrackingActionName,
+                defaultKeyCode: KeyboardKeyCode.None,
+                modifier: ModifierKey.None,
+                modifier2: ModifierKey.None,
+                modifier3: ModifierKey.None,
+                categoryId: controlCategoryId);
+
             // Rewired isn't initialized at EarlyInit; subscribe to the
             // rewiredStart hook so we grab the player handle as soon as it
             // exists. Mirrors CoreLib's own CommandModule pattern.
@@ -265,7 +279,40 @@ namespace ItemChecklist
             {
                 rewiredPlayer = ReInput.players.GetPlayer(0);
                 Debug.Log("[ItemChecklist] Rewired player captured");
+                // Iter-40: strip CoreLib's forced keyCode=None default so the cancel
+                // shortcut shows blank (not "None") in Controls; runs each launch.
+                ClearUnboundCancelDefault();
             };
+        }
+
+        // Iter-40: CoreLib's AddKeyboardBind ALWAYS creates an ActionElementMap, even for
+        // defaultKeyCode: None — and CK's control menu renders that map's
+        // elementIdentifierName as the literal "None". A truly unbound action has NO map and
+        // renders blank (Pug.ControlMapping: the setup loop only renders a slot when a map
+        // exists; SingleActionMapping.Setup renders elementIdentifierName). So delete the
+        // forced None-keyCode map from the player's keyboard maps — the cancel action stays
+        // registered + rebindable, just with no default binding (blank in Controls). Guarded
+        // on keyCode == None so a player's real rebinding is never removed; idempotent, run
+        // every rewiredStart because AddKeyboardBind re-seeds the None default each launch.
+        private static void ClearUnboundCancelDefault()
+        {
+            try
+            {
+                if (rewiredPlayer == null) return;
+                var action = ReInput.mapping.GetAction(CancelTrackingActionName);
+                if (action == null) return;
+                var maps = new System.Collections.Generic.List<ActionElementMap>();
+                rewiredPlayer.controllers.maps.GetElementMapsWithAction(action.id, false, maps);
+                foreach (var aem in maps)
+                    if (aem.controllerMap != null
+                        && aem.controllerMap.controllerType == ControllerType.Keyboard
+                        && aem.keyCode == KeyCode.None)  // UnityEngine.KeyCode; the forced-unbound sentinel
+                        aem.controllerMap.DeleteElementMap(aem.id);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[ItemChecklist] ClearUnboundCancelDefault failed: " + ex.Message);
+            }
         }
 
         public void Init()
@@ -414,6 +461,16 @@ namespace ItemChecklist
                 && Manager.ui.chestInventoryUI != null)
             {
                 Object.Instantiate(trackerHudPrefab, Manager.ui.chestInventoryUI.transform.parent);
+            }
+
+            // Iter-40: global cancel-tracking hotkey (unbound by default). Clears the
+            // tracked item from gameplay without reopening the checklist. Harmless when
+            // nothing is tracked; only polled when the Rewired player handle exists.
+            if (ItemTracker.IsActive && rewiredPlayer != null
+                && rewiredPlayer.GetButtonDown(CancelTrackingActionName))
+            {
+                ItemTracker.Clear();
+                ItemChecklist.UI.TrackerHud.Instance?.Hide();
             }
 
             // Iter-40: drive the tracker arrows. TrackedItemTiles is the live truth each
