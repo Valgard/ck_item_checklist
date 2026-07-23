@@ -5,6 +5,18 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.1] - 2026-07-23
+
+Fixes missing text on the locate feature from 1.3.0.
+
+### Fixed
+
+- **The locate tooltips now show proper text.** The "Click to locate", "Click to
+  stop locating" and "You are carrying it" lines on item rows were showing an
+  internal placeholder instead of the translated line; they now read correctly in
+  English and German. The "stop locating" keybind name under Options → Controls →
+  Item Checklist is corrected the same way.
+
 ## [1.3.0] - 2026-07-20
 
 Adds a way to find **where an item is stored** in your base.
