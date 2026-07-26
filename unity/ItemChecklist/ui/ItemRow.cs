@@ -10,26 +10,27 @@ namespace ItemChecklist.UI
         public SpriteRenderer background;
         public SpriteRenderer icon;
         public PugText label;
-        public Sprite unknownIcon;           // Iter-12: sprite shown in the icon slot for undiscovered items
-        public SpriteRenderer checkmark;     // empty checkbox, shown on every row
-        public SpriteRenderer checkFill;     // requirement icon inside the box, discovered only
-        public SpriteRenderer rarityBorder;   // Iter-6: rarity frame, shown for Uncommon+
-        public PugText levelText;    // Iter-10: right-aligned "Lv N" column ("—" if level 0 / undiscovered)
-        public PugText valueText;    // Iter-10: right-aligned sell-value column ("—" if unsellable / undiscovered)
-        public SpriteRenderer coinIcon;   // Iter-10: Ancient Coin glyph beside the value (shown only when a value is shown)
-        public PugText possessionText;    // Iter-20: right-aligned "owned" count column
+        public Sprite unknownIcon; // Iter-12: sprite shown in the icon slot for undiscovered items
+        public SpriteRenderer checkmark; // empty checkbox, shown on every row
+        public SpriteRenderer checkFill; // requirement icon inside the box, discovered only
+        public SpriteRenderer rarityBorder; // Iter-6: rarity frame, shown for Uncommon+
+        public PugText levelText; // Iter-10: right-aligned "Lv N" column ("—" if level 0 / undiscovered)
+        public PugText valueText; // Iter-10: right-aligned sell-value column ("—" if unsellable / undiscovered)
+        public SpriteRenderer coinIcon; // Iter-10: Ancient Coin glyph beside the value (shown only when a value is shown)
+        public PugText possessionText; // Iter-20: right-aligned "owned" count column
 
         public const float RowHeight = 1.5f; // world units (~24px at 16 PPU)
 
         // Iter-22: the row's current identity, captured each Bind so the hover
         // virtuals (called by UIMouse on the selected row) describe THIS item.
         private int _objectId;
-        private int _ckVariation;     // CK object variation (pets → 0, not skinIndex)
-        private int _entryVariation;  // Iter-40: the ENTRY variation (skinIndex/colour), unlike
-                                      // _ckVariation which is 0 for pets — used for the tracked
-                                      // identity + spoiler gate (OwnedCount expects it).
-        private bool _nameKnown;      // tooltip allowed iff the row shows a real name
-        private string _displayName;  // Iter-35: the row's baked display name (fallback tooltip title)
+        private int _ckVariation; // CK object variation (pets → 0, not skinIndex)
+        private int _entryVariation; // Iter-40: the ENTRY variation (skinIndex/colour), unlike
+
+        // _ckVariation which is 0 for pets — used for the tracked
+        // identity + spoiler gate (OwnedCount expects it).
+        private bool _nameKnown; // tooltip allowed iff the row shows a real name
+        private string _displayName; // Iter-35: the row's baked display name (fallback tooltip title)
         private bool _nameIsFallback; // Iter-35: name is a derived fallback → CK's tooltip would show "missing: …"
         private TooltipSlot _tooltip; // shared helper (one per window), injected by Content
 
@@ -80,11 +81,24 @@ namespace ItemChecklist.UI
         // equal "discovered". For pet skins they differ: `nameKnown` = the pet SPECIES
         // is discovered (CK var-0), `showDetails` = THIS skin is collected (mod ledger)
         // — so a known species' uncollected skin shows the name but the unknown icon + —.
-        public void Bind(int objectId, Sprite iconSprite, string name, bool nameKnown,
-            bool showDetails, Color rarityColor, Rarity rarity, int level, int sellValue,
-            int possessionCount, bool isPetSkin, int skinIndex, bool nameIsFallback = false)
+        public void Bind(
+            int objectId,
+            Sprite iconSprite,
+            string name,
+            bool nameKnown,
+            bool showDetails,
+            Color rarityColor,
+            Rarity rarity,
+            int level,
+            int sellValue,
+            int possessionCount,
+            bool isPetSkin,
+            int skinIndex,
+            bool nameIsFallback = false
+        )
         {
-            if (label != null) label.Render(nameKnown ? name : "???");
+            if (label != null)
+                label.Render(nameKnown ? name : "???");
 
             if (icon != null)
             {
@@ -92,15 +106,23 @@ namespace ItemChecklist.UI
                 {
                     // Real icon. Pet skins recolor the base sprite via a gradient map;
                     // everything else is a plain sprite (keyword reset for the pool).
-                    if (isPetSkin) PetSkinIcon.Apply(icon, objectId, skinIndex, iconSprite);
-                    else { PetSkinIcon.Disable(icon); icon.sprite = iconSprite; icon.color = Color.white; }
+                    if (isPetSkin)
+                        PetSkinIcon.Apply(icon, objectId, skinIndex, iconSprite);
+                    else
+                    {
+                        PetSkinIcon.Disable(icon);
+                        icon.sprite = iconSprite;
+                        icon.color = Color.white;
+                    }
                     icon.enabled = icon.sprite != null;
                 }
                 else
                 {
                     // Undiscovered/uncollected: the "unknown object" sprite, rarity-tinted.
                     PetSkinIcon.Disable(icon);
-                    icon.sprite = unknownIcon; icon.enabled = unknownIcon != null; icon.color = rarityColor;
+                    icon.sprite = unknownIcon;
+                    icon.enabled = unknownIcon != null;
+                    icon.color = rarityColor;
                 }
 
                 // NATIVE scale; per-item iconOffset only for a real non-pet icon (pets +
@@ -137,11 +159,12 @@ namespace ItemChecklist.UI
             // tint survive PugText's renderOnStart re-render (first open after a fresh
             // row instantiate), which would otherwise reset glyphs to style.color and
             // leave the tint blank until the next RefreshVisible.
-            if (label != null) label.SetTempColor(rarityColor, keepColorOnStart: true);
+            if (label != null)
+                label.SetTempColor(rarityColor, keepColorOnStart: true);
             if (rarityBorder != null)
             {
                 rarityBorder.color = rarityColor;
-                rarityBorder.enabled = rarity >= Rarity.Uncommon;   // Poor + Common: no border
+                rarityBorder.enabled = rarity >= Rarity.Uncommon; // Poor + Common: no border
             }
 
             // Iter-10: Level + Value columns. Undiscovered = "—"/"—" (no spoiler).
@@ -171,7 +194,7 @@ namespace ItemChecklist.UI
             // variation 0 — the `skinIndex` param is a skin selector, not a CK variation.
             _objectId = objectId;
             _ckVariation = isPetSkin ? 0 : skinIndex;
-            _entryVariation = skinIndex;   // Content passes entry.Variation as skinIndex
+            _entryVariation = skinIndex; // Content passes entry.Variation as skinIndex
             _nameKnown = nameKnown;
             _displayName = name;
             _nameIsFallback = nameIsFallback;
@@ -181,7 +204,8 @@ namespace ItemChecklist.UI
             // four hover overrides instead — ??? rows highlight but show no tooltip
             // (spoiler-safe, since the highlight reveals nothing). The highlight itself
             // is driven per-frame in LateUpdate, not here.
-            if (hoverCollider != null) hoverCollider.enabled = true;
+            if (hoverCollider != null)
+                hoverCollider.enabled = true;
         }
 
         // Iter-22 — native CK tooltip. UIMouse selects this row (collider always on)
@@ -189,31 +213,31 @@ namespace ItemChecklist.UI
         // the highlight still appears (spoiler-safe, it reveals nothing).
         public override ContainedObjectsBuffer GetContainedObject()
         {
-            if (!ItemChecklistContent.PointerInViewport()) return default;
-            if (!_nameKnown || _tooltip == null) return default;
+            if (!ItemChecklistContent.PointerInViewport())
+                return default;
+            if (!_nameKnown || _tooltip == null)
+                return default;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.GetSlotObjectPublic();
         }
 
         public override TextAndFormatFields GetHoverTitle()
         {
-            if (!ItemChecklistContent.PointerInViewport()) return null;
+            if (!ItemChecklistContent.PointerInViewport())
+                return null;
             // Undiscovered: a minimal placeholder title only — no description/stats/icon
             // (those overrides stay gated), so the row hovers + shows "??? - not yet
             // discovered" without leaking the item. Resolve our term ourselves (CK's
             // tooltip localiser doesn't see mod terms) and pass it dontLocalize.
             if (!_nameKnown)
-                return new TextAndFormatFields
-                {
-                    text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscovered"),
-                    dontLocalize = true,
-                };
+                return new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscovered"), dontLocalize = true };
             // Iter-35: foreign-mod items with no I2 term — CK's tooltip localiser renders
             // "missing: Items/Mod:Name". Show our baked (derived) name instead, dontLocalize
             // (matches the row label); description/stats are suppressed below.
             if (_nameIsFallback)
                 return new TextAndFormatFields { text = _displayName, dontLocalize = true };
-            if (_tooltip == null) return null;
+            if (_tooltip == null)
+                return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.TitleFor();
         }
@@ -225,61 +249,60 @@ namespace ItemChecklist.UI
         // dontLocalize term (CK's tooltip localiser doesn't see mod terms — Iter-35).
         private TextAndFormatFields LocateHintLine()
         {
-            if (!_nameKnown) return null;                                                 // ??? row: no hint
-            if (ItemChecklistMod.OwnedCount(_objectId, _entryVariation) < 1) return null; // nothing to locate
+            if (!_nameKnown)
+                return null; // ??? row: no hint
+            if (ItemChecklistMod.OwnedCount(_objectId, _entryVariation) < 1)
+                return null; // nothing to locate
             if (ItemChecklistMod.IsTrackable(_objectId, _entryVariation))
             {
                 if (ItemTracker.Matches(_objectId, _entryVariation))
-                    return new TextAndFormatFields
-                    { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateStop"), dontLocalize = true };
+                    return new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateStop"), dontLocalize = true };
                 int n = ItemChecklistMod.CountTilesHolding(_objectId);
-                return new TextAndFormatFields
-                { text = ItemChecklist.Loc.F("ItemChecklist-General/LocateHint", n), dontLocalize = true };
+                return new TextAndFormatFields { text = ItemChecklist.Loc.F("ItemChecklist-General/LocateHint", n), dontLocalize = true };
             }
             // owned but not in any stored container -> carried only
-            return new TextAndFormatFields
-            { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateCarried"), dontLocalize = true };
+            return new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateCarried"), dontLocalize = true };
         }
 
         public override List<TextAndFormatFields> GetHoverDescription()
         {
-            if (!ItemChecklistContent.PointerInViewport()) return null;
+            if (!ItemChecklistContent.PointerInViewport())
+                return null;
             // Undiscovered: a small hint line under the placeholder title (still no real
             // item info). Resolved via our term, passed dontLocalize. No locate hint (spoiler).
             if (!_nameKnown)
                 return new List<TextAndFormatFields>
                 {
-                    new TextAndFormatFields
-                    {
-                        text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscoveredDesc"),
-                        dontLocalize = true,
-                    },
+                    new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/HoverUndiscoveredDesc"), dontLocalize = true },
                 };
             // Base description: none for a term-less foreign item (Iter-35, no "missing:");
             // otherwise CK's own description. Copy into a fresh list before appending so we
             // never mutate a shared/cached CK list.
             List<TextAndFormatFields> lines;
-            if (_nameIsFallback) lines = new List<TextAndFormatFields>();
-            else if (_tooltip == null) lines = new List<TextAndFormatFields>();
+            if (_nameIsFallback)
+                lines = new List<TextAndFormatFields>();
+            else if (_tooltip == null)
+                lines = new List<TextAndFormatFields>();
             else
             {
                 _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
                 var baseLines = _tooltip.DescriptionFor();
-                lines = baseLines != null
-                    ? new List<TextAndFormatFields>(baseLines)
-                    : new List<TextAndFormatFields>();
+                lines = baseLines != null ? new List<TextAndFormatFields>(baseLines) : new List<TextAndFormatFields>();
             }
             // Iter-40: append the locate affordance line.
             var hint = LocateHintLine();
-            if (hint != null) lines.Add(hint);
+            if (hint != null)
+                lines.Add(hint);
             return lines.Count > 0 ? lines : null;
         }
 
         public override List<TextAndFormatFields> GetHoverStats(bool previewReinforced)
         {
-            if (!ItemChecklistContent.PointerInViewport()) return null;
+            if (!ItemChecklistContent.PointerInViewport())
+                return null;
             // Iter-35: suppress stats for a term-less foreign item (name-only tooltip).
-            if (!_nameKnown || _nameIsFallback || _tooltip == null) return null;
+            if (!_nameKnown || _nameIsFallback || _tooltip == null)
+                return null;
             _tooltip.SetObject((ObjectID)_objectId, _ckVariation);
             return _tooltip.StatsFor();
         }
@@ -292,8 +315,10 @@ namespace ItemChecklist.UI
         public override void OnLeftClicked(bool mod1, bool mod2)
         {
             base.OnLeftClicked(mod1, mod2);
-            if (!ItemChecklistContent.PointerInViewport()) return;
-            if (!ItemChecklistMod.IsTrackable(_objectId, _entryVariation)) return;
+            if (!ItemChecklistContent.PointerInViewport())
+                return;
+            if (!ItemChecklistMod.IsTrackable(_objectId, _entryVariation))
+                return;
             ItemTracker.Toggle(_objectId, _entryVariation);
             // Re-render visible rows so the tracked highlight (Task 4) updates at once.
             GetComponentInParent<ItemChecklistContent>()?.RefreshVisible();
@@ -317,9 +342,9 @@ namespace ItemChecklist.UI
             // sortingOrder 53 > ToggledHighlight 52).
             if (highlight != null)
             {
-                bool hover = Manager.ui.currentSelectedUIElement == this
-                             && ItemChecklistContent.PointerInViewport();
-                if (highlight.gameObject.activeSelf != hover) highlight.gameObject.SetActive(hover);
+                bool hover = Manager.ui.currentSelectedUIElement == this && ItemChecklistContent.PointerInViewport();
+                if (highlight.gameObject.activeSelf != hover)
+                    highlight.gameObject.SetActive(hover);
             }
 
             // Tracked "toggled" marker — persistent, on the tracked row only. Its own SR/sprite

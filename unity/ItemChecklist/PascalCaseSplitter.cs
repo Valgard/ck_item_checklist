@@ -18,7 +18,8 @@ namespace ItemChecklist
     {
         public static string Split(string input)
         {
-            if (string.IsNullOrEmpty(input)) return input;
+            if (string.IsNullOrEmpty(input))
+                return input;
             var sb = new StringBuilder(input.Length + 8);
             for (int i = 0; i < input.Length; i++)
             {
@@ -34,13 +35,17 @@ namespace ItemChecklist
                     bool prevLetter = char.IsLetter(prev);
 
                     bool boundary = false;
-                    if (isUpper && prevLower) boundary = true;                     // (a)
-                    else if (isUpper && prevDigit) boundary = true;                // (b)
-                    else if (isUpper && prevUpper && i + 1 < input.Length
-                             && char.IsLower(input[i + 1])) boundary = true;       // (c)
-                    else if (isDigit && prevLetter) boundary = true;               // (d)
+                    if (isUpper && prevLower)
+                        boundary = true; // (a)
+                    else if (isUpper && prevDigit)
+                        boundary = true; // (b)
+                    else if (isUpper && prevUpper && i + 1 < input.Length && char.IsLower(input[i + 1]))
+                        boundary = true; // (c)
+                    else if (isDigit && prevLetter)
+                        boundary = true; // (d)
 
-                    if (boundary) sb.Append(' ');
+                    if (boundary)
+                        sb.Append(' ');
                 }
                 sb.Append(c);
             }

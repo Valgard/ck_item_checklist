@@ -16,7 +16,8 @@ namespace ItemChecklist
         /// </summary>
         public static string Counter(int discovered, int total)
         {
-            if (total <= 0) return "0 / 0";
+            if (total <= 0)
+                return "0 / 0";
             float percent = 100f * discovered / total;
             return $"{discovered} / {total} ({percent:F1}%)";
         }

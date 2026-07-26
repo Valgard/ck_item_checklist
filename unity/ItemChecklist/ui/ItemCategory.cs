@@ -2,8 +2,19 @@ namespace ItemChecklist.UI
 {
     public enum ItemCategory
     {
-        Weapons, ArmorAccessories, Tools, Food, Placeables,
-        Materials, Valuables, KeyItems, Instruments, Pets, Critters, Cattle, Other
+        Weapons,
+        ArmorAccessories,
+        Tools,
+        Food,
+        Placeables,
+        Materials,
+        Valuables,
+        KeyItems,
+        Instruments,
+        Pets,
+        Critters,
+        Cattle,
+        Other,
     }
 
     public static class ItemCategories
@@ -11,10 +22,19 @@ namespace ItemChecklist.UI
         // Display order = enum order. "Other" is the catch-all fallback.
         public static readonly ItemCategory[] All =
         {
-            ItemCategory.Weapons, ItemCategory.ArmorAccessories, ItemCategory.Tools,
-            ItemCategory.Food, ItemCategory.Placeables, ItemCategory.Materials,
-            ItemCategory.Valuables, ItemCategory.KeyItems, ItemCategory.Instruments,
-            ItemCategory.Pets, ItemCategory.Critters, ItemCategory.Cattle, ItemCategory.Other
+            ItemCategory.Weapons,
+            ItemCategory.ArmorAccessories,
+            ItemCategory.Tools,
+            ItemCategory.Food,
+            ItemCategory.Placeables,
+            ItemCategory.Materials,
+            ItemCategory.Valuables,
+            ItemCategory.KeyItems,
+            ItemCategory.Instruments,
+            ItemCategory.Pets,
+            ItemCategory.Critters,
+            ItemCategory.Cattle,
+            ItemCategory.Other,
         };
 
         // Iter-16.3: cattle are ObjectType.Creature (which falls to the default → Other),
@@ -23,14 +43,15 @@ namespace ItemChecklist.UI
         // even if a future non-cattle Creature is ever admitted to the catalog.
         public static ItemCategory Of(ObjectType t, bool isCattle = false)
         {
-            if (isCattle) return ItemCategory.Cattle;
+            if (isCattle)
+                return ItemCategory.Cattle;
             switch (t)
             {
                 case ObjectType.MeleeWeapon:
                 case ObjectType.RangeWeapon:
                 case ObjectType.SummoningWeapon:
                 case ObjectType.ThrowingWeapon:
-                case ObjectType.BeamWeapon:        // numeric 610 (tool range) but a weapon
+                case ObjectType.BeamWeapon: // numeric 610 (tool range) but a weapon
                     return ItemCategory.Weapons;
 
                 case ObjectType.Helm:
@@ -65,7 +86,7 @@ namespace ItemChecklist.UI
                 case ObjectType.PlaceablePrefab:
                     return ItemCategory.Placeables;
 
-                case ObjectType.NonUsable:               // raw materials (ores/bars/wood)
+                case ObjectType.NonUsable: // raw materials (ores/bars/wood)
                 case ObjectType.UniqueCraftingComponent:
                     return ItemCategory.Materials;
 
@@ -81,7 +102,7 @@ namespace ItemChecklist.UI
                 case ObjectType.Pet:
                     return ItemCategory.Pets;
 
-                case ObjectType.Critter:        // Iter-16.2: net-catchable critters + fireflies
+                case ObjectType.Critter: // Iter-16.2: net-catchable critters + fireflies
                     return ItemCategory.Critters;
 
                 default:

@@ -45,12 +45,12 @@ namespace ItemChecklist
                 var sceneHandler = Manager.sceneHandler;
                 return sceneHandler != null
                     && sceneHandler.isInGame
-                    && sceneHandler.isSceneHandlerReady       // scene fully set up (false during load)
-                    && !sceneHandler.cutsceneIsPlaying        // intro spawn-from-Core cutscene (input-locked) — Iter-15
+                    && sceneHandler.isSceneHandlerReady // scene fully set up (false during load)
+                    && !sceneHandler.cutsceneIsPlaying // intro spawn-from-Core cutscene (input-locked) — Iter-15
                     && Manager.main != null
-                    && Manager.main.player != null            // sanity / NRE guard (NOT a load-screen signal)
+                    && Manager.main.player != null // sanity / NRE guard (NOT a load-screen signal)
                     && Manager.load != null
-                    && !Manager.load.IsLoading();             // no scene load queued/in-flight — covers entry load screen AND exit-to-menu fade
+                    && !Manager.load.IsLoading(); // no scene load queued/in-flight — covers entry load screen AND exit-to-menu fade
             }
         }
     }

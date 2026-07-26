@@ -15,17 +15,17 @@ namespace ItemChecklist.UI
     {
         // Shared serialized chrome (inherited by both consumers; the prefab YAML
         // field names match these, so the Editor wiring resolves unchanged).
-        public SpriteRenderer caret;           // ui_group_expand/collapse glyph
-        public Sprite caretClosed;             // ui_group_expand (collapsed)
-        public Sprite caretOpen;               // ui_group_collapse (expanded)
-        public GameObject popupPanel;          // toggled container holding the rows
-        public Transform rowContainer;         // parent for cloned rows
-        public float rowSpacing = 0.625f;      // compact row spacing (NOT the big list RowHeight); matches the prefab
+        public SpriteRenderer caret; // ui_group_expand/collapse glyph
+        public Sprite caretClosed; // ui_group_expand (collapsed)
+        public Sprite caretOpen; // ui_group_collapse (expanded)
+        public GameObject popupPanel; // toggled container holding the rows
+        public Transform rowContainer; // parent for cloned rows
+        public float rowSpacing = 0.625f; // compact row spacing (NOT the big list RowHeight); matches the prefab
 
-        protected SpriteRenderer _panel;       // cached popup bg, auto-sized to the row count
-        protected float _topY;                 // authored popup top edge (popup.y + size/2), captured once
+        protected SpriteRenderer _panel; // cached popup bg, auto-sized to the row count
+        protected float _topY; // authored popup top edge (popup.y + size/2), captured once
         protected bool _open;
-        private bool _armed;                   // click-outside arming: skip the frame the popup opened
+        private bool _armed; // click-outside arming: skip the frame the popup opened
 
         // --- Iter-24 scroll (manual translate; gated by _scrollActive) ---
         // Dormant until a prefab caps the height: the Dropdown skeleton sets
@@ -33,15 +33,15 @@ namespace ItemChecklist.UI
         // a newly-added serialized float is absent from legacy prefab YAML (Unity
         // deserialises it to 0), so existing popups stay uncapped → today's centred
         // behaviour, build-neutral.
-        public int MaxVisibleRows = 6;                 // cap = MaxVisibleRows * rowSpacing; 0 = no cap. Base default → every variant scrolls past it (Sort can override).
-        public GameObject scrollMask;                  // popup SpriteMask GO; auto-discovered from the inherited skeleton child if unset (no serialized cross-ref)
-        public PopupScrollHandle scrollHandle;         // hand-rolled handle; nullable
-        public float WheelStep = 0.625f;               // one row per wheel notch (= rowSpacing)
+        public int MaxVisibleRows = 6; // cap = MaxVisibleRows * rowSpacing; 0 = no cap. Base default → every variant scrolls past it (Sort can override).
+        public GameObject scrollMask; // popup SpriteMask GO; auto-discovered from the inherited skeleton child if unset (no serialized cross-ref)
+        public PopupScrollHandle scrollHandle; // hand-rolled handle; nullable
+        public float WheelStep = 0.625f; // one row per wheel notch (= rowSpacing)
 
         protected bool _scrollActive;
-        protected float _scrollOffset;   // [0, contentH - viewportH]; 0 = top
-        protected float _contentH;       // last laid-out stack height
-        protected float _viewportH;      // min(contentH, MaxPopupHeight) = mask height when scrolling
+        protected float _scrollOffset; // [0, contentH - viewportH]; 0 = top
+        protected float _contentH; // last laid-out stack height
+        protected float _viewportH; // min(contentH, MaxPopupHeight) = mask height when scrolling
 
         /// <summary>Slot offset of the first laid-out row. Sort reserves row 0 for
         /// the header-shown selected option (=> 1); Filter starts members at row 0
@@ -57,27 +57,34 @@ namespace ItemChecklist.UI
             {
                 _panel = popupPanel.GetComponent<SpriteRenderer>();
                 // capture the authored top edge from the prefab (popup.y + half height)
-                if (_panel != null) _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
+                if (_panel != null)
+                    _topY = popupPanel.transform.localPosition.y + _panel.size.y / 2f;
             }
             // Auto-discover the popup SpriteMask (inherited from the Dropdown skeleton) so no
             // variant needs to serialize a fragile cross-prefab ref — the Iter-13 runtime-wire rule.
             if (scrollMask == null && popupPanel != null)
             {
                 var sm = popupPanel.GetComponentInChildren<SpriteMask>(includeInactive: true);
-                if (sm != null) scrollMask = sm.gameObject;
+                if (sm != null)
+                    scrollMask = sm.gameObject;
             }
             // Same runtime-wire for the scrollbar handle (inherited skeleton child); also bind its owner.
             if (scrollHandle == null && popupPanel != null)
             {
                 var h = popupPanel.GetComponentInChildren<PopupScrollHandle>(includeInactive: true);
-                if (h != null) { scrollHandle = h; h.owner = this; }
+                if (h != null)
+                {
+                    scrollHandle = h;
+                    h.owner = this;
+                }
             }
         }
 
         /// <summary>Handle drag: set the scroll offset from the thumb's normalized track position.</summary>
-        public void SetScrollFromHandle(float fraction01)   // 0 = top … 1 = bottom
+        public void SetScrollFromHandle(float fraction01) // 0 = top … 1 = bottom
         {
-            if (!_scrollActive) return;
+            if (!_scrollActive)
+                return;
             _scrollOffset = Mathf.Clamp01(fraction01) * (_contentH - _viewportH);
             ApplyScroll();
         }
@@ -87,7 +94,8 @@ namespace ItemChecklist.UI
         public float CursorFractionInTrack(Transform track, float trackLength)
         {
             var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
-            if (cam == null || trackLength <= 0f || track == null) return 0f;
+            if (cam == null || trackLength <= 0f || track == null)
+                return 0f;
             Vector3 local = track.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
             return Mathf.Clamp01((trackLength * 0.5f - local.y) / trackLength);
         }
@@ -99,9 +107,10 @@ namespace ItemChecklist.UI
         /// subclass laid out this rebuild.</summary>
         protected void AutoSizePopup(int rowCount)
         {
-            if (rowCount <= 0) return;
+            if (rowCount <= 0)
+                return;
             _contentH = rowCount * rowSpacing;
-            float cap = MaxVisibleRows > 0 ? MaxVisibleRows * rowSpacing : 0f;   // 0 = no cap
+            float cap = MaxVisibleRows > 0 ? MaxVisibleRows * rowSpacing : 0f; // 0 = no cap
             bool capped = cap > 0f;
             _viewportH = capped ? Mathf.Min(_contentH, cap) : _contentH;
             _scrollActive = capped && _contentH > cap + 1e-4f;
@@ -109,7 +118,10 @@ namespace ItemChecklist.UI
             // Panel: top-aligned to the authored top edge, grows downward, bounded by the cap.
             if (popupPanel != null)
                 popupPanel.transform.localPosition = new Vector3(
-                    popupPanel.transform.localPosition.x, _topY - _viewportH / 2f, popupPanel.transform.localPosition.z);
+                    popupPanel.transform.localPosition.x,
+                    _topY - _viewportH / 2f,
+                    popupPanel.transform.localPosition.z
+                );
             if (_panel != null)
                 _panel.size = new Vector2(_panel.size.x, _viewportH);
 
@@ -130,16 +142,16 @@ namespace ItemChecklist.UI
                 {
                     // Top-align row 0 to the mask top, then apply the scroll offset.
                     _scrollOffset = Mathf.Clamp(_scrollOffset, 0f, _contentH - _viewportH);
-                    rowContainer.localPosition = new Vector3(
-                        rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
+                    rowContainer.localPosition = new Vector3(rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
                 }
                 else
                 {
                     _scrollOffset = 0f;
                     rowContainer.localPosition = new Vector3(
                         rowContainer.localPosition.x,
-                        (FirstRowOffset + (rowCount - 1) / 2f) * rowSpacing,   // unchanged centring
-                        rowContainer.localPosition.z);
+                        (FirstRowOffset + (rowCount - 1) / 2f) * rowSpacing, // unchanged centring
+                        rowContainer.localPosition.z
+                    );
                 }
             }
 
@@ -148,12 +160,14 @@ namespace ItemChecklist.UI
             // exceeds it and shows everything when it fits — so a short popup never hits the
             // VisibleInsideMask-with-no-active-mask invisibility (docs/gotchas § SpriteMask).
             // Only the scrollbar/handle is gated on actual overflow (D7).
-            if (scrollMask != null && !scrollMask.activeSelf) scrollMask.SetActive(true);
+            if (scrollMask != null && !scrollMask.activeSelf)
+                scrollMask.SetActive(true);
             if (scrollHandle != null)
             {
-                scrollHandle.SetTrackLength(_viewportH);   // track span = visible window (the cap when scrolling), never the baked 6-row constant
+                scrollHandle.SetTrackLength(_viewportH); // track span = visible window (the cap when scrolling), never the baked 6-row constant
                 scrollHandle.SetActiveScrolling(_scrollActive);
-                if (_scrollActive) scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
+                if (_scrollActive)
+                    scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
             }
         }
 
@@ -169,16 +183,25 @@ namespace ItemChecklist.UI
         // The most-recently-opened popup, for gap-F: the wheel-suppression Harmony patch on
         // UIScrollWindow asks whether an open popup currently owns the wheel (cursor over it).
         private static PopupWidget _openInstance;
+
         public static bool OpenPopupCapturesWheel() => _openInstance != null && _openInstance._open && _openInstance.PointerOverPanel();
 
         protected void SetOpen(bool open)
         {
             _open = open;
-            if (open) { _scrollOffset = 0f; _openInstance = this; }   // track for gap-F wheel ownership
-            else if (_openInstance == this) _openInstance = null;
-            if (popupPanel != null) popupPanel.SetActive(open);
-            if (caret != null) caret.sprite = open ? caretOpen : caretClosed;
-            if (open) OnPopupOpened();
+            if (open)
+            {
+                _scrollOffset = 0f;
+                _openInstance = this;
+            } // track for gap-F wheel ownership
+            else if (_openInstance == this)
+                _openInstance = null;
+            if (popupPanel != null)
+                popupPanel.SetActive(open);
+            if (caret != null)
+                caret.sprite = open ? caretOpen : caretClosed;
+            if (open)
+                OnPopupOpened();
         }
 
         /// <summary>Runs when the popup opens. Default no-op (Sort). Filter overrides
@@ -194,14 +217,24 @@ namespace ItemChecklist.UI
         // behaviour exactly.
         protected override void LateUpdate()
         {
-            if (!_open) { _armed = false; return; }
-            if (_scrollActive) HandleWheel();
-            if (!_armed) { _armed = true; return; }
+            if (!_open)
+            {
+                _armed = false;
+                return;
+            }
+            if (_scrollActive)
+                HandleWheel();
+            if (!_armed)
+            {
+                _armed = true;
+                return;
+            }
             // Gap-A: close only on a click genuinely OUTSIDE the popup. The old code closed on
             // ANY mouse-down, so an inside click (checkbox, and — from Iter-24 on — a section
             // header or the scrollbar handle) wrongly closed the popup. A bounds check against
             // the panel rect fixes all three.
-            if (Input.GetMouseButtonDown(0) && !PointerOverPanel()) SetOpen(false);
+            if (Input.GetMouseButtonDown(0) && !PointerOverPanel())
+                SetOpen(false);
         }
 
         // Mouse-wheel scroll, but only while the cursor is over THIS popup (gap-F: the main
@@ -209,7 +242,8 @@ namespace ItemChecklist.UI
         private void HandleWheel()
         {
             float d = Input.mouseScrollDelta.y;
-            if (d == 0f || !PointerOverPanel()) return;
+            if (d == 0f || !PointerOverPanel())
+                return;
             _scrollOffset = Mathf.Clamp(_scrollOffset - d * WheelStep, 0f, _contentH - _viewportH);
             ApplyScroll();
         }
@@ -218,9 +252,9 @@ namespace ItemChecklist.UI
         protected void ApplyScroll()
         {
             if (rowContainer != null)
-                rowContainer.localPosition = new Vector3(
-                    rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
-            if (scrollHandle != null) scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
+                rowContainer.localPosition = new Vector3(rowContainer.localPosition.x, RowTopY + _scrollOffset, rowContainer.localPosition.z);
+            if (scrollHandle != null)
+                scrollHandle.Sync(_scrollOffset, _contentH, _viewportH);
         }
 
         /// <summary>True when the UI cursor lies within the popup panel's world rect. The UI
@@ -228,13 +262,14 @@ namespace ItemChecklist.UI
         /// (Manager.camera property access is sandbox-safe by the same precedent as Manager.ui.)</summary>
         protected bool PointerOverPanel()
         {
-            if (_panel == null || popupPanel == null || !popupPanel.activeInHierarchy) return false;
+            if (_panel == null || popupPanel == null || !popupPanel.activeInHierarchy)
+                return false;
             var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
-            if (cam == null) return false;
+            if (cam == null)
+                return false;
             Vector3 c = cam.ScreenToWorldPoint(Input.mousePosition);
             Vector3 p = popupPanel.transform.position;
-            return Mathf.Abs(c.x - p.x) <= _panel.size.x * 0.5f
-                && Mathf.Abs(c.y - p.y) <= _panel.size.y * 0.5f;
+            return Mathf.Abs(c.x - p.x) <= _panel.size.x * 0.5f && Mathf.Abs(c.y - p.y) <= _panel.size.y * 0.5f;
         }
     }
 }

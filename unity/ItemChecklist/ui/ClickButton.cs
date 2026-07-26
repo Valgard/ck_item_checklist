@@ -13,7 +13,8 @@ namespace ItemChecklist.UI
     {
         public sealed override void OnLeftClicked(bool mod1, bool mod2)
         {
-            if (!canBeClicked) return;
+            if (!canBeClicked)
+                return;
             base.OnLeftClicked(mod1, mod2);
             OnClick();
         }

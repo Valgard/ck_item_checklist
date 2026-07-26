@@ -46,10 +46,12 @@ namespace ItemChecklist
         [HarmonyPostfix]
         static void After(CharacterData __instance)
         {
-            if (__instance == null || __instance.discoveredObjects2 == null) return;
+            if (__instance == null || __instance.discoveredObjects2 == null)
+                return;
 
             string guid = __instance.characterGuid;
-            if (string.IsNullOrEmpty(guid)) return;
+            if (string.IsNullOrEmpty(guid))
+                return;
 
             int count = __instance.discoveredObjects2.Count;
             long[] packedKeys;
@@ -63,7 +65,7 @@ namespace ItemChecklist
                 for (int i = 0; i < count; i++)
                 {
                     var record = __instance.discoveredObjects2[i];
-                    packedKeys[i] = DiscoveredState.PackKey((int) record.objectID, record.variation);
+                    packedKeys[i] = DiscoveredState.PackKey((int)record.objectID, record.variation);
                 }
             }
 

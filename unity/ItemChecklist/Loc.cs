@@ -7,6 +7,7 @@ namespace ItemChecklist
     internal static class Loc
     {
         public static string T(string term) => API.Localization.GetLocalizedTerm(term) ?? term;
+
         public static string F(string term, object arg0) => string.Format(T(term), arg0);
     }
 }

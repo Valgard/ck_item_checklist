@@ -17,6 +17,7 @@ namespace ItemChecklist.UI
     public sealed class ItemListViewModel
     {
         private readonly ItemCatalog catalog;
+
         // Iter-16.4: the discovery dimension now reads ItemChecklistMod.IsCollected (the
         // pet-skin-aware chokepoint, symmetric to the OwnedCount call below) instead of an
         // injected DiscoveredState — so no DiscoveredState field is held here anymore.
@@ -29,11 +30,11 @@ namespace ItemChecklist.UI
         // Filter dimensions (Iter-10). OR within a set, AND across sets.
         // Empty set = no constraint. Static: survive reopen + re-bake, reset on
         // process restart (mirrors the sort state).
-        private static readonly HashSet<bool> s_discovery = new HashSet<bool>();      // true=discovered
-        private static readonly HashSet<Rarity> s_rarity  = new HashSet<Rarity>();
+        private static readonly HashSet<bool> s_discovery = new HashSet<bool>(); // true=discovered
+        private static readonly HashSet<Rarity> s_rarity = new HashSet<Rarity>();
         private static readonly HashSet<ItemCategory> s_category = new HashSet<ItemCategory>();
-        private static readonly HashSet<bool> s_craft = new HashSet<bool>();          // true=craftable
-        private static readonly HashSet<bool> s_owned = new HashSet<bool>();          // Iter-20: true=owned (possession ≥1)
+        private static readonly HashSet<bool> s_craft = new HashSet<bool>(); // true=craftable
+        private static readonly HashSet<bool> s_owned = new HashSet<bool>(); // Iter-20: true=owned (possession ≥1)
 
         private string searchText = "";
 
@@ -52,43 +53,70 @@ namespace ItemChecklist.UI
         public SortMode Mode
         {
             get => s_mode;
-            set { if (value != s_mode) { s_mode = value; Recompute(); } }
+            set
+            {
+                if (value != s_mode)
+                {
+                    s_mode = value;
+                    Recompute();
+                }
+            }
         }
 
         public bool Ascending
         {
             get => s_ascending;
-            set { if (value != s_ascending) { s_ascending = value; Recompute(); } }
+            set
+            {
+                if (value != s_ascending)
+                {
+                    s_ascending = value;
+                    Recompute();
+                }
+            }
         }
 
         public void ToggleDirection() => Ascending = !Ascending;
 
         // --- Filter dimensions (Iter-10) ---
         public bool DiscoverySelected(bool discovered) => s_discovery.Contains(discovered);
-        public bool RaritySelected(Rarity r)           => s_rarity.Contains(r);
-        public bool CategorySelected(ItemCategory c)   => s_category.Contains(c);
-        public bool CraftSelected(bool craftable)      => s_craft.Contains(craftable);
-        public bool OwnedSelected(bool owned)          => s_owned.Contains(owned);
+
+        public bool RaritySelected(Rarity r) => s_rarity.Contains(r);
+
+        public bool CategorySelected(ItemCategory c) => s_category.Contains(c);
+
+        public bool CraftSelected(bool craftable) => s_craft.Contains(craftable);
+
+        public bool OwnedSelected(bool owned) => s_owned.Contains(owned);
 
         public void ToggleDiscovery(bool discovered) => Toggle(s_discovery, discovered);
-        public void ToggleRarity(Rarity r)           => Toggle(s_rarity, r);
-        public void ToggleCategory(ItemCategory c)   => Toggle(s_category, c);
-        public void ToggleCraft(bool craftable)      => Toggle(s_craft, craftable);
-        public void ToggleOwned(bool owned)          => Toggle(s_owned, owned);
 
-        public int ActiveFilterCount =>
-            s_discovery.Count + s_rarity.Count + s_category.Count + s_craft.Count + s_owned.Count;
+        public void ToggleRarity(Rarity r) => Toggle(s_rarity, r);
+
+        public void ToggleCategory(ItemCategory c) => Toggle(s_category, c);
+
+        public void ToggleCraft(bool craftable) => Toggle(s_craft, craftable);
+
+        public void ToggleOwned(bool owned) => Toggle(s_owned, owned);
+
+        public int ActiveFilterCount => s_discovery.Count + s_rarity.Count + s_category.Count + s_craft.Count + s_owned.Count;
 
         public void ClearAllFilters()
         {
             bool any = ActiveFilterCount > 0;
-            s_discovery.Clear(); s_rarity.Clear(); s_category.Clear(); s_craft.Clear(); s_owned.Clear();
-            if (any) Recompute();
+            s_discovery.Clear();
+            s_rarity.Clear();
+            s_category.Clear();
+            s_craft.Clear();
+            s_owned.Clear();
+            if (any)
+                Recompute();
         }
 
         private void Toggle<T>(HashSet<T> set, T value)
         {
-            if (!set.Remove(value)) set.Add(value);
+            if (!set.Remove(value))
+                set.Add(value);
             Recompute();
         }
 
@@ -96,7 +124,14 @@ namespace ItemChecklist.UI
         public string SearchText
         {
             get => searchText;
-            set { if (value != searchText) { searchText = value ?? ""; Recompute(); } }
+            set
+            {
+                if (value != searchText)
+                {
+                    searchText = value ?? "";
+                    Recompute();
+                }
+            }
         }
 
         /// <summary>
@@ -126,11 +161,16 @@ namespace ItemChecklist.UI
                 // hiding it from the Discovered filter and under-counting "· N shown".
                 bool isDisc = ItemChecklistMod.IsCollected(e.ObjectId, e.Variation);
 
-                if (s_discovery.Count > 0 && !s_discovery.Contains(isDisc)) continue;
-                if (s_rarity.Count   > 0 && !s_rarity.Contains(e.Rarity))   continue;
-                if (s_category.Count > 0 && !s_category.Contains(ItemCategories.Of(e.ObjectType, e.IsCattle))) continue;
-                if (s_craft.Count    > 0 && !s_craft.Contains(e.IsCraftable)) continue;
-                if (s_owned.Count    > 0 && !s_owned.Contains(ItemChecklistMod.OwnedCount(e.ObjectId, e.Variation) >= 1)) continue;
+                if (s_discovery.Count > 0 && !s_discovery.Contains(isDisc))
+                    continue;
+                if (s_rarity.Count > 0 && !s_rarity.Contains(e.Rarity))
+                    continue;
+                if (s_category.Count > 0 && !s_category.Contains(ItemCategories.Of(e.ObjectType, e.IsCattle)))
+                    continue;
+                if (s_craft.Count > 0 && !s_craft.Contains(e.IsCraftable))
+                    continue;
+                if (s_owned.Count > 0 && !s_owned.Contains(ItemChecklistMod.OwnedCount(e.ObjectId, e.Variation) >= 1))
+                    continue;
                 if (needle.Length > 0)
                 {
                     if (e.DisplayName.ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0)
@@ -138,12 +178,14 @@ namespace ItemChecklist.UI
                 }
 
                 indices.Add(i);
-                if (isDisc) discovered++;
+                if (isDisc)
+                    discovered++;
             }
 
             // 2. Sort by the active mode; reverse for descending.
             indices.Sort(Compare);
-            if (!s_ascending) indices.Reverse();
+            if (!s_ascending)
+                indices.Reverse();
 
             Order = indices.ToArray();
             DiscoveredInView = discovered;
@@ -179,15 +221,16 @@ namespace ItemChecklist.UI
                     c = 0;
                     break;
             }
-            if (c != 0) return c;
+            if (c != 0)
+                return c;
             // Locale-aware: InvariantCulture weights "Ü" as a U-variant (diacritic =
             // secondary weight) so it sorts under U, not after Z (which Ordinal,
             // comparing raw codepoints, would do). Invariant matches the
             // corekeeper-patch-forced UI culture (no de-DE satellite lookup).
             c = string.Compare(a.DisplayName, b.DisplayName, StringComparison.InvariantCultureIgnoreCase);
-            if (c != 0) return c;
-            return ia.CompareTo(ib);   // final tiebreak: total order, stable under Reverse()
+            if (c != 0)
+                return c;
+            return ia.CompareTo(ib); // final tiebreak: total order, stable under Reverse()
         }
-
     }
 }

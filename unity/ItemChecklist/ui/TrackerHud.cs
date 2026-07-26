@@ -16,7 +16,7 @@ namespace ItemChecklist.UI
     /// smaller) — keeping position and scale orthogonal is what makes it read right.</summary>
     public class TrackerHud : UIelement
     {
-        public GameObject hudRoot;   // Editor-wired: the child GO toggled by the visibility gate.
+        public GameObject hudRoot; // Editor-wired: the child GO toggled by the visibility gate.
 
         // Iter-40: the arrow sprite, Editor-wired in the prefab to the ui_checklist
         // "Tracker Arrow" sub-sprite (runtime-pooled SpriteRenderers can't be
@@ -58,11 +58,17 @@ namespace ItemChecklist.UI
             Instance = this;
             _hudLayer = LayerMask.NameToLayer("HUD");
             if (arrowSprite == null)
-                Debug.LogError("[ItemChecklist] TrackerHud.arrowSprite is not wired in the prefab. " +
-                               "Arrows will be blank — assign the ui_checklist 'Tracker Arrow' sub-sprite.");
+                Debug.LogError(
+                    "[ItemChecklist] TrackerHud.arrowSprite is not wired in the prefab. "
+                        + "Arrows will be blank — assign the ui_checklist 'Tracker Arrow' sub-sprite."
+                );
         }
 
-        private void OnDestroy() { if (Instance == this) Instance = null; }
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
+        }
 
         protected override void LateUpdate()
         {
@@ -75,13 +81,14 @@ namespace ItemChecklist.UI
                 // screen is still up and survives the exit transition (Iter-11.6/15), so a raw
                 // player-null check lets the arrows flash over a teleport / Save-&-Quit fade.
                 bool show =
-                    WorldState.IsInPlayableWorld &&
-                    !Manager.ui.isAnyInventoryShowing &&
-                    !Manager.menu.IsAnyMenuActive() &&
-                    ModConfig.Enabled &&
-                    ModConfig.LocateEnabled &&
-                    ItemTracker.IsActive;
-                if (hudRoot.activeSelf != show) hudRoot.SetActive(show);
+                    WorldState.IsInPlayableWorld
+                    && !Manager.ui.isAnyInventoryShowing
+                    && !Manager.menu.IsAnyMenuActive()
+                    && ModConfig.Enabled
+                    && ModConfig.LocateEnabled
+                    && ItemTracker.IsActive;
+                if (hudRoot.activeSelf != show)
+                    hudRoot.SetActive(show);
             }
             base.LateUpdate();
         }
@@ -91,7 +98,8 @@ namespace ItemChecklist.UI
         /// is inactive.</summary>
         public void Render(float3 playerWorldPos, IReadOnlyList<float3> targets)
         {
-            if (hudRoot == null || !hudRoot.activeSelf) return;
+            if (hudRoot == null || !hudRoot.activeSelf)
+                return;
             EnsurePoolSize(targets.Count);
 
             // Iter-40: the ring centres on the player-sprite via a constant offset (see
@@ -106,7 +114,8 @@ namespace ItemChecklist.UI
                 var sr = _arrowPool[i];
                 if (i >= targets.Count)
                 {
-                    if (sr.gameObject.activeSelf) sr.gameObject.SetActive(false);
+                    if (sr.gameObject.activeSelf)
+                        sr.gameObject.SetActive(false);
                     continue;
                 }
                 float3 delta = targets[i] - playerWorldPos;
@@ -114,16 +123,18 @@ namespace ItemChecklist.UI
                 // atan2(delta.z, delta.x) (empirically verified, divining-rod 2026-06-07);
                 // HUD-Y is sin(bearing), not delta.z.
                 float distance = math.length(delta);
-                if (!sr.gameObject.activeSelf) sr.gameObject.SetActive(true);
+                if (!sr.gameObject.activeSelf)
+                    sr.gameObject.SetActive(true);
                 float bearing = math.atan2(delta.z, delta.x);
                 // Iter-40: POSITION = player-centered ring, fixed radius, never touched by scale.
-                sr.transform.localPosition = ringCenter + new Vector3(
-                    math.cos(bearing) * RingRadius, math.sin(bearing) * RingRadius, 0f);
+                sr.transform.localPosition = ringCenter + new Vector3(math.cos(bearing) * RingRadius, math.sin(bearing) * RingRadius, 0f);
                 sr.transform.localRotation = Quaternion.Euler(0, 0, math.degrees(bearing) + ArrowRotationOffsetDeg);
                 // SIZE lerps with distance, INDEPENDENTLY of position (near = 1.0, far = 0.6).
                 float scale = math.lerp(ScaleNear, ScaleFar, math.saturate(distance / ScaleRefDistance));
                 sr.transform.localScale = new Vector3(scale, scale, 1f);
-                Color c = sr.color; c.a = 1f; sr.color = c;   // no radar fade — full opacity
+                Color c = sr.color;
+                c.a = 1f;
+                sr.color = c; // no radar fade — full opacity
             }
         }
 
@@ -131,7 +142,8 @@ namespace ItemChecklist.UI
         public void Hide()
         {
             for (int i = 0; i < _arrowPool.Count; i++)
-                if (_arrowPool[i].gameObject.activeSelf) _arrowPool[i].gameObject.SetActive(false);
+                if (_arrowPool[i].gameObject.activeSelf)
+                    _arrowPool[i].gameObject.SetActive(false);
         }
 
         private void EnsurePoolSize(int needed)
@@ -140,7 +152,7 @@ namespace ItemChecklist.UI
             {
                 var go = new GameObject($"TrackArrow_{_arrowPool.Count}");
                 go.transform.SetParent(hudRoot.transform, false);
-                go.layer = _hudLayer;   // HUD layer (27) — uiCamera draws it during plain gameplay
+                go.layer = _hudLayer; // HUD layer (27) — uiCamera draws it during plain gameplay
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite = arrowSprite;
                 _arrowPool.Add(sr);

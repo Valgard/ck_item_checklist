@@ -5,9 +5,11 @@ namespace ItemChecklist.UI
     {
         public DropdownWidget owner;
         public int index;
+
         protected override void OnClick()
         {
-            if (owner != null) owner.SelectOption(index);
+            if (owner != null)
+                owner.SelectOption(index);
         }
     }
 }

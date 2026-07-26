@@ -13,9 +13,9 @@ namespace ItemChecklist.UI
     public sealed class DropdownWidget : PopupWidget
     {
         // Editor-wired serialized fields (chrome fields inherited from PopupWidget).
-        public PugText selectedLabel;          // header: shows the current option text
-        public DropdownToggleButton toggle;    // open/close button (carries the caret)
-        public GameObject rowTemplate;         // one option-row prefab (inactive)
+        public PugText selectedLabel; // header: shows the current option text
+        public DropdownToggleButton toggle; // open/close button (carries the caret)
+        public GameObject rowTemplate; // one option-row prefab (inactive)
 
         private readonly List<DropdownOptionButton> _rows = new List<DropdownOptionButton>();
         private readonly List<PugText> _rowLabels = new List<PugText>();
@@ -32,7 +32,8 @@ namespace ItemChecklist.UI
             _onSelected = onSelected;
             EnsurePanel();
             _labels = new string[labels.Count];
-            for (int i = 0; i < labels.Count; i++) _labels[i] = labels[i];
+            for (int i = 0; i < labels.Count; i++)
+                _labels[i] = labels[i];
             EnsurePool(Mathf.Max(0, _labels.Length - 1));
             _selected = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, _labels.Length - 1));
             RenderHeader();
@@ -50,7 +51,8 @@ namespace ItemChecklist.UI
 
         private void EnsurePool(int n)
         {
-            if (rowTemplate == null || rowContainer == null) return;
+            if (rowTemplate == null || rowContainer == null)
+                return;
             for (int i = _rows.Count; i < n; i++)
             {
                 var go = UnityEngine.Object.Instantiate(rowTemplate, rowContainer);
@@ -80,18 +82,24 @@ namespace ItemChecklist.UI
             int pos = 0;
             for (int opt = 0; opt < _labels.Length; opt++)
             {
-                if (opt == _selected) continue;          // selected lives in the header
-                if (pos >= _rows.Count) break;
+                if (opt == _selected)
+                    continue; // selected lives in the header
+                if (pos >= _rows.Count)
+                    break;
                 var btn = _rows[pos];
-                btn.index = opt;                          // clicking selects this option
-                if (!btn.gameObject.activeSelf) btn.gameObject.SetActive(true);
+                btn.index = opt; // clicking selects this option
+                if (!btn.gameObject.activeSelf)
+                    btn.gameObject.SetActive(true);
                 btn.transform.localPosition = new Vector3(0f, -((pos + FirstRowOffset) * rowSpacing), 0f);
-                if (_rowLabels[pos] != null) _rowLabels[pos].RenderNoWrap(_labels[opt]);
-                if (_rowSelectedMarks[pos] != null) _rowSelectedMarks[pos].enabled = false;
+                if (_rowLabels[pos] != null)
+                    _rowLabels[pos].RenderNoWrap(_labels[opt]);
+                if (_rowSelectedMarks[pos] != null)
+                    _rowSelectedMarks[pos].enabled = false;
                 pos++;
             }
             for (int i = pos; i < _rows.Count; i++)
-                if (_rows[i].gameObject.activeSelf) _rows[i].gameObject.SetActive(false);
+                if (_rows[i].gameObject.activeSelf)
+                    _rows[i].gameObject.SetActive(false);
 
             AutoSizePopup(pos);
         }
@@ -106,9 +114,8 @@ namespace ItemChecklist.UI
         }
 
         // Template child lookup — child names must match the prefab authoring.
-        private static PugText FindLabel(GameObject row) =>
-            row.transform.Find("Label")?.GetComponent<PugText>();
-        private static SpriteRenderer FindSelectedMark(GameObject row) =>
-            row.transform.Find("SelectedMark")?.GetComponent<SpriteRenderer>();
+        private static PugText FindLabel(GameObject row) => row.transform.Find("Label")?.GetComponent<PugText>();
+
+        private static SpriteRenderer FindSelectedMark(GameObject row) => row.transform.Find("SelectedMark")?.GetComponent<SpriteRenderer>();
     }
 }

@@ -74,9 +74,7 @@ namespace ItemChecklist
             // per-skin live count — CK's DiscoveredState is blind to skins (variation
             // is force-zeroed for pets). For pets, `variation` carries the skinIndex.
             if (Catalog != null && Catalog.IsPetSkinEntry(objectId, variation))
-                return Pets != null && Pets.IsCollected(objectId, variation)
-                    ? Possession.CountSkin(objectId, variation)
-                    : 0;
+                return Pets != null && Pets.IsCollected(objectId, variation) ? Possession.CountSkin(objectId, variation) : 0;
 
             var disc = DiscoveredState.Instance;
             // Iter-17: colour-variant slots get their OWN live owned count (per (id, colour))
@@ -85,15 +83,9 @@ namespace ItemChecklist
             // cattle (live penned/caged, adult-folded) AND placed paintable furniture
             // (the entity carries its paint colour in variation). Non-scannable items
             // (tile floors/walls) have no entry → CountColour returns 0 → "—".
-            if (Catalog != null
-                && (Catalog.IsCattleEntry(objectId, variation)
-                    || Catalog.IsPaintableVariantSlot(objectId, variation)))
-                return disc != null && disc.IsDiscovered(objectId, variation)
-                    ? Possession.CountColour(objectId, variation)
-                    : 0;
-            return disc != null && disc.IsDiscovered(objectId, variation)
-                ? Possession.Count(objectId)
-                : 0;
+            if (Catalog != null && (Catalog.IsCattleEntry(objectId, variation) || Catalog.IsPaintableVariantSlot(objectId, variation)))
+                return disc != null && disc.IsDiscovered(objectId, variation) ? Possession.CountColour(objectId, variation) : 0;
+            return disc != null && disc.IsDiscovered(objectId, variation) ? Possession.Count(objectId) : 0;
         }
 
         // Iter-16.4: the discovery twin of OwnedCount — the single "is this catalog
@@ -111,7 +103,8 @@ namespace ItemChecklist
                 return Pets != null && Pets.IsCollected(objectId, variation);
 
             var disc = DiscoveredState.Instance;
-            if (disc == null) return false;
+            if (disc == null)
+                return false;
             // Iter-17: cattle colour slots route through normal per-(id, colour) discovery
             // (the "collected" tick reflects the SPECIFIC colour caught). The species-name
             // gate (show all 5 slots named once any colour is found) lives in
@@ -128,12 +121,14 @@ namespace ItemChecklist
         internal static int CollectedCatalogCount()
         {
             var cat = Catalog;
-            if (cat == null) return 0;
+            if (cat == null)
+                return 0;
             int n = 0;
             for (int i = 0; i < cat.Count; i++)
             {
                 var e = cat.GetByIndex(i);
-                if (IsCollected(e.ObjectId, e.Variation)) n++;
+                if (IsCollected(e.ObjectId, e.Variation))
+                    n++;
             }
             return n;
         }
@@ -145,12 +140,14 @@ namespace ItemChecklist
         internal static int OwnedCatalogCount()
         {
             var cat = Catalog;
-            if (cat == null) return 0;
+            if (cat == null)
+                return 0;
             int n = 0;
             for (int i = 0; i < cat.Count; i++)
             {
                 var e = cat.GetByIndex(i);
-                if (OwnedCount(e.ObjectId, e.Variation) >= 1) n++;
+                if (OwnedCount(e.ObjectId, e.Variation) >= 1)
+                    n++;
             }
             return n;
         }
@@ -159,23 +156,17 @@ namespace ItemChecklist
         // of it in a STORED container (a locatable tile). Owned-only-carried has no tile
         // (-> "you are carrying it"), owned==0 has nothing to locate. Reuses the Iter-21
         // spoiler chokepoint (OwnedCount), so an undiscovered ??? row is never trackable.
-        internal static bool IsTrackable(int objectId, int variation)
-            => ModConfig.LocateEnabled
-               && OwnedCount(objectId, variation) >= 1
-               && s_ledger != null
-               && s_ledger.CountTilesHolding(objectId) > 0;
+        internal static bool IsTrackable(int objectId, int variation) =>
+            ModConfig.LocateEnabled && OwnedCount(objectId, variation) >= 1 && s_ledger != null && s_ledger.CountTilesHolding(objectId) > 0;
 
         // Iter-40: container-tile count for the tooltip hint ("in N chests"). 0 if no ledger.
-        internal static int CountTilesHolding(int objectId)
-            => s_ledger != null ? s_ledger.CountTilesHolding(objectId) : 0;
+        internal static int CountTilesHolding(int objectId) => s_ledger != null ? s_ledger.CountTilesHolding(objectId) : 0;
 
         // Iter-40: the tracked item's holding tiles as packed (x,z) keys (empty if nothing
         // tracked / no ledger). Read fresh each frame by Update -> TrackerHud (the arrows
         // follow the possession scan, giving free self-correction).
-        internal static System.Collections.Generic.List<long> TrackedItemTiles()
-            => (ItemTracker.IsActive && s_ledger != null)
-                ? s_ledger.TilesHolding(ItemTracker.TrackedId)
-                : new System.Collections.Generic.List<long>();
+        internal static System.Collections.Generic.List<long> TrackedItemTiles() =>
+            (ItemTracker.IsActive && s_ledger != null) ? s_ledger.TilesHolding(ItemTracker.TrackedId) : new System.Collections.Generic.List<long>();
 
         // Iter-40: local player's world position (null on the main menu / world-load
         // screen). Mirrors caveling-divining-rod's TryGetLocalPlayerPosition; WorldPosition
@@ -183,21 +174,20 @@ namespace ItemChecklist
         internal static float3? TryGetPlayerWorldPos()
         {
             var p = Manager.main?.player;
-            if (p == null) return null;
+            if (p == null)
+                return null;
             var v = p.WorldPosition;
             return new float3(v.x, v.y, v.z);
         }
 
         // Iter-36: single numerator source for BOTH counter surfaces (HUD + window footer),
         // selected by ModConfig.Mode. Denominator (total = Catalog.Count) is unchanged per mode.
-        internal static int CurrentCounterNumerator()
-            => ModConfig.Mode == ModConfig.CounterMode.Possession
-                ? OwnedCatalogCount()
-                : CollectedCatalogCount();
+        internal static int CurrentCounterNumerator() => ModConfig.Mode == ModConfig.CounterMode.Possession ? OwnedCatalogCount() : CollectedCatalogCount();
 
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
         private float _possessionTimer;
+
         // Prune grace: chunks stream in asynchronously after a world load/teleport, so
         // the self-heal prune must stay off until the world has been continuously
         // playable for this long (else it deletes not-yet-streamed real storage and
@@ -230,7 +220,8 @@ namespace ItemChecklist
                 AssetBundle = ModInfo.AssetBundles[0];
                 var names = AssetBundle.GetAllAssetNames();
                 Debug.Log($"[ItemChecklist] AssetBundle loaded with {names.Length} assets:");
-                foreach (var n in names) Debug.Log($"[ItemChecklist]   asset: {n}");
+                foreach (var n in names)
+                    Debug.Log($"[ItemChecklist]   asset: {n}");
             }
             else
             {
@@ -257,7 +248,8 @@ namespace ItemChecklist
                 modifier: ModifierKey.None,
                 modifier2: ModifierKey.None,
                 modifier3: ModifierKey.None,
-                categoryId: controlCategoryId);
+                categoryId: controlCategoryId
+            );
 
             // Iter-40: a second bind under the SAME category — the "stop locating" hotkey.
             // Unbound by default (KeyboardKeyCode.None) so it can never collide with a CK
@@ -270,7 +262,8 @@ namespace ItemChecklist
                 modifier: ModifierKey.None,
                 modifier2: ModifierKey.None,
                 modifier3: ModifierKey.None,
-                categoryId: controlCategoryId);
+                categoryId: controlCategoryId
+            );
 
             // Rewired isn't initialized at EarlyInit; subscribe to the
             // rewiredStart hook so we grab the player handle as soon as it
@@ -298,15 +291,15 @@ namespace ItemChecklist
         {
             try
             {
-                if (rewiredPlayer == null) return;
+                if (rewiredPlayer == null)
+                    return;
                 var action = ReInput.mapping.GetAction(CancelTrackingActionName);
-                if (action == null) return;
+                if (action == null)
+                    return;
                 var maps = new System.Collections.Generic.List<ActionElementMap>();
                 rewiredPlayer.controllers.maps.GetElementMapsWithAction(action.id, false, maps);
                 foreach (var aem in maps)
-                    if (aem.controllerMap != null
-                        && aem.controllerMap.controllerType == ControllerType.Keyboard
-                        && aem.keyCode == KeyCode.None)  // UnityEngine.KeyCode; the forced-unbound sentinel
+                    if (aem.controllerMap != null && aem.controllerMap.controllerType == ControllerType.Keyboard && aem.keyCode == KeyCode.None) // UnityEngine.KeyCode; the forced-unbound sentinel
                         aem.controllerMap.DeleteElementMap(aem.id);
             }
             catch (System.Exception ex)
@@ -323,15 +316,20 @@ namespace ItemChecklist
             // CoreLib API.Config surface). Section uses the default AsDeclared sort, so builder-call
             // order IS render order: counter mode (Iter-36) first, then base radius, then scan
             // interval (Iter-38), then the locate-items toggle (Iter-40), then diagnostics.
-            ModSettings.Section(this)
-                .Hint("Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging.")
+            ModSettings
+                .Section(this)
+                .Hint(
+                    "Counter mode (HUD + window footer), plus possession tracking - how far from a workbench storage counts as yours, how often it scans, and optional diagnostic logging."
+                )
                 .Toggle(out var enabled, "enabled", true)
-                .Choice(out var counterMode, "counterMode",
+                .Choice(
+                    out var counterMode,
+                    "counterMode",
                     new[] { ModConfig.CounterMode.Discovery, ModConfig.CounterMode.Possession },
-                    ModConfig.CounterMode.Discovery)
+                    ModConfig.CounterMode.Discovery
+                )
                 .Slider(out var radius, "anchorRadius", 16f, 96f, 48f, 8f, SliderDisplay.Number)
-                .Choice(out var scanInterval, "scanInterval",
-                    new[] { 1, 2, 3, 5, 8, 10, 15, 20, 25, 30 }, 3)
+                .Choice(out var scanInterval, "scanInterval", new[] { 1, 2, 3, 5, 8, 10, 15, 20, 25, 30 }, 3)
                 .Toggle(out var locateEnabled, "locateEnabled", true)
                 .Toggle(out var diag, "diagnostics", false)
                 .Build();
@@ -340,7 +338,14 @@ namespace ItemChecklist
             // Iter-40 (refined): turning the locate feature off clears any active tracking and
             // hides the tracker HUD immediately — mirrors the master-switch Update() early-out
             // pattern, but as an immediate menu-toggle reaction instead of waiting for the next tick.
-            locateEnabled.OnChanged += v => { if (!v) { ItemTracker.Clear(); ItemChecklist.UI.TrackerHud.Instance?.Hide(); } };
+            locateEnabled.OnChanged += v =>
+            {
+                if (!v)
+                {
+                    ItemTracker.Clear();
+                    ItemChecklist.UI.TrackerHud.Instance?.Hide();
+                }
+            };
 
             // Iter-36: re-render both counter surfaces immediately when the mode is toggled
             // in-menu (SettingHandle.OnChanged fires on menu edit / reload). Iter-37: the HUD goes
@@ -388,6 +393,7 @@ namespace ItemChecklist
                     Debug.Log($"[ItemChecklist] Skipping RegisterModUI for building-block prefab '{go.name}'");
             }
         }
+
         public void Shutdown()
         {
             // Backstop autosave on a clean quit (mods unload on "Beenden"), for any
@@ -412,8 +418,7 @@ namespace ItemChecklist
             if (!ModConfig.Enabled)
             {
                 // Fully inert: close the window if open, and skip scan + HUD work.
-                if (ItemChecklist.UI.ItemChecklistWindow.Instance != null
-                    && ItemChecklist.UI.ItemChecklistWindow.Instance.Root.activeSelf)
+                if (ItemChecklist.UI.ItemChecklistWindow.Instance != null && ItemChecklist.UI.ItemChecklistWindow.Instance.Root.activeSelf)
                     Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false);
                 return;
             }
@@ -438,27 +443,21 @@ namespace ItemChecklist
             }
             else
             {
-                _possessionPlayableTime = 0f;   // left the playable world → re-arm grace
+                _possessionPlayableTime = 0f; // left the playable world → re-arm grace
             }
 
             // Instantiate the always-on HUD counter once the UIManager and its
             // HUD hierarchy exist. Parent under chestInventoryUI's parent — the
             // in-game HUD root (where CK's HUD lives and CoreLib mounts modal
             // UIs). The instance's Awake sets ItemChecklistHud.Instance.
-            if (hudPrefab != null
-                && ItemChecklist.UI.ItemChecklistHud.Instance == null
-                && Manager.ui != null
-                && Manager.ui.chestInventoryUI != null)
+            if (hudPrefab != null && ItemChecklist.UI.ItemChecklistHud.Instance == null && Manager.ui != null && Manager.ui.chestInventoryUI != null)
             {
                 Object.Instantiate(hudPrefab, Manager.ui.chestInventoryUI.transform.parent);
             }
 
             // Iter-40: instantiate the tracker HUD once the UIManager hierarchy exists
             // (same lazy pattern as the counter HUD above).
-            if (trackerHudPrefab != null
-                && ItemChecklist.UI.TrackerHud.Instance == null
-                && Manager.ui != null
-                && Manager.ui.chestInventoryUI != null)
+            if (trackerHudPrefab != null && ItemChecklist.UI.TrackerHud.Instance == null && Manager.ui != null && Manager.ui.chestInventoryUI != null)
             {
                 Object.Instantiate(trackerHudPrefab, Manager.ui.chestInventoryUI.transform.parent);
             }
@@ -466,8 +465,7 @@ namespace ItemChecklist
             // Iter-40: global cancel-tracking hotkey (unbound by default). Clears the
             // tracked item from gameplay without reopening the checklist. Harmless when
             // nothing is tracked; only polled when the Rewired player handle exists.
-            if (ItemTracker.IsActive && rewiredPlayer != null
-                && rewiredPlayer.GetButtonDown(CancelTrackingActionName))
+            if (ItemTracker.IsActive && rewiredPlayer != null && rewiredPlayer.GetButtonDown(CancelTrackingActionName))
             {
                 ItemTracker.Clear();
                 ItemChecklist.UI.TrackerHud.Instance?.Hide();
@@ -491,9 +489,9 @@ namespace ItemChecklist
                     {
                         var targets = new System.Collections.Generic.List<float3>(tiles.Count);
                         foreach (var key in tiles)
-                            targets.Add(new float3(
-                                ItemChecklist.Possession.PossessionLedger.KeyX(key), 0f,
-                                ItemChecklist.Possession.PossessionLedger.KeyZ(key)));
+                            targets.Add(
+                                new float3(ItemChecklist.Possession.PossessionLedger.KeyX(key), 0f, ItemChecklist.Possession.PossessionLedger.KeyZ(key))
+                            );
                         ItemChecklist.UI.TrackerHud.Instance.Render(player.Value, targets);
                     }
                 }
@@ -509,8 +507,8 @@ namespace ItemChecklist
             // Independent of the discovery-snapshot cache below (that can miss).
             if (activeGuid != s_ledgerGuid)
             {
-                ItemTracker.Clear();   // Iter-40: tracking is session-only — reset on any character/world switch
-                SavePossessionLedger();   // backstop: persist the outgoing char on switch
+                ItemTracker.Clear(); // Iter-40: tracking is session-only — reset on any character/world switch
+                SavePossessionLedger(); // backstop: persist the outgoing char on switch
                 if (string.IsNullOrEmpty(activeGuid))
                 {
                     s_ledger = null;
@@ -521,7 +519,7 @@ namespace ItemChecklist
                 {
                     s_ledger = PossessionStore.Load(activeGuid);
                     Pets = PetCollectionStore.Load(activeGuid);
-                    _possessionPlayableTime = 0f;   // fresh load → withhold prune until grace
+                    _possessionPlayableTime = 0f; // fresh load → withhold prune until grace
                     Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, false);
                 }
                 s_ledgerGuid = activeGuid;
@@ -531,10 +529,10 @@ namespace ItemChecklist
             // memory so the next char-select pushes a fresh snapshot.
             if (string.IsNullOrEmpty(activeGuid))
             {
-                if (lastAppliedFor != null) lastAppliedFor = null;
+                if (lastAppliedFor != null)
+                    lastAppliedFor = null;
             }
-            else if (activeGuid != lastAppliedFor
-                && CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
+            else if (activeGuid != lastAppliedFor && CharacterDataDiscoverySnapshot.Cache.TryGetValue(activeGuid, out var ids))
             {
                 DiscoveredState.Instance.Snapshot(ids);
                 lastAppliedFor = activeGuid;
@@ -582,11 +580,13 @@ namespace ItemChecklist
                 // inventory/crafting UI. (The intro spawn-from-Core cutscene is
                 // gated inside WorldState.IsInPlayableWorld via cutsceneIsPlaying
                 // — Iter-15.)
-                else if (!WorldState.IsInPlayableWorld
+                else if (
+                    !WorldState.IsInPlayableWorld
                     || Manager.menu.IsAnyMenuActive()
                     || Manager.ui.isPlayerInventoryShowing
                     || Manager.input.textInputIsActive
-                    || ReferenceEquals(Manager.input.activeInputField, Manager.ui.chatWindow))
+                    || ReferenceEquals(Manager.input.activeInputField, Manager.ui.chatWindow)
+                )
                 {
                     Debug.Log("[ItemChecklist] Hotkey ignored (loading screen / other menu/input active)");
                 }
@@ -599,9 +599,7 @@ namespace ItemChecklist
                     // rows a second time and races the search field's focus init (the
                     // field then ignores keystrokes until another widget is clicked).
                     if (s_ledger != null)
-                        Possession = PossessionScanner.Scan(
-                            s_ledger, Pets, ModConfig.AnchorRadius,
-                            _possessionPlayableTime > PossessionPruneGraceSeconds);
+                        Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, _possessionPlayableTime > PossessionPruneGraceSeconds);
                     ListView?.Refresh();
                     UserInterfaceModule.OpenModUI("ItemChecklist:Window");
                 }

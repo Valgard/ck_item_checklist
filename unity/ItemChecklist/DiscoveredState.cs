@@ -40,16 +40,16 @@ namespace ItemChecklist
         /// preserve sign-bit identity since CookedFoodCD encodes via
         /// <c>(primary &lt;&lt; 16) | secondary</c>).
         /// </summary>
-        public static long PackKey(int objectId, int variation) =>
-            ((long)objectId << 32) | (uint)variation;
+        public static long PackKey(int objectId, int variation) => ((long)objectId << 32) | (uint)variation;
 
         // Symmetric unpack of PackKey (Iter-16.1: PetCollection serialises by id+skin).
         public static int KeyObjectId(long key) => (int)(key >> 32);
+
         public static int KeyVariation(long key) => (int)(uint)key;
 
         public int Count => keys.Count;
-        public bool IsDiscovered(int objectId, int variation) =>
-            keys.Contains(PackKey(objectId, variation));
+
+        public bool IsDiscovered(int objectId, int variation) => keys.Contains(PackKey(objectId, variation));
 
         // Iter-17: true iff any (objectId, *) pair is discovered. O(1) — backs the
         // cattle placeholder's collected-test (IsCollected hot path, per-row render).
@@ -61,7 +61,8 @@ namespace ItemChecklist
         {
             var result = new List<int>();
             foreach (var k in keys)
-                if (KeyObjectId(k) == objectId) result.Add(KeyVariation(k));
+                if (KeyObjectId(k) == objectId)
+                    result.Add(KeyVariation(k));
             return result;
         }
 
@@ -72,6 +73,7 @@ namespace ItemChecklist
 
         /// <summary>Raised when a single new (objectId, variation) is added.</summary>
         public event Action<int, int> Discovered;
+
         /// <summary>Raised after any mutation (Snapshot or AddOne).</summary>
         public event Action Changed;
 
@@ -79,9 +81,8 @@ namespace ItemChecklist
         {
             if (keys.Add(PackKey(objectId, variation)))
             {
-                objectIds.Add(objectId);                       // Iter-17
-                UnityEngine.Debug.Log(
-                    $"[ItemChecklist] AddOne: ({objectId}, {variation}) (total {keys.Count})");
+                objectIds.Add(objectId); // Iter-17
+                UnityEngine.Debug.Log($"[ItemChecklist] AddOne: ({objectId}, {variation}) (total {keys.Count})");
                 Discovered?.Invoke(objectId, variation);
                 Changed?.Invoke();
             }
@@ -90,8 +91,12 @@ namespace ItemChecklist
         internal void Snapshot(IEnumerable<long> packedKeys)
         {
             keys.Clear();
-            objectIds.Clear();                                 // Iter-17
-            foreach (var k in packedKeys) { keys.Add(k); objectIds.Add(KeyObjectId(k)); }
+            objectIds.Clear(); // Iter-17
+            foreach (var k in packedKeys)
+            {
+                keys.Add(k);
+                objectIds.Add(KeyObjectId(k));
+            }
             Changed?.Invoke();
         }
     }

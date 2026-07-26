@@ -28,7 +28,8 @@ namespace ItemChecklist
 
         public static void Subscribe()
         {
-            if (subscribed) return;
+            if (subscribed)
+                return;
             LocalizationManager.OnLocalizeEvent += OnLocalize;
             subscribed = true;
         }
@@ -44,7 +45,8 @@ namespace ItemChecklist
 
         private static void OnLocalize()
         {
-            if (ItemChecklistMod.Catalog == null) return;   // menu / pre-world: WorldLoadHook bakes with the right language
+            if (ItemChecklistMod.Catalog == null)
+                return; // menu / pre-world: WorldLoadHook bakes with the right language
             RebakePending = true;
         }
 
@@ -52,24 +54,27 @@ namespace ItemChecklist
         /// re-bake once, in a stable post-localize frame.</summary>
         public static void ProcessPending()
         {
-            if (!RebakePending) return;
-            RebakePending = false;   // consume (avoids a stale flag re-baking later)
-            if (ItemChecklistMod.Catalog == null) return;
+            if (!RebakePending)
+                return;
+            RebakePending = false; // consume (avoids a stale flag re-baking later)
+            if (ItemChecklistMod.Catalog == null)
+                return;
             // Only re-bake while actually in a world. Catalog can be non-null in
             // the main menu (baked in a prior world this session); baking there
             // NREs (no ECS/player). The next world-load bakes in the current
             // language anyway. Same readiness signal as ItemCatalogWorldLoadHook.
-            if (Manager.main == null || Manager.main.player == null) return;
+            if (Manager.main == null || Manager.main.player == null)
+                return;
             try
             {
                 ItemChecklistMod.Catalog.Bake();
                 ItemChecklistMod.ListView = new ItemChecklist.UI.ItemListViewModel(ItemChecklistMod.Catalog);
                 ItemChecklistWindow.Instance?.RebindRows();
-                ItemChecklistHud.Instance?.Refresh();   // re-render counter after a language-change re-bake
+                ItemChecklistHud.Instance?.Refresh(); // re-render counter after a language-change re-bake
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[ItemChecklist] Deferred loc-change rebake threw: {ex}");   // full stack for diagnosis
+                Debug.LogError($"[ItemChecklist] Deferred loc-change rebake threw: {ex}"); // full stack for diagnosis
             }
         }
     }

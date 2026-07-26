@@ -17,15 +17,21 @@ namespace ItemChecklist.Possession
         // hash, not a duplicate of the ~9KB text. FNV-1a/64 (not 32-bit GetHashCode):
         // a hash collision means a needed save is skipped = data loss, and 1/2^64 per
         // save is negligible where 1/2^32 would not be.
-        private static readonly System.Collections.Generic.Dictionary<string, ulong> _lastSavedHash =
-            new System.Collections.Generic.Dictionary<string, ulong>();
+        private static readonly System.Collections.Generic.Dictionary<string, ulong> _lastSavedHash = new System.Collections.Generic.Dictionary<
+            string,
+            ulong
+        >();
 
         private static ulong Fnv1a64(string s)
         {
             unchecked
             {
-                ulong h = 14695981039346656037UL;                                      // FNV-1a 64 offset basis
-                for (int i = 0; i < s.Length; i++) { h ^= s[i]; h *= 1099511628211UL; } // ^ char, * FNV prime (wraps)
+                ulong h = 14695981039346656037UL; // FNV-1a 64 offset basis
+                for (int i = 0; i < s.Length; i++)
+                {
+                    h ^= s[i];
+                    h *= 1099511628211UL;
+                } // ^ char, * FNV prime (wraps)
                 return h;
             }
         }
@@ -34,7 +40,8 @@ namespace ItemChecklist.Possession
 
         public static void Save(string guid, PossessionLedger ledger)
         {
-            if (string.IsNullOrEmpty(guid) || ledger == null) return;
+            if (string.IsNullOrEmpty(guid) || ledger == null)
+                return;
             try
             {
                 bool diag = ModConfig.Diagnostics;
@@ -49,38 +56,54 @@ namespace ItemChecklist.Possession
                 if (_lastSavedHash.TryGetValue(guid, out var prev) && prev == hash)
                 {
                     if (diag)
-                        Debug.Log($"[ItemChecklist] DIAG save SKIPPED unchanged serialize={(t1 - t0) * 1000f:F1}ms " +
-                            $"bytes={text.Length} containers={ledger.Containers.Count}");
+                        Debug.Log(
+                            $"[ItemChecklist] DIAG save SKIPPED unchanged serialize={(t1 - t0) * 1000f:F1}ms "
+                                + $"bytes={text.Length} containers={ledger.Containers.Count}"
+                        );
                     return;
                 }
 
-                if (!API.ConfigFilesystem.DirectoryExists(Dir)) API.ConfigFilesystem.CreateDirectory(Dir);
+                if (!API.ConfigFilesystem.DirectoryExists(Dir))
+                    API.ConfigFilesystem.CreateDirectory(Dir);
                 var bytes = new byte[text.Length];
-                for (int i = 0; i < text.Length; i++) bytes[i] = (byte)text[i];   // ASCII content only
+                for (int i = 0; i < text.Length; i++)
+                    bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
                 _lastSavedHash[guid] = hash;
                 if (diag)
-                    Debug.Log($"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms " +
-                        $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.Containers.Count}");
+                    Debug.Log(
+                        $"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms "
+                            + $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.Containers.Count}"
+                    );
             }
-            catch (System.Exception e) { Debug.LogWarning($"[ItemChecklist] possession save failed: {e.Message}"); }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[ItemChecklist] possession save failed: {e.Message}");
+            }
         }
 
         public static PossessionLedger Load(string guid)
         {
             var ledger = new PossessionLedger();
-            if (string.IsNullOrEmpty(guid)) return ledger;
+            if (string.IsNullOrEmpty(guid))
+                return ledger;
             try
             {
                 string path = PathFor(guid);
-                if (!API.ConfigFilesystem.FileExists(path)) return ledger;
+                if (!API.ConfigFilesystem.FileExists(path))
+                    return ledger;
                 var bytes = API.ConfigFilesystem.Read(path);
-                if (bytes == null) return ledger;
+                if (bytes == null)
+                    return ledger;
                 var chars = new char[bytes.Length];
-                for (int i = 0; i < bytes.Length; i++) chars[i] = (char)bytes[i];
+                for (int i = 0; i < bytes.Length; i++)
+                    chars[i] = (char)bytes[i];
                 ledger.LoadFrom(new string(chars));
             }
-            catch (System.Exception e) { Debug.LogWarning($"[ItemChecklist] possession load failed: {e.Message}"); }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[ItemChecklist] possession load failed: {e.Message}");
+            }
             return ledger;
         }
     }

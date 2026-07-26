@@ -22,10 +22,10 @@ namespace ItemChecklist.UI
     public sealed class FilterWidget : PopupWidget
     {
         // Editor-wired serialized fields (chrome fields inherited from PopupWidget).
-        public PugText headerLabel;            // "Filter" / "Filter (N)"
-        public GameObject checkboxTemplate;    // one FilterCheckboxButton checkbox row (inactive)
-        public GameObject headerTemplate;      // one section-header PugText row (inactive)
-        public GameObject actionTemplate;      // one action row: glyph + label, no checkbox (inactive)
+        public PugText headerLabel; // "Filter" / "Filter (N)"
+        public GameObject checkboxTemplate; // one FilterCheckboxButton checkbox row (inactive)
+        public GameObject headerTemplate; // one section-header PugText row (inactive)
+        public GameObject actionTemplate; // one action row: glyph + label, no checkbox (inactive)
 
         // One row in the flat member table. An empty section marks an action row.
         private struct Member
@@ -39,10 +39,10 @@ namespace ItemChecklist.UI
         private static bool IsAction(Member m) => string.IsNullOrEmpty(m.section);
 
         private readonly List<Member> _members = new List<Member>();
-        private readonly List<FilterCheckboxButton> _rowPool = new List<FilterCheckboxButton>();      // checkbox (filter) rows
-        private readonly List<FilterCheckboxButton> _actionPool = new List<FilterCheckboxButton>();   // action rows
+        private readonly List<FilterCheckboxButton> _rowPool = new List<FilterCheckboxButton>(); // checkbox (filter) rows
+        private readonly List<FilterCheckboxButton> _actionPool = new List<FilterCheckboxButton>(); // action rows
         private readonly List<PugText> _headerPool = new List<PugText>();
-        private Action _onAnyChange;   // refresh header count after a toggle
+        private Action _onAnyChange; // refresh header count after a toggle
         private Action _clearAll;
 
         // Filter starts members at popup row 0 (the header is a count label, not a row).
@@ -54,8 +54,7 @@ namespace ItemChecklist.UI
         // Iter-24 collapse: closed-set keyed on the stable section TERM (Task 5), so it survives
         // a language change. Empty = all sections open (the default). static = session-stable
         // (mirrors the Sort-mode / filter-dimension state), resets on game restart.
-        private static readonly System.Collections.Generic.HashSet<string> _closedSections
-            = new System.Collections.Generic.HashSet<string>();
+        private static readonly System.Collections.Generic.HashSet<string> _closedSections = new System.Collections.Generic.HashSet<string>();
 
         public static bool IsSectionOpen(string term) => !_closedSections.Contains(term);
 
@@ -66,20 +65,29 @@ namespace ItemChecklist.UI
         /// <summary>Toggle a section's collapsed state + re-lay out (members shown/hidden).</summary>
         public void ToggleSection(string term)
         {
-            if (term == null) return;
-            if (!_closedSections.Remove(term)) _closedSections.Add(term);
+            if (term == null)
+                return;
+            if (!_closedSections.Remove(term))
+                _closedSections.Add(term);
             RebuildList();
         }
 
         /// <summary>(Re)build the member table from the model + a label provider,
         /// then lay out the popup. Called from WireControls.</summary>
-        public void Configure(IList<(string section, string label, Func<bool> isOn, Action toggle)> members,
-            Func<int> activeCount, Action clearAll)
+        public void Configure(IList<(string section, string label, Func<bool> isOn, Action toggle)> members, Func<int> activeCount, Action clearAll)
         {
             _members.Clear();
             EnsurePanel();
             foreach (var m in members)
-                _members.Add(new Member { section = m.section, label = m.label, isOn = m.isOn, toggle = m.toggle });
+                _members.Add(
+                    new Member
+                    {
+                        section = m.section,
+                        label = m.label,
+                        isOn = m.isOn,
+                        toggle = m.toggle,
+                    }
+                );
             _onAnyChange = () => RenderHeader(activeCount);
             _clearAll = clearAll;
             EnsurePools();
@@ -96,9 +104,17 @@ namespace ItemChecklist.UI
 
         private void EnsurePools()
         {
-            if (rowContainer == null) return;
-            int normalCount = 0, actionCount = 0;
-            foreach (var m in _members) { if (IsAction(m)) actionCount++; else normalCount++; }
+            if (rowContainer == null)
+                return;
+            int normalCount = 0,
+                actionCount = 0;
+            foreach (var m in _members)
+            {
+                if (IsAction(m))
+                    actionCount++;
+                else
+                    normalCount++;
+            }
 
             GrowButtonPool(_rowPool, checkboxTemplate, normalCount);
             GrowButtonPool(_actionPool, actionTemplate, actionCount);
@@ -115,7 +131,8 @@ namespace ItemChecklist.UI
 
         private void GrowButtonPool(List<FilterCheckboxButton> pool, GameObject template, int target)
         {
-            if (template == null) return;
+            if (template == null)
+                return;
             for (int i = pool.Count; i < target; i++)
             {
                 var go = UnityEngine.Object.Instantiate(template, rowContainer);
@@ -135,13 +152,18 @@ namespace ItemChecklist.UI
         {
             int n = activeCount != null ? activeCount() : 0;
             if (headerLabel != null)
-                headerLabel.RenderNoWrap(n > 0 ? ItemChecklist.Loc.F("ItemChecklist-Filters/HeaderCount", n) : ItemChecklist.Loc.T("ItemChecklist-Filters/Header"));
+                headerLabel.RenderNoWrap(
+                    n > 0 ? ItemChecklist.Loc.F("ItemChecklist-Filters/HeaderCount", n) : ItemChecklist.Loc.T("ItemChecklist-Filters/Header")
+                );
         }
 
         /// <summary>Lay out section headers + checkbox/action rows top-to-bottom.</summary>
         private void RebuildList()
         {
-            int pos = 0, rowIdx = 0, actionIdx = 0, headerIdx = 0;
+            int pos = 0,
+                rowIdx = 0,
+                actionIdx = 0,
+                headerIdx = 0;
             string lastSection = null;
 
             for (int m = 0; m < _members.Count; m++)
@@ -157,56 +179,68 @@ namespace ItemChecklist.UI
                         var ht = _headerPool[headerIdx];
                         var headerGo = ht.transform.parent.gameObject;
                         headerGo.transform.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
-                        if (!headerGo.activeSelf) headerGo.SetActive(true);
-                        ht.RenderNoWrap(ItemChecklist.Loc.T(lastSection));   // colour set on the headerTemplate PugText style in the prefab (gray)
+                        if (!headerGo.activeSelf)
+                            headerGo.SetActive(true);
+                        ht.RenderNoWrap(ItemChecklist.Loc.T(lastSection)); // colour set on the headerTemplate PugText style in the prefab (gray)
                         // Iter-24 collapse: bind the click toggle + reflect the caret state.
                         var hb = headerGo.GetComponent<SectionHeaderButton>();
                         if (hb != null)
                         {
                             hb.Bind(lastSection, this);
-                            if (hb.caret != null) hb.caret.sprite = IsSectionOpen(lastSection) ? caretOpen : caretClosed;
+                            if (hb.caret != null)
+                                hb.caret.sprite = IsSectionOpen(lastSection) ? caretOpen : caretClosed;
                         }
-                        headerIdx++; pos++;
+                        headerIdx++;
+                        pos++;
                     }
                 }
 
                 // Collapsed section: the header is shown, but its member rows are skipped.
-                if (!action && !IsSectionOpen(_members[m].section)) continue;
+                if (!action && !IsSectionOpen(_members[m].section))
+                    continue;
 
                 FilterCheckboxButton btn;
                 if (action)
                 {
-                    if (actionIdx >= _actionPool.Count) continue;
+                    if (actionIdx >= _actionPool.Count)
+                        continue;
                     btn = _actionPool[actionIdx++];
                 }
                 else
                 {
-                    if (rowIdx >= _rowPool.Count) break;
+                    if (rowIdx >= _rowPool.Count)
+                        break;
                     btn = _rowPool[rowIdx++];
                 }
-                if (btn == null) continue;
+                if (btn == null)
+                    continue;
 
-                if (!btn.gameObject.activeSelf) btn.gameObject.SetActive(true);
+                if (!btn.gameObject.activeSelf)
+                    btn.gameObject.SetActive(true);
                 btn.memberId = m;
                 btn.transform.localPosition = new Vector3(0f, -(pos * rowSpacing), 0f);
                 var label = btn.transform.Find("Label")?.GetComponent<PugText>();
                 if (label != null)
                 {
-                    label.RenderNoWrap((action ? "" : "  ") + _members[m].label);   // indent filter members
+                    label.RenderNoWrap((action ? "" : "  ") + _members[m].label); // indent filter members
                 }
-                if (!action) btn.SetChecked(_members[m].isOn());   // action rows carry no checkbox state
+                if (!action)
+                    btn.SetChecked(_members[m].isOn()); // action rows carry no checkbox state
                 pos++;
             }
 
             // Hide unused pooled rows / actions / headers.
             for (int i = rowIdx; i < _rowPool.Count; i++)
-                if (_rowPool[i].gameObject.activeSelf) _rowPool[i].gameObject.SetActive(false);
+                if (_rowPool[i].gameObject.activeSelf)
+                    _rowPool[i].gameObject.SetActive(false);
             for (int i = actionIdx; i < _actionPool.Count; i++)
-                if (_actionPool[i].gameObject.activeSelf) _actionPool[i].gameObject.SetActive(false);
+                if (_actionPool[i].gameObject.activeSelf)
+                    _actionPool[i].gameObject.SetActive(false);
             for (int i = headerIdx; i < _headerPool.Count; i++)
             {
                 var p = _headerPool[i]?.transform.parent;
-                if (p != null && p.gameObject.activeSelf) p.gameObject.SetActive(false);
+                if (p != null && p.gameObject.activeSelf)
+                    p.gameObject.SetActive(false);
             }
 
             AutoSizePopup(pos);
@@ -228,9 +262,10 @@ namespace ItemChecklist.UI
 
         public void OnMemberClicked(int memberId)
         {
-            if (memberId < 0 || memberId >= _members.Count) return;
+            if (memberId < 0 || memberId >= _members.Count)
+                return;
             _members[memberId].toggle();
-            RebuildList();          // re-sync every checkbox visual across both pools
+            RebuildList(); // re-sync every checkbox visual across both pools
             _onAnyChange?.Invoke();
         }
 

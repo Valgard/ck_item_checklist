@@ -12,7 +12,7 @@ namespace ItemChecklist.UI
     /// </summary>
     public sealed class SectionHeaderButton : ClickButton
     {
-        public SpriteRenderer caret;     // expand/collapse glyph (driven by FilterWidget)
+        public SpriteRenderer caret; // expand/collapse glyph (driven by FilterWidget)
 
         private string _term;
         private FilterWidget _owner;
@@ -25,7 +25,8 @@ namespace ItemChecklist.UI
 
         protected override void OnClick()
         {
-            if (_owner != null && _term != null) _owner.ToggleSection(_term);
+            if (_owner != null && _term != null)
+                _owner.ToggleSection(_term);
         }
     }
 }

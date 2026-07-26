@@ -17,8 +17,16 @@ namespace ItemChecklist.Possession
         // lock component exists, so this static set is the signal.
         public static readonly HashSet<int> LockedChestIds = new HashSet<int>
         {
-            181, 182, 183,            // LockedPrince/Queen/KingChest (boss)
-            210, 213, 216, 219, 222, 225, 950  // LockedCopper/Iron/Scarlet/Octarine/Galaxite/Solarite/ReluciteChest
+            181,
+            182,
+            183, // LockedPrince/Queen/KingChest (boss)
+            210,
+            213,
+            216,
+            219,
+            222,
+            225,
+            950, // LockedCopper/Iron/Scarlet/Octarine/Galaxite/Solarite/ReluciteChest
         };
 
         public static bool IsLockedChest(int objectId) => LockedChestIds.Contains(objectId);
@@ -50,22 +58,29 @@ namespace ItemChecklist.Possession
         // Wild nature with NO nature tag → matched explicitly by ObjectID.
         private static readonly HashSet<int> WorldNatureIds = new HashSet<int>
         {
-            5610,  // Stalagmite
-            5614,  // WaterLily
-            5622,  // GraveTree
-            5804,  // TallLandKelp
-            5710,  // CavelingFloorTileDark (natural biome floor)
-            5571,  // RuinsPiece2
-
+            5610, // Stalagmite
+            5614, // WaterLily
+            5622, // GraveTree
+            5804, // TallLandKelp
+            5710, // CavelingFloorTileDark (natural biome floor)
+            5571, // RuinsPiece2
             // Iter-30 diag dump: wild mineable ore/boulder deposits — placed near base
             // anchors but never owned, tag-less so caught only by ID. These were the
             // churn source defeating the autosave-skip (counted as placed objects, added
             // then PruneStaleNear-removed as the player roams). The diag saw Iron(2202)/
             // Gold(2203); the rest of the family is listed for cross-biome coverage.
-            2200, 2201, 2202, 2203, 2204,  // Copper/Tin/Iron/Gold/Scarlet OreBoulder
-            2205, 2206, 2207, 2209, 2218,  // Octarine/Galaxite/Solarite/Pandorium/Relucite OreBoulder
-            5606,  // AmberBoulder
-            5879,  // CrystalMeteorBoulder
+            2200,
+            2201,
+            2202,
+            2203,
+            2204, // Copper/Tin/Iron/Gold/Scarlet OreBoulder
+            2205,
+            2206,
+            2207,
+            2209,
+            2218, // Octarine/Galaxite/Solarite/Pandorium/Relucite OreBoulder
+            5606, // AmberBoulder
+            5879, // CrystalMeteorBoulder
             // NOTE: MeadowTree (15500) is deliberately NOT here. A tree within the base
             // anchor radius is plausibly placed décor (user wants it counted as owned),
             // and the anchor gate already excludes wild trees OUTSIDE the base from path
@@ -75,10 +90,12 @@ namespace ItemChecklist.Possession
 
         public static bool IsWorldNature(int objectId, ObjectInfo info)
         {
-            if (WorldNatureIds.Contains(objectId)) return true;
+            if (WorldNatureIds.Contains(objectId))
+                return true;
             if (info != null && info.tags != null)
                 foreach (var t in info.tags)
-                    if (WorldNatureTagValues.Contains((int)t)) return true;
+                    if (WorldNatureTagValues.Contains((int)t))
+                        return true;
             return false;
         }
 
@@ -91,14 +108,14 @@ namespace ItemChecklist.Possession
         // specialised benches if a real base is ever missed.
         private static readonly HashSet<int> WorkbenchIds = new HashSet<int>
         {
-            4003,  // WoodenWorkBench (the universal first build)
-            4043,  // CopperWorkbench
-            4019,  // TinWorkbench
-            4010,  // IronWorkBench
-            4016,  // ScarletWorkBench
-            4027,  // OctarineWorkbench
-            4033,  // GalaxiteWorkbench
-            4049,  // SolariteWorkbench
+            4003, // WoodenWorkBench (the universal first build)
+            4043, // CopperWorkbench
+            4019, // TinWorkbench
+            4010, // IronWorkBench
+            4016, // ScarletWorkBench
+            4027, // OctarineWorkbench
+            4033, // GalaxiteWorkbench
+            4049, // SolariteWorkbench
         };
 
         public static bool IsWorkbench(int objectId) => WorkbenchIds.Contains(objectId);

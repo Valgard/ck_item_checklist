@@ -29,9 +29,9 @@ namespace ItemChecklist
             {
                 if (__instance.container != null && __instance.container.activeSelf)
                     __instance.container.SetActive(false);
-                return false;          // skip the stock re-assertion this frame
+                return false; // skip the stock re-assertion this frame
             }
-            return true;               // otherwise: stock behaviour untouched
+            return true; // otherwise: stock behaviour untouched
         }
     }
 }

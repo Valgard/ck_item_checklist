@@ -37,18 +37,21 @@ namespace ItemChecklist.UI
         private new void Awake()
         {
             base.Awake();
-            if (pugText != null) pugText.maxWidth = 0f;
+            if (pugText != null)
+                pugText.maxWidth = 0f;
         }
 
         protected override void LateUpdate()
         {
             base.LateUpdate();
-            Iter26FocusProbe.DetectFrame(this);   // THROWAWAY iter-26 focus-race probe — remove with the fix
+            Iter26FocusProbe.DetectFrame(this); // THROWAWAY iter-26 focus-race probe — remove with the fix
             string current = GetInputText() ?? "";
-            if (current == _lastPushed) return;
+            if (current == _lastPushed)
+                return;
             _lastPushed = current;
             var model = ItemChecklistMod.ListView;
-            if (model != null) model.SearchText = current;
+            if (model != null)
+                model.SearchText = current;
         }
 
         /// <summary>
@@ -56,7 +59,11 @@ namespace ItemChecklist.UI
         /// Forwards to the base class's inherited <c>hintText</c> PugText so the
         /// hint re-localises whenever the window re-wires controls.
         /// </summary>
-        public void SetHint(string text) { if (hintText != null) hintText.Render(text); }
+        public void SetHint(string text)
+        {
+            if (hintText != null)
+                hintText.Render(text);
+        }
 
         /// <summary>
         /// Set the field text to <paramref name="text"/> WITHOUT triggering a push

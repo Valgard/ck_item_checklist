@@ -23,8 +23,9 @@ namespace ItemChecklist
         [HarmonyPostfix]
         static void After(ObjectDataCD objectData, bool __result)
         {
-            if (!__result) return;
-            int objectId  = (int) objectData.objectID;
+            if (!__result)
+                return;
+            int objectId = (int)objectData.objectID;
             int variation = objectData.variation;
 
             // Iter-33: a suppressed cooked-food epic phantom should never be discovered

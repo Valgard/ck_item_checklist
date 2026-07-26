@@ -16,12 +16,15 @@ namespace ItemChecklist
             // One line per term. Language identified by readable ISO code.
             // English is mandatory (CoreLib throws without "en") and is the fallback
             // for every not-yet-translated language.
-            LocalizationModule.AddTerm("ItemChecklist/SearchHint", new Dictionary<string, string>
-            {
-                { "en", "Search..." },
-                { "de", "Suchen..." },
-                // MT later: just add more pairs here — { "fr", "..." }, { "pt-br", "..." }, ...
-            });
+            LocalizationModule.AddTerm(
+                "ItemChecklist/SearchHint",
+                new Dictionary<string, string>
+                {
+                    { "en", "Search..." },
+                    { "de", "Suchen..." },
+                    // MT later: just add more pairs here — { "fr", "..." }, { "pt-br", "..." }, ...
+                }
+            );
 
             // ...the other ~29 terms follow, each one block like the above.
         }

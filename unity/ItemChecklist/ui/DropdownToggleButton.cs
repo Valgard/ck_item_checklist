@@ -9,9 +9,11 @@ namespace ItemChecklist.UI
         // lives in a consumer prefab/variant, so a serialized cross-prefab ref is
         // fragile (it broke the header toggle during the chrome extraction).
         public IPopupToggle owner;
+
         protected override void OnClick()
         {
-            if (owner != null) owner.TogglePopup();
+            if (owner != null)
+                owner.TogglePopup();
         }
     }
 }

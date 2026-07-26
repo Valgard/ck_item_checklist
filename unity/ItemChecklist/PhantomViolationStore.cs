@@ -23,13 +23,12 @@ namespace ItemChecklist
     /// </summary>
     internal static class PhantomViolationStore
     {
-        private const string Dir    = "ItemChecklist";
-        private const string Path   = Dir + "/phantom-violations.txt";
+        private const string Dir = "ItemChecklist";
+        private const string Path = Dir + "/phantom-violations.txt";
         private const string Header = "#icl-phantom-violations v1";
 
         private static bool _loaded;
-        private static readonly System.Collections.Generic.HashSet<long> _known =
-            new System.Collections.Generic.HashSet<long>();
+        private static readonly System.Collections.Generic.HashSet<long> _known = new System.Collections.Generic.HashSet<long>();
 
         /// <summary>
         /// Record a violating <c>(objectId, variation)</c> durably. Returns <c>true</c> iff it
@@ -42,27 +41,35 @@ namespace ItemChecklist
             long key = DiscoveredState.PackKey(objectId, variation);
             try
             {
-                if (!_loaded) { LoadKnown(); _loaded = true; }
-                if (!_known.Add(key)) return false;
+                if (!_loaded)
+                {
+                    LoadKnown();
+                    _loaded = true;
+                }
+                if (!_known.Add(key))
+                    return false;
 
-                int primary   = (int) CookedFoodCD.GetPrimaryIngredientFromVariation(variation);
-                int secondary = (int) CookedFoodCD.GetSecondaryIngredientFromVariation(variation);
+                int primary = (int)CookedFoodCD.GetPrimaryIngredientFromVariation(variation);
+                int secondary = (int)CookedFoodCD.GetSecondaryIngredientFromVariation(variation);
                 string line = objectId + "," + variation + "," + primary + "," + secondary + "\n";
 
-                if (!API.ConfigFilesystem.DirectoryExists(Dir)) API.ConfigFilesystem.CreateDirectory(Dir);
+                if (!API.ConfigFilesystem.DirectoryExists(Dir))
+                    API.ConfigFilesystem.CreateDirectory(Dir);
                 string existing = ReadAll();
                 string text = string.IsNullOrEmpty(existing) ? Header + "\n" + line : existing + line;
                 var bytes = new byte[text.Length];
-                for (int i = 0; i < text.Length; i++) bytes[i] = (byte) text[i];   // ASCII content only
+                for (int i = 0; i < text.Length; i++)
+                    bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(Path, bytes);
                 // The one live heads-up (Record dedups cross-session, so it fires once ever per
                 // key). Emitted here — not at the call site — so the real-time hook AND the
                 // world-load sweeps all surface it identically.
                 Debug.LogWarning(
-                    $"[ItemChecklist] Iter-33: a cooked-food epic believed unreachable was " +
-                    $"discovered ({objectId},{variation}) — recorded to " +
-                    $"mods/ItemChecklist/phantom-violations.txt. The reachability model may be " +
-                    $"wrong (CK's tier gate changed, or a non-cooking source now exists).");
+                    $"[ItemChecklist] Iter-33: a cooked-food epic believed unreachable was "
+                        + $"discovered ({objectId},{variation}) — recorded to "
+                        + $"mods/ItemChecklist/phantom-violations.txt. The reachability model may be "
+                        + $"wrong (CK's tier gate changed, or a non-cooking source now exists)."
+                );
                 return true;
             }
             catch (System.Exception e)
@@ -81,26 +88,34 @@ namespace ItemChecklist
             try
             {
                 string text = ReadAll();
-                if (string.IsNullOrEmpty(text)) return;
+                if (string.IsNullOrEmpty(text))
+                    return;
                 foreach (var raw in text.Split('\n'))
                 {
                     var l = raw.Trim();
-                    if (l.Length == 0 || l[0] == '#') continue;
+                    if (l.Length == 0 || l[0] == '#')
+                        continue;
                     var parts = l.Split(',');
                     if (parts.Length >= 2 && int.TryParse(parts[0], out int oid) && int.TryParse(parts[1], out int v))
                         _known.Add(DiscoveredState.PackKey(oid, v));
                 }
             }
-            catch (System.Exception e) { Debug.LogWarning($"[ItemChecklist] phantom-violation load failed: {e.Message}"); }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[ItemChecklist] phantom-violation load failed: {e.Message}");
+            }
         }
 
         private static string ReadAll()
         {
-            if (!API.ConfigFilesystem.FileExists(Path)) return null;
+            if (!API.ConfigFilesystem.FileExists(Path))
+                return null;
             var bytes = API.ConfigFilesystem.Read(Path);
-            if (bytes == null) return null;
+            if (bytes == null)
+                return null;
             var chars = new char[bytes.Length];
-            for (int i = 0; i < bytes.Length; i++) chars[i] = (char) bytes[i];
+            for (int i = 0; i < bytes.Length; i++)
+                chars[i] = (char)bytes[i];
             return new string(chars);
         }
     }

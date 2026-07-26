@@ -44,14 +44,16 @@ namespace ItemChecklist
             s_cattle.Clear();
             s_babyToAdult.Clear();
             s_colours.Clear();
-            if (PugDatabase.objectsByType == null) return;
+            if (PugDatabase.objectsByType == null)
+                return;
             foreach (var od in PugDatabase.objectsByType.Keys)
             {
-                if (od.variation != 0) continue;
-                if (!PugDatabase.HasComponent<CattleCD>(od)) continue;
+                if (od.variation != 0)
+                    continue;
+                if (!PugDatabase.HasComponent<CattleCD>(od))
+                    continue;
                 s_cattle.Add((int)od.objectID);
-                if (PugDatabase.TryGetComponent<BreedStateCD>(od, out var bs)
-                    && bs.babyType != ObjectID.None)
+                if (PugDatabase.TryGetComponent<BreedStateCD>(od, out var bs) && bs.babyType != ObjectID.None)
                     s_babyToAdult[(int)bs.babyType] = (int)od.objectID;
                 s_colours[(int)od.objectID] = ReadColours(od);
             }
@@ -63,14 +65,19 @@ namespace ItemChecklist
         private static List<int> ReadColours(ObjectDataCD od)
         {
             var result = new List<int>();
-            if (PugDatabase.TryGetComponent<Pug.Properties.ObjectPropertiesCD>(od, out var props)
-                && props.TryGetList(BreedVariationPropertyId,
+            if (
+                PugDatabase.TryGetComponent<Pug.Properties.ObjectPropertiesCD>(od, out var props)
+                && props.TryGetList(
+                    BreedVariationPropertyId,
                     out NativeArray<BreedStateCD.PossibleChildVariation> list,
-                    (AllocatorManager.AllocatorHandle)Allocator.Temp))
+                    (AllocatorManager.AllocatorHandle)Allocator.Temp
+                )
+            )
             {
                 var seen = new HashSet<int>();
                 for (int i = 0; i < list.Length; i++)
-                    if (seen.Add(list[i].Variation)) result.Add(list[i].Variation);
+                    if (seen.Add(list[i].Variation))
+                        result.Add(list[i].Variation);
                 result.Sort();
             }
             return result;
@@ -83,12 +90,10 @@ namespace ItemChecklist
         public static bool IsBaby(int objectId) => s_babyToAdult.ContainsKey(objectId);
 
         /// <summary>The adult species' ObjectID for a baby; the id unchanged otherwise.</summary>
-        public static int AdultOf(int objectId)
-            => s_babyToAdult.TryGetValue(objectId, out var adult) ? adult : objectId;
+        public static int AdultOf(int objectId) => s_babyToAdult.TryGetValue(objectId, out var adult) ? adult : objectId;
 
         /// <summary>Iter-17: the species' full colour set (sorted distinct variations),
         /// or an empty list if the authored list was absent.</summary>
-        public static IReadOnlyList<int> ColoursOf(int objectId)
-            => s_colours.TryGetValue(objectId, out var c) ? c : System.Array.Empty<int>();
+        public static IReadOnlyList<int> ColoursOf(int objectId) => s_colours.TryGetValue(objectId, out var c) ? c : System.Array.Empty<int>();
     }
 }

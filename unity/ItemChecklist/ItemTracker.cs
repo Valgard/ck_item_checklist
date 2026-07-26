@@ -15,15 +15,19 @@ namespace ItemChecklist
 
         internal static bool IsActive => TrackedId >= 0;
 
-        internal static bool Matches(int objectId, int variation)
-            => TrackedId == objectId && TrackedVariation == variation;
+        internal static bool Matches(int objectId, int variation) => TrackedId == objectId && TrackedVariation == variation;
 
         /// <summary>Track this row, or untrack if it is already the tracked row. Tracking
         /// a different row replaces the previous (one item at a time).</summary>
         internal static void Toggle(int objectId, int variation)
         {
-            if (Matches(objectId, variation)) Clear();
-            else { TrackedId = objectId; TrackedVariation = variation; }
+            if (Matches(objectId, variation))
+                Clear();
+            else
+            {
+                TrackedId = objectId;
+                TrackedVariation = variation;
+            }
         }
 
         internal static void Clear()

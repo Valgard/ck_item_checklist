@@ -109,39 +109,58 @@ namespace ItemChecklist
 
         public static void InsertOnce()
         {
-            if (_done) return;
+            if (_done)
+                return;
             try
             {
                 var tm = Manager.text;
                 var f = tm != null ? tm.thinTiny : null;
-                if (f == null || f.codePoints == null || f.glyphData == null) return;
+                if (f == null || f.codePoints == null || f.glyphData == null)
+                    return;
 
                 var bundle = ItemChecklistMod.AssetBundle;
-                if (bundle == null) { Debug.LogWarning("[ItemChecklist] iter-25: AssetBundle null, glyph insert skipped"); return; }
+                if (bundle == null)
+                {
+                    Debug.LogWarning("[ItemChecklist] iter-25: AssetBundle null, glyph insert skipped");
+                    return;
+                }
                 var sheet = bundle.LoadAsset<Sprite>("Assets/ItemChecklist/Art/thinTiny_glyphs.png");
-                if (sheet == null) { Debug.LogWarning("[ItemChecklist] iter-25: thinTiny_glyphs sprite not found in bundle"); return; }
+                if (sheet == null)
+                {
+                    Debug.LogWarning("[ItemChecklist] iter-25: thinTiny_glyphs sprite not found in bundle");
+                    return;
+                }
                 var tex = sheet.texture;
 
                 int n = Glyphs.GetLength(0);
                 int baseIdx = f.glyphData.Length;
                 var gd = new PugFont.GlyphData[baseIdx + n];
-                for (int i = 0; i < baseIdx; i++) gd[i] = f.glyphData[i];
+                for (int i = 0; i < baseIdx; i++)
+                    gd[i] = f.glyphData[i];
 
                 int inserted = 0;
                 for (int i = 0; i < n; i++)
                 {
-                    int code = Glyphs[i, 0], x = Glyphs[i, 1], y = Glyphs[i, 2], w = Glyphs[i, 3], h = Glyphs[i, 4];
+                    int code = Glyphs[i, 0],
+                        x = Glyphs[i, 1],
+                        y = Glyphs[i, 2],
+                        w = Glyphs[i, 3],
+                        h = Glyphs[i, 4];
                     // Replicate PugFont.InitCodePoints' sprite convention exactly: outline
                     // padding (y+1, h-1, then x-1, w+2) + a CENTERED pivot. A (0,0) pivot
                     // renders the glyph shifted up-right.
                     var rect2 = new Rect(x, y + 1, w, h - 1);
-                    if (rect2.width + rect2.x + 2f < tex.width) { rect2.width += 2f; rect2.x -= 1f; }
+                    if (rect2.width + rect2.x + 2f < tex.width)
+                    {
+                        rect2.width += 2f;
+                        rect2.x -= 1f;
+                    }
                     int num = (int)rect2.width / 2;
                     int num2 = (int)rect2.height / 2;
                     var pivot = new Vector2((float)num / rect2.width, (float)num2 / rect2.height);
                     var sprite = Sprite.Create(tex, rect2, pivot, 16f, 0, SpriteMeshType.FullRect);
                     var g = new PugFont.GlyphData();
-                    g.rect = new RectInt(x, y, w, h);   // width = advance
+                    g.rect = new RectInt(x, y, w, h); // width = advance
                     g.volatileSprite = sprite;
                     int idx = baseIdx + i;
                     gd[idx] = g;

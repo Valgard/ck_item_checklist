@@ -35,7 +35,11 @@ namespace ItemChecklist
         private const int DefaultScanInterval = 3;
 
         /// <summary>Iter-36: what the HUD + window-footer counter shows.</summary>
-        public enum CounterMode { Discovery, Possession }
+        public enum CounterMode
+        {
+            Discovery,
+            Possession,
+        }
 
         private static SettingHandle<bool> _enabledHandle;
         private static SettingHandle<float> _radiusHandle;
@@ -44,9 +48,14 @@ namespace ItemChecklist
         private static SettingHandle<int> _scanIntervalHandle;
         private static SettingHandle<bool> _locateEnabledHandle;
 
-        public static void Bind(SettingHandle<bool> enabled, SettingHandle<float> radius,
-            SettingHandle<bool> diagnostics, SettingHandle<CounterMode> counterMode,
-            SettingHandle<int> scanInterval, SettingHandle<bool> locateEnabled)
+        public static void Bind(
+            SettingHandle<bool> enabled,
+            SettingHandle<float> radius,
+            SettingHandle<bool> diagnostics,
+            SettingHandle<CounterMode> counterMode,
+            SettingHandle<int> scanInterval,
+            SettingHandle<bool> locateEnabled
+        )
         {
             _enabledHandle = enabled;
             _radiusHandle = radius;

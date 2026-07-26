@@ -10,7 +10,8 @@ namespace ItemChecklist.UI
     {
         public static void RenderNoWrap(this PugText text, string s)
         {
-            if (text == null) return;
+            if (text == null)
+                return;
             text.maxWidth = 0f;
             text.Render(s);
         }

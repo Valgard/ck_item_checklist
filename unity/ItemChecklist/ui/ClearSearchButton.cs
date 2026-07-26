@@ -9,13 +9,15 @@ namespace ItemChecklist.UI
     /// </summary>
     public sealed class ClearSearchButton : ClickButton
     {
-        public SearchBar searchBar;   // Editor-wired
+        public SearchBar searchBar; // Editor-wired
 
         protected override void OnClick()
         {
-            if (searchBar != null) searchBar.ResetText();
+            if (searchBar != null)
+                searchBar.ResetText();
             var model = ItemChecklistMod.ListView;
-            if (model != null) model.SearchText = "";
+            if (model != null)
+                model.SearchText = "";
         }
     }
 }

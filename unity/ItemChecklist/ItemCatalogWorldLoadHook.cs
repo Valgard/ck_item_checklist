@@ -40,10 +40,12 @@ namespace ItemChecklist
             // Only the local player triggers a bake — remote players share
             // the same PugDatabase but are not the authoritative session owner.
             // Pattern mirrors ItemBrowser ItemBrowserAPI.cs:196-198.
-            if (!__instance.isLocal) return;
+            if (!__instance.isLocal)
+                return;
 
             // EarlyInit-race defense: Catalog must exist before we can bake it.
-            if (ItemChecklistMod.Catalog == null) return;
+            if (ItemChecklistMod.Catalog == null)
+                return;
 
             __instance.StartCoroutine(BakeWhenReady());
         }
@@ -70,7 +72,7 @@ namespace ItemChecklist
             {
                 ItemChecklistMod.Catalog.Bake();
                 ItemChecklistMod.ListView = new ItemChecklist.UI.ItemListViewModel(ItemChecklistMod.Catalog);
-                ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh();   // show the total as soon as the catalog is baked
+                ItemChecklist.UI.ItemChecklistHud.Instance?.Refresh(); // show the total as soon as the catalog is baked
             }
             catch (NullReferenceException ex)
             {

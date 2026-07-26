@@ -24,8 +24,8 @@ namespace ItemChecklist.UI
     public class ItemChecklistHud : UIelement
     {
         // Editor-wired serialized fields (set in ItemChecklistHUD.prefab).
-        public GameObject hudRoot;    // the scaled/toggled container
-        public PugText counterText;   // renders the "N / M (p.p%)" string
+        public GameObject hudRoot; // the scaled/toggled container
+        public PugText counterText; // renders the "N / M (p.p%)" string
 
         public static ItemChecklistHud Instance { get; private set; }
 
@@ -43,7 +43,8 @@ namespace ItemChecklist.UI
         private void OnDestroy()
         {
             DiscoveredState.Instance.Changed -= RefreshIfChanged;
-            if (Instance == this) Instance = null;
+            if (Instance == this)
+                Instance = null;
         }
 
         protected override void LateUpdate()
@@ -57,11 +58,10 @@ namespace ItemChecklist.UI
                 // player inventory / crafting / the checklist window (a CoreLib mod
                 // UI, covered by the aggregate isAnyInventoryShowing) or any menu is
                 // open; shown only while actually playing in a world.
-                bool show = WorldState.IsInPlayableWorld
-                            && !Manager.ui.isAnyInventoryShowing
-                            && !Manager.menu.IsAnyMenuActive()
-                            && ItemChecklist.ModConfig.Enabled;
-                if (hudRoot.activeSelf != show) hudRoot.SetActive(show);
+                bool show =
+                    WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing && !Manager.menu.IsAnyMenuActive() && ItemChecklist.ModConfig.Enabled;
+                if (hudRoot.activeSelf != show)
+                    hudRoot.SetActive(show);
             }
             base.LateUpdate();
         }
@@ -79,7 +79,8 @@ namespace ItemChecklist.UI
         /// it always leaves <see cref="_lastCounter"/> equal to what is on screen.</summary>
         public void Refresh()
         {
-            if (counterText == null) return;
+            if (counterText == null)
+                return;
             var catalog = ItemChecklistMod.Catalog;
             int total = (catalog == null) ? 0 : catalog.Count;
             // Iter-36: numerator = the mode-selected count (discovery N or possession K),
@@ -96,7 +97,8 @@ namespace ItemChecklist.UI
         /// Denominator-changing callers (bake / loc re-bake) use <see cref="Refresh"/> directly.</summary>
         public void RefreshIfChanged()
         {
-            if (ItemChecklistMod.CurrentCounterNumerator() != _lastCounter) Refresh();
+            if (ItemChecklistMod.CurrentCounterNumerator() != _lastCounter)
+                Refresh();
         }
     }
 }

@@ -27,7 +27,8 @@ namespace ItemChecklist
         static void After(UIMouse __instance)
         {
             var w = ItemChecklistWindow.Instance;
-            if (w == null || w.Root == null || !w.Root.activeSelf) return;
+            if (w == null || w.Root == null || !w.Root.activeSelf)
+                return;
             if (__instance.pointerSR != null)
                 __instance.pointerSR.transform.localScale = UnityEngine.Vector3.one;
         }

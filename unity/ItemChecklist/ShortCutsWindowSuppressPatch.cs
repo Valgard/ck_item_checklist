@@ -32,10 +32,10 @@ namespace ItemChecklist
             var w = ItemChecklistWindow.Instance;
             if (w != null && w.Root != null && w.Root.activeSelf)
             {
-                __instance.HideUI();   // root.SetActive(false) — verified public
-                return false;          // skip the stock show-driver this frame
+                __instance.HideUI(); // root.SetActive(false) — verified public
+                return false; // skip the stock show-driver this frame
             }
-            return true;               // otherwise: stock behaviour untouched
+            return true; // otherwise: stock behaviour untouched
         }
     }
 }

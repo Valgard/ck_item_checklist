@@ -32,38 +32,44 @@ namespace ItemChecklist
         internal static void Record(string ev)
         {
             s_events.Enqueue($"f{Time.frameCount} {ev}");
-            while (s_events.Count > MaxEvents) s_events.Dequeue();
+            while (s_events.Count > MaxEvents)
+                s_events.Dequeue();
         }
 
         internal static void Dump(string header)
         {
-            if (!ModConfig.Diagnostics) return;   // fold into the existing diagnostic-log gate (Iter-30) — logs only when Diagnostics is on
+            if (!ModConfig.Diagnostics)
+                return; // fold into the existing diagnostic-log gate (Iter-30) — logs only when Diagnostics is on
             Debug.Log($"[ICL-DIAG26] ===== {header} =====");
             foreach (var e in s_events)
                 Debug.Log($"[ICL-DIAG26]   {e}");
         }
 
         internal static string Kind(object o) =>
-            o == null ? "null" : o is SearchBar ? "SearchBar"
-            : o is TextInputField ? "TextInputField" : "other";
+            o == null ? "null"
+            : o is SearchBar ? "SearchBar"
+            : o is TextInputField ? "TextInputField"
+            : "other";
 
         // Called every frame from SearchBar.LateUpdate (mod code — NOT a Harmony patch).
         // Silent unless an EDGE occurs: caret ON but activeInputField != SearchBar.
         internal static void DetectFrame(SearchBar sb)
         {
-            if (!ModConfig.Diagnostics) return;   // inert unless the Diagnostics toggle is on (Iter-30 gate); Record() stays ungated to keep the ring buffer warm
+            if (!ModConfig.Diagnostics)
+                return; // inert unless the Diagnostics toggle is on (Iter-30 gate); Record() stays ungated to keep the ring buffer warm
             bool active = ReferenceEquals(Manager.input.activeInputField, sb);
-            bool caret = sb.characterMarkBlinker != null
-                && sb.characterMarkBlinker.gameObject.activeSelf;
+            bool caret = sb.characterMarkBlinker != null && sb.characterMarkBlinker.gameObject.activeSelf;
             bool bug = caret && !active;
 
             if (bug && !s_bug)
             {
                 s_bug = true;
-                Record($"BUG-ONSET inputIsActive={sb.inputIsActive} "
-                    + $"activeField={Kind(Manager.input.activeInputField)} "
-                    + $"selected={Kind(Manager.ui.currentSelectedUIElement)} "
-                    + $"textInputIsActive={Manager.input.textInputIsActive}");
+                Record(
+                    $"BUG-ONSET inputIsActive={sb.inputIsActive} "
+                        + $"activeField={Kind(Manager.input.activeInputField)} "
+                        + $"selected={Kind(Manager.ui.currentSelectedUIElement)} "
+                        + $"textInputIsActive={Manager.input.textInputIsActive}"
+                );
                 Dump("BUG DETECTED (caret on, typing dead)");
             }
             else if (!bug && s_bug)
@@ -78,9 +84,7 @@ namespace ItemChecklist
     [HarmonyPatch(typeof(InputManager), nameof(InputManager.SetActiveInputField))]
     internal static class Iter26_SetActivePatch
     {
-        static void Postfix(InputManager __instance) =>
-            Iter26FocusProbe.Record(
-                $"SetActiveInputField -> {Iter26FocusProbe.Kind(__instance.activeInputField)}");
+        static void Postfix(InputManager __instance) => Iter26FocusProbe.Record($"SetActiveInputField -> {Iter26FocusProbe.Kind(__instance.activeInputField)}");
     }
 
     [HarmonyPatch(typeof(TextInputField), nameof(TextInputField.OnLeftClicked))]
@@ -89,8 +93,7 @@ namespace ItemChecklist
         static void Postfix(TextInputField __instance)
         {
             if (__instance is SearchBar)
-                Iter26FocusProbe.Record(
-                    $"SearchBar.OnLeftClicked selected={Iter26FocusProbe.Kind(Manager.ui.currentSelectedUIElement)}");
+                Iter26FocusProbe.Record($"SearchBar.OnLeftClicked selected={Iter26FocusProbe.Kind(Manager.ui.currentSelectedUIElement)}");
         }
     }
 

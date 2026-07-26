@@ -11,16 +11,19 @@ namespace ItemChecklist.Possession
     {
         private readonly HashSet<long> _collected = new HashSet<long>();
         public bool Dirty { get; private set; }
+
         public void ClearDirty() => Dirty = false;
 
-        public bool IsCollected(int objectId, int skinIndex)
-            => _collected.Contains(DiscoveredState.PackKey(objectId, skinIndex));
+        public bool IsCollected(int objectId, int skinIndex) => _collected.Contains(DiscoveredState.PackKey(objectId, skinIndex));
 
         /// <summary>Returns true if this skin is newly collected (sets Dirty).</summary>
         public bool MarkCollected(int objectId, int skinIndex)
         {
             if (_collected.Add(DiscoveredState.PackKey(objectId, skinIndex)))
-            { Dirty = true; return true; }
+            {
+                Dirty = true;
+                return true;
+            }
             return false;
         }
 
@@ -36,13 +39,14 @@ namespace ItemChecklist.Possession
         public void LoadFrom(string text)
         {
             _collected.Clear();
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text))
+                return;
             foreach (var line in text.Split('\n'))
             {
                 int colon = line.IndexOf(':');
-                if (colon <= 0) continue;
-                if (int.TryParse(line.Substring(0, colon), out int id)
-                    && int.TryParse(line.Substring(colon + 1), out int skin))
+                if (colon <= 0)
+                    continue;
+                if (int.TryParse(line.Substring(0, colon), out int id) && int.TryParse(line.Substring(colon + 1), out int skin))
                     _collected.Add(DiscoveredState.PackKey(id, skin));
             }
             Dirty = false;

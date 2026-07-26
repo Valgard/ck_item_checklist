@@ -25,7 +25,7 @@ namespace ItemChecklist.UI
 
         private static Shader s_shader;
         private static bool s_shaderResolved;
-        private static Material s_baseMaterial;   // pristine prefab icon material (non-gradient)
+        private static Material s_baseMaterial; // pristine prefab icon material (non-gradient)
         private static readonly Dictionary<object, Material> s_skinMats = new Dictionary<object, Material>();
         private static readonly Dictionary<object, Texture2D> s_texCache = new Dictionary<object, Texture2D>();
 
@@ -33,7 +33,8 @@ namespace ItemChecklist.UI
         /// non-pet rows can be restored exactly. Called from the pool build.</summary>
         public static void CaptureBase(SpriteRenderer icon)
         {
-            if (s_baseMaterial == null && icon != null) s_baseMaterial = icon.sharedMaterial;
+            if (s_baseMaterial == null && icon != null)
+                s_baseMaterial = icon.sharedMaterial;
         }
 
         private static Shader GradShader()
@@ -50,18 +51,26 @@ namespace ItemChecklist.UI
 
         public static void Apply(SpriteRenderer icon, int petObjectId, int skinIndex, Sprite baseSprite)
         {
-            if (icon == null) return;
+            if (icon == null)
+                return;
             icon.sprite = baseSprite;
             icon.color = Color.white;
 
             var table = Manager.ui != null ? Manager.ui.petInfosTable : null;
             var info = table != null ? table.GetPetSkinInfo((ObjectID)petObjectId) : null;
             if (info == null || info.skins == null || skinIndex < 0 || skinIndex >= info.skins.Count)
-            { Disable(icon); return; }
+            {
+                Disable(icon);
+                return;
+            }
 
             var grad = info.skins[skinIndex].primaryGradientMap;
             var shader = GradShader();
-            if (grad == null || !grad.hasData || shader == null) { Disable(icon); return; }
+            if (grad == null || !grad.hasData || shader == null)
+            {
+                Disable(icon);
+                return;
+            }
 
             if (!s_skinMats.TryGetValue(grad, out var mat) || mat == null)
             {
@@ -69,7 +78,8 @@ namespace ItemChecklist.UI
                 {
                     tex = new Texture2D(grad.textureWidth, 1, TextureFormat.ARGB32, mipChain: false);
                     var px = new Color32[tex.width];
-                    for (int i = 0; i < tex.width; i++) px[i] = grad.GetPixel(i);
+                    for (int i = 0; i < tex.width; i++)
+                        px[i] = grad.GetPixel(i);
                     tex.SetPixels32(px);
                     tex.Apply();
                     s_texCache[grad] = tex;

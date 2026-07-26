@@ -12,14 +12,15 @@ namespace ItemChecklist.Possession
     /// </summary>
     internal sealed class PossessionLedger
     {
-        private readonly Dictionary<long, Dictionary<int, int>> _containers =
-            new Dictionary<long, Dictionary<int, int>>();
+        private readonly Dictionary<long, Dictionary<int, int>> _containers = new Dictionary<long, Dictionary<int, int>>();
         private Dictionary<int, int> _carried = new Dictionary<int, int>();
 
         public IReadOnlyDictionary<long, Dictionary<int, int>> Containers => _containers;
 
         public static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
+
         public static int KeyX(long key) => (int)(key >> 32);
+
         public static int KeyZ(long key) => (int)(uint)key;
 
         public void SetCarried(Dictionary<int, int> carried) => _carried = carried ?? new Dictionary<int, int>();
@@ -28,11 +29,11 @@ namespace ItemChecklist.Possession
         // pet skins in stored/carried inventories, penned/caged cattle colours, placed
         // paintable-furniture colours. Same remember+prune model as _containers; _auxCarried
         // is the live (carried + active pet) portion, never persisted.
-        private readonly Dictionary<long, Dictionary<long, int>> _auxContainers =
-            new Dictionary<long, Dictionary<long, int>>();
+        private readonly Dictionary<long, Dictionary<long, int>> _auxContainers = new Dictionary<long, Dictionary<long, int>>();
         private Dictionary<long, int> _auxCarried = new Dictionary<long, int>();
 
         public void SetCarriedAux(Dictionary<long, int> aux) => _auxCarried = aux ?? new Dictionary<long, int>();
+
         public void SetLiveAux(long key, Dictionary<long, int> aux) => _auxContainers[key] = aux;
 
         // Iter-41: drop a live tile's remembered aux when it was re-observed this scan WITHOUT
@@ -57,11 +58,17 @@ namespace ItemChecklist.Possession
             {
                 List<int> dropItems = null;
                 foreach (var kv in pair.Value)
-                    if (removeId(kv.Key)) (dropItems ??= new List<int>()).Add(kv.Key);
-                if (dropItems != null) foreach (var k in dropItems) pair.Value.Remove(k);
-                if (pair.Value.Count == 0) (dropKeys ??= new List<long>()).Add(pair.Key);
+                    if (removeId(kv.Key))
+                        (dropItems ??= new List<int>()).Add(kv.Key);
+                if (dropItems != null)
+                    foreach (var k in dropItems)
+                        pair.Value.Remove(k);
+                if (pair.Value.Count == 0)
+                    (dropKeys ??= new List<long>()).Add(pair.Key);
             }
-            if (dropKeys != null) foreach (var k in dropKeys) _containers.Remove(k);
+            if (dropKeys != null)
+                foreach (var k in dropKeys)
+                    _containers.Remove(k);
         }
 
         /// <summary>Self-heal: drop a remembered container/aux tile that WOULD be counted this scan
@@ -76,27 +83,35 @@ namespace ItemChecklist.Possession
         /// observation dropout (mode 1). A real destruction is always both (you stand next to the
         /// container; its workbench is co-located), so nothing legitimate is missed. Collect-then-
         /// remove to avoid mutating during iteration.</summary>
-        public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys,
-            Func<long, bool> coveredByLoadedAnchor)
+        public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys, Func<long, bool> coveredByLoadedAnchor)
         {
             float r2 = radius * radius;
             List<long> drop = null;
             var keys = new HashSet<long>(_containers.Keys);
-            keys.UnionWith(_auxContainers.Keys);              // Iter-41: aux-only tiles (penned cattle) too
+            keys.UnionWith(_auxContainers.Keys); // Iter-41: aux-only tiles (penned cattle) too
             foreach (var key in keys)
             {
-                if (liveKeys.Contains(key)) continue;
-                float dx = KeyX(key) - px, dz = KeyZ(key) - pz;
-                if (dx * dx + dz * dz > r2) continue;            // not player-near → chunk not guaranteed loaded → keep
-                if (!coveredByLoadedAnchor(key)) continue;       // loaded but no loaded anchor would observe it → not destroyed → keep
+                if (liveKeys.Contains(key))
+                    continue;
+                float dx = KeyX(key) - px,
+                    dz = KeyZ(key) - pz;
+                if (dx * dx + dz * dz > r2)
+                    continue; // not player-near → chunk not guaranteed loaded → keep
+                if (!coveredByLoadedAnchor(key))
+                    continue; // loaded but no loaded anchor would observe it → not destroyed → keep
                 (drop ??= new List<long>()).Add(key);
             }
-            if (drop != null) foreach (var k in drop) { _containers.Remove(k); _auxContainers.Remove(k); }
+            if (drop != null)
+                foreach (var k in drop)
+                {
+                    _containers.Remove(k);
+                    _auxContainers.Remove(k);
+                }
         }
 
         public PossessionView BuildView(HashSet<long> liveKeys)
         {
-            var totals = new Dictionary<int, int>(_carried);   // carried first (always live)
+            var totals = new Dictionary<int, int>(_carried); // carried first (always live)
             var liveItems = new HashSet<int>(_carried.Keys);
             var anyItem = new HashSet<int>(_carried.Keys);
 
@@ -107,7 +122,8 @@ namespace ItemChecklist.Possession
                 {
                     totals[kv.Key] = (totals.TryGetValue(kv.Key, out var c) ? c : 0) + kv.Value;
                     anyItem.Add(kv.Key);
-                    if (live) liveItems.Add(kv.Key);
+                    if (live)
+                        liveItems.Add(kv.Key);
                 }
             }
 
@@ -115,15 +131,16 @@ namespace ItemChecklist.Possession
             // for callers even though the current UI does not surface it.
             var remembered = new HashSet<int>();
             foreach (var id in anyItem)
-                if (!liveItems.Contains(id)) remembered.Add(id);
+                if (!liveItems.Contains(id))
+                    remembered.Add(id);
 
             // Iter-41: aux = live carried/active + all remembered aux containers (same merge
             // as totals). A base-stored/penned/painted entity whose tile is not loaded this
             // snapshot keeps its last-seen aux count → stable while away.
             var aux = new Dictionary<long, int>(_auxCarried);
             foreach (var pair in _auxContainers)
-                foreach (var kv in pair.Value)
-                    aux[kv.Key] = (aux.TryGetValue(kv.Key, out var a) ? a : 0) + kv.Value;
+            foreach (var kv in pair.Value)
+                aux[kv.Key] = (aux.TryGetValue(kv.Key, out var a) ? a : 0) + kv.Value;
 
             return new PossessionView(totals, remembered, aux);
         }
@@ -153,7 +170,8 @@ namespace ItemChecklist.Possession
         {
             int n = 0;
             foreach (var pair in _containers)
-                if (pair.Value.TryGetValue(objectId, out var c) && c >= 1) n++;
+                if (pair.Value.TryGetValue(objectId, out var c) && c >= 1)
+                    n++;
             return n;
         }
 
@@ -181,11 +199,16 @@ namespace ItemChecklist.Possession
                 _auxContainers.TryGetValue(key, out var aux);
                 bool hasC = cont != null && cont.Count > 0;
                 bool hasA = aux != null && aux.Count > 0;
-                if (!hasC && !hasA) continue;
+                if (!hasC && !hasA)
+                    continue;
                 var cPart = new List<string>();
-                if (hasC) foreach (var kv in cont) cPart.Add(kv.Key + ":" + kv.Value);
+                if (hasC)
+                    foreach (var kv in cont)
+                        cPart.Add(kv.Key + ":" + kv.Value);
                 var aPart = new List<string>();
-                if (hasA) foreach (var kv in aux) aPart.Add(kv.Key + ":" + kv.Value);
+                if (hasA)
+                    foreach (var kv in aux)
+                        aPart.Add(kv.Key + ":" + kv.Value);
                 // Two '|': container segment | aux segment (either may be empty).
                 lines.Add(KeyX(key) + "," + KeyZ(key) + "|" + string.Join(",", cPart) + "|" + string.Join(",", aPart));
             }
@@ -196,38 +219,45 @@ namespace ItemChecklist.Possession
         {
             _containers.Clear();
             _auxContainers.Clear();
-            if (string.IsNullOrEmpty(text)) return;
-            if (!text.StartsWith(VersionMarker)) return;   // discard pre-v3 → base re-scans clean
+            if (string.IsNullOrEmpty(text))
+                return;
+            if (!text.StartsWith(VersionMarker))
+                return; // discard pre-v3 → base re-scans clean
             foreach (var line in text.Split('\n'))
             {
-                if (line.Length == 0 || line[0] == '#') continue;
+                if (line.Length == 0 || line[0] == '#')
+                    continue;
                 var seg = line.Split('|');
-                if (seg.Length != 3) continue;             // v3 line has exactly two '|'
+                if (seg.Length != 3)
+                    continue; // v3 line has exactly two '|'
                 var xz = seg[0].Split(',');
-                if (xz.Length != 2 || !int.TryParse(xz[0], out int x) || !int.TryParse(xz[1], out int z)) continue;
+                if (xz.Length != 2 || !int.TryParse(xz[0], out int x) || !int.TryParse(xz[1], out int z))
+                    continue;
                 long key = Key(x, z);
 
                 var cont = new Dictionary<int, int>();
                 foreach (var pair in seg[1].Split(','))
                 {
                     int colon = pair.IndexOf(':');
-                    if (colon <= 0) continue;
-                    if (int.TryParse(pair.Substring(0, colon), out int id)
-                        && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                    if (colon <= 0)
+                        continue;
+                    if (int.TryParse(pair.Substring(0, colon), out int id) && int.TryParse(pair.Substring(colon + 1), out int cnt))
                         cont[id] = cnt;
                 }
-                if (cont.Count > 0) _containers[key] = cont;
+                if (cont.Count > 0)
+                    _containers[key] = cont;
 
                 var aux = new Dictionary<long, int>();
                 foreach (var pair in seg[2].Split(','))
                 {
                     int colon = pair.IndexOf(':');
-                    if (colon <= 0) continue;
-                    if (long.TryParse(pair.Substring(0, colon), out long pk)
-                        && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                    if (colon <= 0)
+                        continue;
+                    if (long.TryParse(pair.Substring(0, colon), out long pk) && int.TryParse(pair.Substring(colon + 1), out int cnt))
                         aux[pk] = cnt;
                 }
-                if (aux.Count > 0) _auxContainers[key] = aux;
+                if (aux.Count > 0)
+                    _auxContainers[key] = aux;
             }
         }
     }

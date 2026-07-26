@@ -47,23 +47,37 @@ namespace ItemChecklist
             public readonly int Variation;
             public readonly string DisplayName;
             public readonly Sprite Icon;
-            public readonly string ModOrigin;   // empty string = vanilla
-            public readonly Rarity Rarity;      // CK ObjectInfo.rarity (Poor..Legendary)
-            public readonly ObjectType ObjectType;  // CK ObjectInfo.objectType (Category sort key)
-            public readonly int Level;          // CK ObjectInfo.level
-            public readonly int SellValue;      // 0 = unsellable/legendary; >0 = computed sell value
-            public readonly bool IsCraftable;   // ObjectInfo.requiredObjectsToCraft non-empty
-            public readonly bool IsPetSkin;     // Iter-16.1: pet-skin row — Variation carries skinIndex, collected via PetCollection
-            public readonly bool IsCattle;      // Iter-16.3: cattle species row (drives the Cattle category + collection routing)
+            public readonly string ModOrigin; // empty string = vanilla
+            public readonly Rarity Rarity; // CK ObjectInfo.rarity (Poor..Legendary)
+            public readonly ObjectType ObjectType; // CK ObjectInfo.objectType (Category sort key)
+            public readonly int Level; // CK ObjectInfo.level
+            public readonly int SellValue; // 0 = unsellable/legendary; >0 = computed sell value
+            public readonly bool IsCraftable; // ObjectInfo.requiredObjectsToCraft non-empty
+            public readonly bool IsPetSkin; // Iter-16.1: pet-skin row — Variation carries skinIndex, collected via PetCollection
+            public readonly bool IsCattle; // Iter-16.3: cattle species row (drives the Cattle category + collection routing)
             public readonly bool IsColourVariant; // Iter-17: a colour-variant slot (cattle colour OR paintable variant) — name is
-                                                  // species-gated (shown once ANY form of the item is discovered), unlike per-variation rows
-            public readonly bool NameIsFallback; // Iter-35: DisplayName is a derived fallback (foreign-mod item with no I2 term) —
-                                                 // CK's own tooltip would render "missing: …", so ItemRow's tooltip uses our name instead
 
-            public Entry(int objectId, int variation, string displayName, Sprite icon,
-                string modOrigin, Rarity rarity, ObjectType objectType,
-                int level, int sellValue, bool isCraftable, bool isPetSkin = false,
-                bool isCattle = false, bool isColourVariant = false, bool nameIsFallback = false)
+            // species-gated (shown once ANY form of the item is discovered), unlike per-variation rows
+            public readonly bool NameIsFallback; // Iter-35: DisplayName is a derived fallback (foreign-mod item with no I2 term) —
+
+            // CK's own tooltip would render "missing: …", so ItemRow's tooltip uses our name instead
+
+            public Entry(
+                int objectId,
+                int variation,
+                string displayName,
+                Sprite icon,
+                string modOrigin,
+                Rarity rarity,
+                ObjectType objectType,
+                int level,
+                int sellValue,
+                bool isCraftable,
+                bool isPetSkin = false,
+                bool isCattle = false,
+                bool isColourVariant = false,
+                bool nameIsFallback = false
+            )
             {
                 ObjectId = objectId;
                 Variation = variation;
@@ -90,34 +104,35 @@ namespace ItemChecklist
         private readonly HashSet<long> suppressedCookedPhantoms = new HashSet<long>();
 
         public int Count => entries.Length;
+
         public Entry GetByIndex(int index) => entries[index];
-        public bool TryGetIndex(int objectId, int variation, out int index) =>
-            keyToIndex.TryGetValue(DiscoveredState.PackKey(objectId, variation), out index);
+
+        public bool TryGetIndex(int objectId, int variation, out int index) => keyToIndex.TryGetValue(DiscoveredState.PackKey(objectId, variation), out index);
 
         public bool TryGetEntry(int objectId, int variation, out Entry entry)
         {
             if (keyToIndex.TryGetValue(DiscoveredState.PackKey(objectId, variation), out int idx))
-            { entry = entries[idx]; return true; }
+            {
+                entry = entries[idx];
+                return true;
+            }
             entry = default;
             return false;
         }
 
         // Iter-16.1: pet-skin rows route possession/discovery through PetCollection
         // instead of CK's skin-blind DiscoveredState (OwnedCount uses this).
-        public bool IsPetSkinEntry(int objectId, int variation)
-            => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
+        public bool IsPetSkinEntry(int objectId, int variation) => TryGetEntry(objectId, variation, out var e) && e.IsPetSkin;
 
         // Iter-17: a cattle colour-slot row (drives per-colour possession routing).
-        public bool IsCattleEntry(int objectId, int variation)
-            => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
+        public bool IsCattleEntry(int objectId, int variation) => TryGetEntry(objectId, variation, out var e) && e.IsCattle;
 
         // Iter-17: a paintable colour VARIANT slot (var≠0 colour-variant, not cattle).
         // OwnedCount routes these through CountColour (per-(id, paint-colour), like cattle):
         // a placed painted entity is counted at its colour; non-scannable tile floors/walls
         // have no entry → 0 → "—". The base (var0) row keeps its objectID-total count.
-        public bool IsPaintableVariantSlot(int objectId, int variation)
-            => variation != 0 && TryGetEntry(objectId, variation, out var e)
-               && e.IsColourVariant && !e.IsCattle;
+        public bool IsPaintableVariantSlot(int objectId, int variation) =>
+            variation != 0 && TryGetEntry(objectId, variation, out var e) && e.IsColourVariant && !e.IsCattle;
 
         /// <summary>
         /// Build the catalog in three loops over <c>PugDatabase.objectsByType.Keys</c>:
@@ -177,17 +192,19 @@ namespace ItemChecklist
                 var paintColours = new Dictionary<int, string>();
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
-                    if (od.variation != 0) continue;
-                    if (!PugDatabase.TryGetComponent<PaintToolCD>(od, out var pt)) continue;
+                    if (od.variation != 0)
+                        continue;
+                    if (!PugDatabase.TryGetComponent<PaintToolCD>(od, out var pt))
+                        continue;
                     // The brush's enum name is code-stable English ("PaintBrushRed"); strip
                     // the "PaintBrush" prefix → the colour key ("Red"), then localize via our
                     // own ItemChecklist-PaintColor terms (DE "Rot", …). Fall back to the
                     // English colour if a term is missing. (ObjectID.ToString is sandbox-safe
                     // — already used by the PascalCaseSplitter fallback.)
                     string enumName = od.objectID.ToString();
-                    string key = enumName.StartsWith("PaintBrush", StringComparison.Ordinal)
-                        ? enumName.Substring("PaintBrush".Length) : enumName;
-                    if (string.IsNullOrEmpty(key)) continue;
+                    string key = enumName.StartsWith("PaintBrush", StringComparison.Ordinal) ? enumName.Substring("PaintBrush".Length) : enumName;
+                    if (string.IsNullOrEmpty(key))
+                        continue;
                     string term = $"ItemChecklist-PaintColor/{key}";
                     string loc = Loc.T(term);
                     paintColours[pt.paintIndex] = (string.IsNullOrEmpty(loc) || loc == term) ? key : loc;
@@ -199,26 +216,24 @@ namespace ItemChecklist
                 var modIdToName = new Dictionary<long, string>();
                 foreach (var mod in API.ModLoader.LoadedMods)
                 {
-                    string name = !string.IsNullOrWhiteSpace(mod.Metadata.displayName)
-                        ? mod.Metadata.displayName
-                        : mod.Metadata.name;
+                    string name = !string.IsNullOrWhiteSpace(mod.Metadata.displayName) ? mod.Metadata.displayName : mod.Metadata.name;
                     modIdToName[mod.ModId] = name ?? string.Empty;
                 }
 
                 // First pass: collect localized + unlocalized names per accepted od.
-                var localizedNames   = new Dictionary<long, string>();  // key = PackKey(objId, variation)
+                var localizedNames = new Dictionary<long, string>(); // key = PackKey(objId, variation)
                 var unlocalizedNames = new Dictionary<long, string>();
                 // Iter-35: keys whose display name is a derived fallback because CK could
                 // not localize it (foreign-mod items with no I2 term). Their Entry is
                 // flagged so ItemRow's tooltip uses our baked name, not CK's "missing: …".
                 var fallbackNameKeys = new HashSet<long>();
-                var accepted         = new List<ObjectDataCD>();
-                var iconCache        = new Dictionary<long, Sprite>();
-                var rarityCache      = new Dictionary<long, Rarity>();
-                var objectTypeCache  = new Dictionary<long, ObjectType>();
-                var levelCache       = new Dictionary<long, int>();
-                var sellValueCache   = new Dictionary<long, int>();
-                var craftableCache   = new Dictionary<long, bool>();
+                var accepted = new List<ObjectDataCD>();
+                var iconCache = new Dictionary<long, Sprite>();
+                var rarityCache = new Dictionary<long, Rarity>();
+                var objectTypeCache = new Dictionary<long, ObjectType>();
+                var levelCache = new Dictionary<long, int>();
+                var sellValueCache = new Dictionary<long, int>();
+                var craftableCache = new Dictionary<long, bool>();
 
                 // Iter-35: CoreLib workbench-chain sets, so Loop 1 can drop internal "page"
                 // workbenches (see the exclusion there + BuildWorkbenchChainSets). chainReferenced
@@ -232,7 +247,7 @@ namespace ItemChecklist
                 // emits that (rareId, variation) via BOTH the base and the rare
                 // branch — duplicating the catalog row and double-counting the dish
                 // in N / M. Measured in-game: 11 such families, 858 duplicate keys.
-                var seenKeys         = new HashSet<long>();
+                var seenKeys = new HashSet<long>();
 
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
@@ -246,22 +261,27 @@ namespace ItemChecklist
                     // and skipped by the existing guards below.
                     if (od.variation != 0)
                     {
-                        if (!PugDatabase.HasComponent<PaintableObjectCD>(od)) continue;
+                        if (!PugDatabase.HasComponent<PaintableObjectCD>(od))
+                            continue;
                         var vinfo0 = PugDatabase.GetObjectInfo(od.objectID, od.variation);
-                        if (vinfo0 == null || (vinfo0.smallIcon == null && vinfo0.icon == null)) continue; // icon-guard
+                        if (vinfo0 == null || (vinfo0.smallIcon == null && vinfo0.icon == null))
+                            continue; // icon-guard
                     }
 
                     // Iter-3.7: Cooked-Food family-items (IDs in [9500,9599]) are
                     // handled by the α-enumeration loop further down — skip them here
                     // so they don't appear as variation=0 placeholder entries.
-                    if (od.objectID.IsCookedFood()) continue;
+                    if (od.objectID.IsCookedFood())
+                        continue;
 
                     // Iter-16.1: pets are emitted per-skin by the pet loop below — skip the
                     // skinless variation-0 form here (same pattern as cooked food).
-                    if (PugDatabase.HasComponent<PetCD>(od)) continue;
+                    if (PugDatabase.HasComponent<PetCD>(od))
+                        continue;
 
                     var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
-                    if (info == null) continue;
+                    if (info == null)
+                        continue;
 
                     // ObjectType has no single "Item" value — it discriminates the
                     // kind of thing (Helm, MiningPick, Ring, …). Items are
@@ -270,14 +290,17 @@ namespace ItemChecklist
                     // (ObjectUtility.cs:393), which excludes NonObtainable / Creature /
                     // Critter / PlayerType — but **not** NonUsable. (Critter is relaxed
                     // back in just below for the catchable subset — see Iter-16.2.)
-                    if (info.objectType == ObjectType.NonObtainable) continue;
+                    if (info.objectType == ObjectType.NonObtainable)
+                        continue;
                     // Iter-17: cattle (CattleCD) are emitted per-colour by Loop 4
                     // (discover-to-reveal), so skip the whole Creature type here — exactly
                     // as pets (Loop 3) and cooked food (Loop 2) are re-emitted. Non-cattle
                     // Creatures were never wanted (Iter-16.3 only ever admitted cattle from
                     // Creature; babies, being CattleCD/Creature, are skipped here too).
-                    if (info.objectType == ObjectType.Creature) continue;
-                    if (info.objectType == ObjectType.PlayerType)    continue;
+                    if (info.objectType == ObjectType.Creature)
+                        continue;
+                    if (info.objectType == ObjectType.PlayerType)
+                        continue;
 
                     // Iter-16.2: catchable critters are the EXCEPTION to the IB mirror
                     // above. CK's static DB holds 25 ObjectType.Critter item-forms, all
@@ -289,8 +312,8 @@ namespace ItemChecklist
                     // a decompile probe produced was wrong on both count and range — count
                     // confirmed = 25 in-game. Keep them all, with the Iter-7.1 icon-guard
                     // dropping any icon-less stub defensively.
-                    if (info.objectType == ObjectType.Critter
-                        && info.smallIcon == null && info.icon == null) continue;
+                    if (info.objectType == ObjectType.Critter && info.smallIcon == null && info.icon == null)
+                        continue;
 
                     // Iter-7.1 catalog-completeness fix: ObjectType.NonUsable is NOT
                     // "garbage". CK assigns it to raw materials — ores, bars, raw wood,
@@ -305,15 +328,14 @@ namespace ItemChecklist
                     // entries with no icon (the 117 real materials all carry one; the 9
                     // internal entities have neither an icon nor a localized name) —
                     // verified in-game on game version 1.2.1.4.
-                    if (info.objectType == ObjectType.NonUsable
-                        && info.smallIcon == null && info.icon == null)
+                    if (info.objectType == ObjectType.NonUsable && info.smallIcon == null && info.icon == null)
                         continue;
 
                     // Two-pass name resolution (ItemBrowser ObjectUtility.cs pattern).
                     // localize=true  → I2.Loc resolved display name (e.g. "Large Water Can")
                     // localize=false → raw I2.Loc term path (e.g. "Items/LargeWaterCan")
                     var (locText, locDontLocalize) = ResolveOne(od, localize: true);
-                    var (rawText, _)               = ResolveOne(od, localize: false);
+                    var (rawText, _) = ResolveOne(od, localize: false);
 
                     // ItemBrowser dontLocalize-output-flag fallback (ObjectUtility.cs:107-108):
                     // when the game signals this item can't be localized, swap to the raw term.
@@ -355,19 +377,18 @@ namespace ItemChecklist
                     // bases are hubs WITH a name → kept. The term-less test is confined to chain
                     // members, so a legit standalone term-less foreign item still gets its derived
                     // name (it is never referenced as a workbench page).
-                    if (chainReferenced.Contains((int)od.objectID)
-                        && (!chainHubs.Contains((int)od.objectID) || fallbackNameKeys.Contains(key)))
+                    if (chainReferenced.Contains((int)od.objectID) && (!chainHubs.Contains((int)od.objectID) || fallbackNameKeys.Contains(key)))
                         continue;
 
-                    localizedNames[key]   = locText;
+                    localizedNames[key] = locText;
                     unlocalizedNames[key] = rawText;
                     accepted.Add(od);
                     iconCache[key] = info.smallIcon != null ? info.smallIcon : info.icon;
                     rarityCache[key] = info.rarity;
                     objectTypeCache[key] = info.objectType;
-                    levelCache[key]      = PugDatabase.TryGetComponent<LevelCD>(od, out var lvlCd) ? lvlCd.level : 0;
-                    sellValueCache[key]  = ComputeSellValue(od, info);
-                    craftableCache[key]  = info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0;
+                    levelCache[key] = PugDatabase.TryGetComponent<LevelCD>(od, out var lvlCd) ? lvlCd.level : 0;
+                    sellValueCache[key] = ComputeSellValue(od, info);
+                    craftableCache[key] = info.requiredObjectsToCraft != null && info.requiredObjectsToCraft.Count > 0;
                 }
 
                 // ─── Loop 2: α-enumeration for Cooked-Food permutations ─────────
@@ -381,14 +402,13 @@ namespace ItemChecklist
                 var tierMap = new Dictionary<ObjectID, (ObjectID rare, ObjectID epic)>();
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
-                    if (od.variation != 0) continue;
-                    if (PugDatabase.TryGetComponent<CookingIngredientCD>(od, out var ing)
-                        && !CookedFoodCD.IsIngredientObsolete(od.objectID))
+                    if (od.variation != 0)
+                        continue;
+                    if (PugDatabase.TryGetComponent<CookingIngredientCD>(od, out var ing) && !CookedFoodCD.IsIngredientObsolete(od.objectID))
                     {
                         turnsInto[od.objectID] = ing.turnsIntoFood;
                     }
-                    if (od.objectID.IsCookedFood()
-                        && PugDatabase.TryGetComponent<CookedFoodCD>(od, out var cf))
+                    if (od.objectID.IsCookedFood() && PugDatabase.TryGetComponent<CookedFoodCD>(od, out var cf))
                     {
                         tierMap[od.objectID] = (cf.rareVersion, cf.epicVersion);
                     }
@@ -403,21 +423,40 @@ namespace ItemChecklist
                     var i1 = ingredients[i];
                     var i2 = ingredients[j];
                     var primary = CookedFoodCD.GetPrimaryIngredient(i1, i2);
-                    if (!turnsInto.TryGetValue(primary, out var baseFamily)) continue;
+                    if (!turnsInto.TryGetValue(primary, out var baseFamily))
+                        continue;
                     int variation = CookedFoodCD.GetFoodVariation(i1, i2);
 
                     // 3 tier-variants per pair, same variation, different objectIDs.
                     AddCookedEntry(
                         new ObjectDataCD { objectID = baseFamily, variation = variation },
-                        localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                        levelCache, sellValueCache, craftableCache, accepted, seenKeys);
+                        localizedNames,
+                        unlocalizedNames,
+                        iconCache,
+                        rarityCache,
+                        objectTypeCache,
+                        levelCache,
+                        sellValueCache,
+                        craftableCache,
+                        accepted,
+                        seenKeys
+                    );
                     if (tierMap.TryGetValue(baseFamily, out var tiers))
                     {
                         if (tiers.rare != ObjectID.None)
                             AddCookedEntry(
                                 new ObjectDataCD { objectID = tiers.rare, variation = variation },
-                                localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                                levelCache, sellValueCache, craftableCache, accepted, seenKeys);
+                                localizedNames,
+                                unlocalizedNames,
+                                iconCache,
+                                rarityCache,
+                                objectTypeCache,
+                                levelCache,
+                                sellValueCache,
+                                craftableCache,
+                                accepted,
+                                seenKeys
+                            );
                         if (tiers.epic != ObjectID.None)
                         {
                             // Iter-33: epic is reachable only when the variation's
@@ -427,10 +466,19 @@ namespace ItemChecklist
                             if (CookedEpicReachable(variation))
                                 AddCookedEntry(
                                     new ObjectDataCD { objectID = tiers.epic, variation = variation },
-                                    localizedNames, unlocalizedNames, iconCache, rarityCache, objectTypeCache,
-                                    levelCache, sellValueCache, craftableCache, accepted, seenKeys);
+                                    localizedNames,
+                                    unlocalizedNames,
+                                    iconCache,
+                                    rarityCache,
+                                    objectTypeCache,
+                                    levelCache,
+                                    sellValueCache,
+                                    craftableCache,
+                                    accepted,
+                                    seenKeys
+                                );
                             else
-                                suppressedCookedPhantoms.Add(DiscoveredState.PackKey((int) tiers.epic, variation));
+                                suppressedCookedPhantoms.Add(DiscoveredState.PackKey((int)tiers.epic, variation));
                         }
                     }
                 }
@@ -447,31 +495,45 @@ namespace ItemChecklist
                 var petEntries = new List<Entry>();
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
-                    if (od.variation != 0 || !PugDatabase.HasComponent<PetCD>(od)) continue;
+                    if (od.variation != 0 || !PugDatabase.HasComponent<PetCD>(od))
+                        continue;
                     var petInfo = PugDatabase.GetObjectInfo(od.objectID, 0);
-                    if (petInfo == null) continue;
+                    if (petInfo == null)
+                        continue;
 
                     var (petLoc, petDont) = ResolveOne(od, localize: true);
-                    var (petRaw, _)       = ResolveOne(od, localize: false);
-                    if (petDont && !string.IsNullOrEmpty(petRaw)) petLoc = petRaw;
+                    var (petRaw, _) = ResolveOne(od, localize: false);
+                    if (petDont && !string.IsNullOrEmpty(petRaw))
+                        petLoc = petRaw;
                     if (string.IsNullOrEmpty(petLoc))
                         petLoc = PascalCaseSplitter.Split(od.objectID.ToString());
 
-                    var skinInfo = (Manager.ui != null && Manager.ui.petInfosTable != null)
-                        ? Manager.ui.petInfosTable.GetPetSkinInfo(od.objectID) : null;
-                    int skinCount = (skinInfo != null && skinInfo.skins != null && skinInfo.skins.Count > 0)
-                        ? skinInfo.skins.Count
-                        : (PugDatabase.TryGetComponent<PetCD>(od, out var pcd) ? Math.Max(1, pcd.maxSkins) : 1);
+                    var skinInfo = (Manager.ui != null && Manager.ui.petInfosTable != null) ? Manager.ui.petInfosTable.GetPetSkinInfo(od.objectID) : null;
+                    int skinCount =
+                        (skinInfo != null && skinInfo.skins != null && skinInfo.skins.Count > 0)
+                            ? skinInfo.skins.Count
+                            : (PugDatabase.TryGetComponent<PetCD>(od, out var pcd) ? Math.Max(1, pcd.maxSkins) : 1);
 
                     var petIcon = petInfo.smallIcon != null ? petInfo.smallIcon : petInfo.icon;
                     string petMod = ResolveModOrigin(od, modIdToName);
                     for (int skin = 0; skin < skinCount; skin++)
                     {
                         string skinName = $"{petLoc} {Loc.F("ItemChecklist-General/SkinSuffix", skin + 1)}";
-                        petEntries.Add(new Entry(
-                            (int)od.objectID, skin, skinName, petIcon, petMod,
-                            petInfo.rarity, ObjectType.Pet,
-                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: true));
+                        petEntries.Add(
+                            new Entry(
+                                (int)od.objectID,
+                                skin,
+                                skinName,
+                                petIcon,
+                                petMod,
+                                petInfo.rarity,
+                                ObjectType.Pet,
+                                level: 0,
+                                sellValue: 0,
+                                isCraftable: false,
+                                isPetSkin: true
+                            )
+                        );
                     }
                 }
 
@@ -490,15 +552,20 @@ namespace ItemChecklist
                 var cattleDisc = DiscoveredState.Instance;
                 foreach (var od in PugDatabase.objectsByType.Keys)
                 {
-                    if (od.variation != 0 || !PugDatabase.HasComponent<CattleCD>(od)) continue;
-                    if (CattleRegistry.IsBaby((int)od.objectID)) continue;
+                    if (od.variation != 0 || !PugDatabase.HasComponent<CattleCD>(od))
+                        continue;
+                    if (CattleRegistry.IsBaby((int)od.objectID))
+                        continue;
                     var cInfo = PugDatabase.GetObjectInfo(od.objectID, 0);
-                    if (cInfo == null) continue;
+                    if (cInfo == null)
+                        continue;
 
                     var (cLoc, cDont) = ResolveOne(od, localize: true);
-                    var (cRaw, _)     = ResolveOne(od, localize: false);
-                    if (cDont && !string.IsNullOrEmpty(cRaw)) cLoc = cRaw;
-                    if (string.IsNullOrEmpty(cLoc)) cLoc = PascalCaseSplitter.Split(od.objectID.ToString());
+                    var (cRaw, _) = ResolveOne(od, localize: false);
+                    if (cDont && !string.IsNullOrEmpty(cRaw))
+                        cLoc = cRaw;
+                    if (string.IsNullOrEmpty(cLoc))
+                        cLoc = PascalCaseSplitter.Split(od.objectID.ToString());
 
                     var cIcon = cInfo.smallIcon != null ? cInfo.smallIcon : cInfo.icon;
                     string cMod = ResolveModOrigin(od, modIdToName);
@@ -513,17 +580,30 @@ namespace ItemChecklist
                         colours.Add(0);
                         if (cattleDisc != null)
                             foreach (var dv in cattleDisc.DiscoveredVariationsOf(cid))
-                                if (seen.Add(dv)) colours.Add(dv);
+                                if (seen.Add(dv))
+                                    colours.Add(dv);
                         colours.Sort();
                     }
                     foreach (var v in colours)
                     {
                         string colourName = $"{cLoc} {Loc.F("ItemChecklist-General/ColorSuffix", v)}";
-                        cattleEntries.Add(new Entry(
-                            cid, v, colourName, cIcon, cMod,
-                            cInfo.rarity, ObjectType.Creature,
-                            level: 0, sellValue: 0, isCraftable: false, isPetSkin: false,
-                            isCattle: true, isColourVariant: true));
+                        cattleEntries.Add(
+                            new Entry(
+                                cid,
+                                v,
+                                colourName,
+                                cIcon,
+                                cMod,
+                                cInfo.rarity,
+                                ObjectType.Creature,
+                                level: 0,
+                                sellValue: 0,
+                                isCraftable: false,
+                                isPetSkin: false,
+                                isCattle: true,
+                                isColourVariant: true
+                            )
+                        );
                     }
                 }
 
@@ -547,12 +627,24 @@ namespace ItemChecklist
                     string modOrigin = ResolveModOrigin(od, modIdToName);
                     // Iter-17: a paintable item (base var0 + its colour variants) is a colour
                     // family → species-gated name reveal (all slots named once any form known).
-                    list.Add(new Entry((int)od.objectID, od.variation, finalName, iconCache[key],
-                        modOrigin, rarityCache[key], objectTypeCache[key],
-                        levelCache[key], sellValueCache[key], craftableCache[key],
-                        isPetSkin: false, isCattle: false,
-                        isColourVariant: PugDatabase.HasComponent<PaintableObjectCD>(od),
-                        nameIsFallback: fallbackNameKeys.Contains(key)));
+                    list.Add(
+                        new Entry(
+                            (int)od.objectID,
+                            od.variation,
+                            finalName,
+                            iconCache[key],
+                            modOrigin,
+                            rarityCache[key],
+                            objectTypeCache[key],
+                            levelCache[key],
+                            sellValueCache[key],
+                            craftableCache[key],
+                            isPetSkin: false,
+                            isCattle: false,
+                            isColourVariant: PugDatabase.HasComponent<PaintableObjectCD>(od),
+                            nameIsFallback: fallbackNameKeys.Contains(key)
+                        )
+                    );
                 }
 
                 // Iter-16.1: pet-skin entries (unique names, no conflict pass needed).
@@ -560,9 +652,7 @@ namespace ItemChecklist
                 // Iter-17: cattle colour + placeholder entries (suffixed/unique names).
                 list.AddRange(cattleEntries);
 
-                entries = list
-                    .OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
+                entries = list.OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
 
                 keyToIndex.Clear();
                 for (int i = 0; i < entries.Length; i++)
@@ -576,8 +666,7 @@ namespace ItemChecklist
                 // covered by the post-snapshot call in ItemChecklistMod. Idempotent.
                 SweepDiscoveredPhantoms();
                 float perfTotalMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
-                UnityEngine.Debug.Log(
-                    $"[ItemChecklist] PERF bake-total={perfTotalMs:F0}ms catalog-size={entries.Length}");
+                UnityEngine.Debug.Log($"[ItemChecklist] PERF bake-total={perfTotalMs:F0}ms catalog-size={entries.Length}");
             }
             finally
             {
@@ -609,13 +698,16 @@ namespace ItemChecklist
                     foreach (var def in mod.Assets.OfType<CoreLib.Submodule.Entity.WorkbenchDefinition>())
                     {
                         string itemId = def.itemID;
-                        if (string.IsNullOrEmpty(itemId)) continue;
-                        if (itemId.StartsWith("CoreLib:RootModWorkbench", StringComparison.Ordinal)) continue;
+                        if (string.IsNullOrEmpty(itemId))
+                            continue;
+                        if (itemId.StartsWith("CoreLib:RootModWorkbench", StringComparison.Ordinal))
+                            continue;
                         var related = def.relatedWorkbenches;
-                        if (related == null || related.Count == 0) continue;
-                        hubs.Add((int) API.Authoring.GetObjectID(itemId));
+                        if (related == null || related.Count == 0)
+                            continue;
+                        hubs.Add((int)API.Authoring.GetObjectID(itemId));
                         foreach (var rel in related)
-                            referenced.Add((int) API.Authoring.GetObjectID(rel));
+                            referenced.Add((int)API.Authoring.GetObjectID(rel));
                     }
                 }
             }
@@ -638,14 +730,15 @@ namespace ItemChecklist
         /// </summary>
         private static string FallbackName(ObjectDataCD od)
         {
-            if (API.Authoring.ObjectProperties.TryGetPropertyString(od.objectID, "name", out var internalName)
-                && !string.IsNullOrEmpty(internalName))
+            if (API.Authoring.ObjectProperties.TryGetPropertyString(od.objectID, "name", out var internalName) && !string.IsNullOrEmpty(internalName))
             {
                 string tail = internalName;
                 int colon = tail.IndexOf(':');
-                if (colon >= 0 && colon + 1 < tail.Length) tail = tail.Substring(colon + 1);
+                if (colon >= 0 && colon + 1 < tail.Length)
+                    tail = tail.Substring(colon + 1);
                 int dollar = tail.IndexOf('$');
-                if (dollar >= 0) tail = tail.Substring(0, dollar);
+                if (dollar >= 0)
+                    tail = tail.Substring(0, dollar);
                 if (!string.IsNullOrEmpty(tail))
                     return PascalCaseSplitter.Split(tail);
             }
@@ -665,22 +758,18 @@ namespace ItemChecklist
         {
             try
             {
-                var fields = PlayerController.GetObjectName(
-                    new ContainedObjectsBuffer { objectData = od },
-                    localize);
+                var fields = PlayerController.GetObjectName(new ContainedObjectsBuffer { objectData = od }, localize);
                 return (fields.text?.Replace("\n", " "), fields.dontLocalize);
             }
             catch (NullReferenceException ex)
             {
                 if (warnedIds.Add(od.objectID))
-                    Debug.LogWarning(
-                        $"[ItemChecklist] GetObjectName({od.objectID}, localize={localize}) threw NullReferenceException: {ex.Message}");
+                    Debug.LogWarning($"[ItemChecklist] GetObjectName({od.objectID}, localize={localize}) threw NullReferenceException: {ex.Message}");
             }
             catch (Exception ex)
             {
                 if (warnedIds.Add(od.objectID))
-                    Debug.LogWarning(
-                        $"[ItemChecklist] GetObjectName({od.objectID}, localize={localize}) threw (non-NRE): {ex.Message}");
+                    Debug.LogWarning($"[ItemChecklist] GetObjectName({od.objectID}, localize={localize}) threw (non-NRE): {ex.Message}");
             }
             return (null, false);
         }
@@ -702,16 +791,20 @@ namespace ItemChecklist
 
                 foreach (var authoring in Manager.mod.ExtraAuthoring)
                 {
-                    if (authoring == null) continue;
+                    if (authoring == null)
+                        continue;
                     var go = authoring.gameObject;
-                    if (go == null) continue;
+                    if (go == null)
+                        continue;
 
                     if (!go.TryGetComponent<ObjectAuthoring>(out var objectAuthoring))
                         continue;
 
                     var entryObjectId = API.Authoring.GetObjectID(objectAuthoring.objectName);
-                    if (entryObjectId != od.objectID) continue;
-                    if (objectAuthoring.variation != od.variation) continue;
+                    if (entryObjectId != od.objectID)
+                        continue;
+                    if (objectAuthoring.variation != od.variation)
+                        continue;
 
                     // Found a mod-side authoring for this object. We don't have a
                     // direct asset → mod-id link here (ItemBrowser uses a cached
@@ -726,9 +819,7 @@ namespace ItemChecklist
                         foreach (var mod in API.ModLoader.LoadedMods)
                         {
                             if (Normalize(mod.Metadata.name) == sourceMod)
-                                return modIdToName.TryGetValue(mod.ModId, out var displayName)
-                                    ? displayName
-                                    : mod.Metadata.name;
+                                return modIdToName.TryGetValue(mod.ModId, out var displayName) ? displayName : mod.Metadata.name;
                         }
                     }
 
@@ -746,7 +837,8 @@ namespace ItemChecklist
 
         private static string Normalize(string name)
         {
-            if (string.IsNullOrEmpty(name)) return string.Empty;
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
             return name.ToLowerInvariant().Replace("-", "").Replace("_", "").Replace(" ", "");
         }
 
@@ -767,10 +859,12 @@ namespace ItemChecklist
             Dictionary<long, int> sellValueCache,
             Dictionary<long, bool> craftableCache,
             List<ObjectDataCD> accepted,
-            HashSet<long> seenKeys)
+            HashSet<long> seenKeys
+        )
         {
             var info = PugDatabase.GetObjectInfo(od.objectID, od.variation);
-            if (info == null) return;
+            if (info == null)
+                return;
 
             // Iter-32: skip a repeat (objectID, variation). A golden-ingredient
             // recipe turns straight into a Rare family whose CookedFoodCD.rareVersion
@@ -779,10 +873,11 @@ namespace ItemChecklist
             // Without this guard the dish gets a duplicate `accepted` entry and is
             // counted twice in the N / M discovery tally.
             long key = DiscoveredState.PackKey((int)od.objectID, od.variation);
-            if (!seenKeys.Add(key)) return;
+            if (!seenKeys.Add(key))
+                return;
 
             var (locText, locDontLocalize) = ResolveOne(od, localize: true);
-            var (rawText, _)               = ResolveOne(od, localize: false);
+            var (rawText, _) = ResolveOne(od, localize: false);
             if (locDontLocalize && !string.IsNullOrEmpty(rawText))
                 locText = rawText;
             if (string.IsNullOrEmpty(locText))
@@ -790,14 +885,14 @@ namespace ItemChecklist
             if (string.IsNullOrEmpty(rawText))
                 rawText = PascalCaseSplitter.Split(od.objectID.ToString());
 
-            localizedNames[key]   = locText;
+            localizedNames[key] = locText;
             unlocalizedNames[key] = rawText;
             accepted.Add(od);
             iconCache[key] = info.smallIcon != null ? info.smallIcon : info.icon;
             rarityCache[key] = info.rarity;
             objectTypeCache[key] = info.objectType;
-            levelCache[key]      = PugDatabase.TryGetComponent<LevelCD>(od, out var lvlCdCooked) ? lvlCdCooked.level : 0;
-            sellValueCache[key]  = ComputeSellValue(od, info);
+            levelCache[key] = PugDatabase.TryGetComponent<LevelCD>(od, out var lvlCdCooked) ? lvlCdCooked.level : 0;
+            sellValueCache[key] = ComputeSellValue(od, info);
             // Iter-39: cooked dishes are produced by the Cooking Pot (an ingredient pair,
             // CookingIngredientCD / ConvertCookedFoodsSystem), never by a workbench recipe, so
             // requiredObjectsToCraft is empty → the generic derivation would file every dish as
@@ -807,7 +902,7 @@ namespace ItemChecklist
             // means "the player can produce it", which folds in cooking. Verified in-game (the
             // Iter-39 probe): all 6006 cooked entries read IsCraftable=false before this line;
             // cooking is the only recipeless station-production in the catalog.
-            craftableCache[key]  = true;
+            craftableCache[key] = true;
         }
 
         // Iter-33: faithful mirror of CK's cook-tier gate (Pug.Other:324037-324049).
@@ -819,13 +914,16 @@ namespace ItemChecklist
         // phantom of 3003 variations.
         private static bool CookedEpicReachable(int variation)
         {
-            ObjectID primary   = CookedFoodCD.GetPrimaryIngredientFromVariation(variation);
+            ObjectID primary = CookedFoodCD.GetPrimaryIngredientFromVariation(variation);
             ObjectID secondary = CookedFoodCD.GetSecondaryIngredientFromVariation(variation);
             var pInfo = PugDatabase.GetObjectInfo(primary);
             var sInfo = PugDatabase.GetObjectInfo(secondary);
-            if (PugDatabase.HasComponent<FlowerCD>(primary)   && pInfo != null && pInfo.rarity == Rarity.Rare) return true;
-            if (PugDatabase.HasComponent<FlowerCD>(secondary) && sInfo != null && sInfo.rarity == Rarity.Rare) return true;
-            if ((pInfo != null && pInfo.rarity == Rarity.Legendary) || (sInfo != null && sInfo.rarity == Rarity.Legendary)) return true;
+            if (PugDatabase.HasComponent<FlowerCD>(primary) && pInfo != null && pInfo.rarity == Rarity.Rare)
+                return true;
+            if (PugDatabase.HasComponent<FlowerCD>(secondary) && sInfo != null && sInfo.rarity == Rarity.Rare)
+                return true;
+            if ((pInfo != null && pInfo.rarity == Rarity.Legendary) || (sInfo != null && sInfo.rarity == Rarity.Legendary))
+                return true;
             return false;
         }
 
@@ -835,8 +933,7 @@ namespace ItemChecklist
         /// (9575-9589); a given (epicId, variation) is produced by exactly one ingredient
         /// pair, so a key is never both emitted and suppressed. See Iter-33.
         /// </summary>
-        internal bool IsSuppressedCookedPhantom(int objectId, int variation)
-            => suppressedCookedPhantoms.Contains(DiscoveredState.PackKey(objectId, variation));
+        internal bool IsSuppressedCookedPhantom(int objectId, int variation) => suppressedCookedPhantoms.Contains(DiscoveredState.PackKey(objectId, variation));
 
         /// <summary>
         /// Iter-33 self-healing backstop. Records (durably, via <see cref="PhantomViolationStore"/>)
@@ -850,10 +947,12 @@ namespace ItemChecklist
         public void SweepDiscoveredPhantoms()
         {
             var disc = DiscoveredState.Instance;
-            if (disc == null || suppressedCookedPhantoms.Count == 0) return;
+            if (disc == null || suppressedCookedPhantoms.Count == 0)
+                return;
             foreach (var key in suppressedCookedPhantoms)
             {
-                int oid = DiscoveredState.KeyObjectId(key), v = DiscoveredState.KeyVariation(key);
+                int oid = DiscoveredState.KeyObjectId(key),
+                    v = DiscoveredState.KeyVariation(key);
                 if (disc.IsDiscovered(oid, v))
                     PhantomViolationStore.Record(oid, v);
             }
@@ -866,9 +965,7 @@ namespace ItemChecklist
         // derive from rarity + crafting ingredients (+ cooked-food recursion).
         private static int ComputeSellValue(ObjectDataCD od, ObjectInfo info)
         {
-            if (info == null
-                || PugDatabase.HasComponent<CantBeSoldAuthoring>(od)
-                || info.rarity == Rarity.Legendary)
+            if (info == null || PugDatabase.HasComponent<CantBeSoldAuthoring>(od) || info.rarity == Rarity.Legendary)
                 return 0;
 
             int sellValue = info.sellValue;

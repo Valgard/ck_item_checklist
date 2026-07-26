@@ -31,7 +31,7 @@ namespace ItemChecklist
         {
             var w = ItemChecklistWindow.Instance;
             if (w != null && w.Root != null && w.Root.activeSelf)
-                __result = true;   // window open → ESC closes it, never opens pause
+                __result = true; // window open → ESC closes it, never opens pause
         }
     }
 }

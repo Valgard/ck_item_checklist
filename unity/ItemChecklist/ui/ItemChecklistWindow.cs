@@ -10,19 +10,19 @@ namespace ItemChecklist.UI
         // Editor-wired serialized fields
         public GameObject root;
         public SpriteRenderer background;
-        public PugText title;          // footer status line — right-aligned discovered/total counter
-        public PugText shownLabel;     // footer status line — left-aligned "N shown" (filtered only)
-        public Transform rowsContent;     // assigned to RowsContainer/Content in Editor
-        public GameObject rowPrefab;      // assigned to ItemRow.prefab in Editor
+        public PugText title; // footer status line — right-aligned discovered/total counter
+        public PugText shownLabel; // footer status line — left-aligned "N shown" (filtered only)
+        public Transform rowsContent; // assigned to RowsContainer/Content in Editor
+        public GameObject rowPrefab; // assigned to ItemRow.prefab in Editor
         public UIScrollWindow scrollWindow;
         public AscDescToggle ascDescToggle;
         public DropdownWidget sortDropdown;
         public FilterWidget filter;
         public SearchBar searchBar;
-        public ClearSearchButton clearSearchButton;   // declared here; wired to its SearchBar in the window prefab
+        public ClearSearchButton clearSearchButton; // declared here; wired to its SearchBar in the window prefab
 
         private ItemChecklistContent _content;
-        private ItemListViewModel _wiredModel;   // last model whose OnResultsChanged we subscribed to (for clean re-bake unsubscribe)
+        private ItemListViewModel _wiredModel; // last model whose OnResultsChanged we subscribed to (for clean re-bake unsubscribe)
 
         private ItemChecklistContent Content
         {
@@ -34,15 +34,18 @@ namespace ItemChecklist.UI
             }
         }
 
-        private static string[] SortLabels => new[]
-        {
-            Loc.T("ItemChecklist-Sorters/Name"),
-            Loc.T("ItemChecklist-Sorters/Rarity"),
-            Loc.T("ItemChecklist-Sorters/Level"),
-            Loc.T("ItemChecklist-Sorters/Value"),
-        };
+        private static string[] SortLabels =>
+            new[]
+            {
+                Loc.T("ItemChecklist-Sorters/Name"),
+                Loc.T("ItemChecklist-Sorters/Rarity"),
+                Loc.T("ItemChecklist-Sorters/Level"),
+                Loc.T("ItemChecklist-Sorters/Value"),
+            };
 
-        private static readonly MemberInfo MiUpdateScrollHeight = typeof(UIScrollWindow).GetMembersChecked().FirstOrDefault(x => x.GetNameChecked() == "UpdateScrollHeight");
+        private static readonly MemberInfo MiUpdateScrollHeight = typeof(UIScrollWindow)
+            .GetMembersChecked()
+            .FirstOrDefault(x => x.GetNameChecked() == "UpdateScrollHeight");
 
         // IModUI implementation
         public GameObject Root => root;
@@ -61,12 +64,13 @@ namespace ItemChecklist.UI
         private void OnDestroy()
         {
             DiscoveredState.Instance.Changed -= OnDiscoveryChanged;
-            if (Instance == this) Instance = null;
+            if (Instance == this)
+                Instance = null;
         }
 
         public void ShowUI()
         {
-            Iter26FocusProbe.Record("Window.ShowUI (opened)");   // THROWAWAY iter-26 focus-race probe — remove with the fix
+            Iter26FocusProbe.Record("Window.ShowUI (opened)"); // THROWAWAY iter-26 focus-race probe — remove with the fix
             root.SetActive(true);
             // Hide the game HUD (health/food/hotbar/buffs) while the checklist is up —
             // CK's own non-persisting menu-open mechanism (mirrors RadicalMenuController).
@@ -79,36 +83,82 @@ namespace ItemChecklist.UI
         private void WireControls()
         {
             var model = ItemChecklistMod.ListView;
-            if (model == null) return;
+            if (model == null)
+                return;
             if (_wiredModel != null && !ReferenceEquals(_wiredModel, model))
-                _wiredModel.OnResultsChanged -= OnViewResultsChanged;   // release the discarded model from the previous bake
+                _wiredModel.OnResultsChanged -= OnViewResultsChanged; // release the discarded model from the previous bake
             model.OnResultsChanged -= OnViewResultsChanged;
             model.OnResultsChanged += OnViewResultsChanged;
             _wiredModel = model;
             if (ascDescToggle != null)
-                ascDescToggle.Configure(model.Ascending, asc => { model.Ascending = asc; });
+                ascDescToggle.Configure(
+                    model.Ascending,
+                    asc =>
+                    {
+                        model.Ascending = asc;
+                    }
+                );
             if (sortDropdown != null)
-                sortDropdown.Configure(SortLabels, (int)model.Mode, i => { model.Mode = (SortMode)i; });
+                sortDropdown.Configure(
+                    SortLabels,
+                    (int)model.Mode,
+                    i =>
+                    {
+                        model.Mode = (SortMode)i;
+                    }
+                );
             if (filter != null)
             {
                 var members = new System.Collections.Generic.List<(string, string, System.Func<bool>, System.Action)>
                 {
                     // Clear-all pseudo-row (empty section → no header rendered).
                     ("", Loc.T("ItemChecklist-Filters/ClearAll"), () => false, () => filter.ClearAll()),
-
-                    ("ItemChecklist-Filters/SecDiscovery", Loc.T("ItemChecklist-Filters/Discovered"),   () => model.DiscoverySelected(true),  () => model.ToggleDiscovery(true)),
-                    ("ItemChecklist-Filters/SecDiscovery", Loc.T("ItemChecklist-Filters/Undiscovered"), () => model.DiscoverySelected(false), () => model.ToggleDiscovery(false)),
-
+                    (
+                        "ItemChecklist-Filters/SecDiscovery",
+                        Loc.T("ItemChecklist-Filters/Discovered"),
+                        () => model.DiscoverySelected(true),
+                        () => model.ToggleDiscovery(true)
+                    ),
+                    (
+                        "ItemChecklist-Filters/SecDiscovery",
+                        Loc.T("ItemChecklist-Filters/Undiscovered"),
+                        () => model.DiscoverySelected(false),
+                        () => model.ToggleDiscovery(false)
+                    ),
                     // Iter-20: possession dimension, placed right under Discovery.
-                    ("ItemChecklist-Filters/SecPossession", Loc.T("ItemChecklist-Filters/Owned"),    () => model.OwnedSelected(true),  () => model.ToggleOwned(true)),
-                    ("ItemChecklist-Filters/SecPossession", Loc.T("ItemChecklist-Filters/NotOwned"), () => model.OwnedSelected(false), () => model.ToggleOwned(false)),
+                    (
+                        "ItemChecklist-Filters/SecPossession",
+                        Loc.T("ItemChecklist-Filters/Owned"),
+                        () => model.OwnedSelected(true),
+                        () => model.ToggleOwned(true)
+                    ),
+                    (
+                        "ItemChecklist-Filters/SecPossession",
+                        Loc.T("ItemChecklist-Filters/NotOwned"),
+                        () => model.OwnedSelected(false),
+                        () => model.ToggleOwned(false)
+                    ),
                 };
                 foreach (var r in RarityFilterTiers())
                     members.Add(("ItemChecklist-Filters/SecRarity", RarityLabel(r), () => model.RaritySelected(r), () => model.ToggleRarity(r)));
                 foreach (var c in ItemCategories.All)
                     members.Add(("ItemChecklist-Filters/SecCategory", CategoryLabel(c), () => model.CategorySelected(c), () => model.ToggleCategory(c)));
-                members.Add(("ItemChecklist-Filters/SecCraftable", Loc.T("ItemChecklist-Filters/Craftable"),     () => model.CraftSelected(true),  () => model.ToggleCraft(true)));
-                members.Add(("ItemChecklist-Filters/SecCraftable", Loc.T("ItemChecklist-Filters/NotCraftable"), () => model.CraftSelected(false), () => model.ToggleCraft(false)));
+                members.Add(
+                    (
+                        "ItemChecklist-Filters/SecCraftable",
+                        Loc.T("ItemChecklist-Filters/Craftable"),
+                        () => model.CraftSelected(true),
+                        () => model.ToggleCraft(true)
+                    )
+                );
+                members.Add(
+                    (
+                        "ItemChecklist-Filters/SecCraftable",
+                        Loc.T("ItemChecklist-Filters/NotCraftable"),
+                        () => model.CraftSelected(false),
+                        () => model.ToggleCraft(false)
+                    )
+                );
 
                 filter.Configure(members, () => model.ActiveFilterCount, () => model.ClearAllFilters());
             }
@@ -144,16 +194,18 @@ namespace ItemChecklist.UI
         // is needed here — only UpdateScrollHeight (private → reflection) + ResetScroll.
         private void RewireScrollHeight()
         {
-            if (scrollWindow == null) return;
+            if (scrollWindow == null)
+                return;
             API.Reflection.Invoke(MiUpdateScrollHeight, scrollWindow);
-            scrollWindow.ResetScroll();   // SetScrollValue(1f) = top
+            scrollWindow.ResetScroll(); // SetScrollValue(1f) = top
         }
 
         private void PopulateContent()
         {
             var content = Content;
             var catalog = ItemChecklistMod.Catalog;
-            if (content == null || catalog == null || rowPrefab == null) return;
+            if (content == null || catalog == null || rowPrefab == null)
+                return;
 
             float perfT0 = UnityEngine.Time.realtimeSinceStartup;
 
@@ -177,8 +229,7 @@ namespace ItemChecklist.UI
             content.RefreshVisible();
 
             float perfMs = (UnityEngine.Time.realtimeSinceStartup - perfT0) * 1000f;
-            UnityEngine.Debug.Log(
-                $"[ItemChecklist] PERF spawn={perfMs:F0}ms pool={content.PoolSize} count={catalog.Count}");
+            UnityEngine.Debug.Log($"[ItemChecklist] PERF spawn={perfMs:F0}ms pool={content.PoolSize} count={catalog.Count}");
         }
 
         private void ApplyTheme()
@@ -224,27 +275,31 @@ namespace ItemChecklist.UI
 
         private void RenderStatus()
         {
-            if (title != null) title.Render(FormatTitle());
-            if (shownLabel != null) shownLabel.Render(FormatShown());
+            if (title != null)
+                title.Render(FormatTitle());
+            if (shownLabel != null)
+                shownLabel.Render(FormatShown());
         }
 
         // Iter-36: external trigger to re-render the footer counter (used when the counter
         // mode is toggled in-menu). No-op while the window is closed.
         internal void RefreshStatus()
         {
-            if (root == null || !root.activeSelf) return;
+            if (root == null || !root.activeSelf)
+                return;
             RenderStatus();
         }
 
         private void OnDiscoveryChanged()
         {
-            if (root == null || !root.activeSelf) return;
+            if (root == null || !root.activeSelf)
+                return;
             RenderStatus();
             var model = ItemChecklistMod.ListView;
             if (model != null && (model.DiscoverySelected(true) || model.DiscoverySelected(false)))
-                model.Recompute();          // discovery filter active → membership may change
+                model.Recompute(); // discovery filter active → membership may change
             else
-                Content?.RefreshVisible();   // otherwise just repaint the affected row
+                Content?.RefreshVisible(); // otherwise just repaint the affected row
         }
 
         /// <summary>
@@ -254,8 +309,9 @@ namespace ItemChecklist.UI
         /// </summary>
         public void RebindRows()
         {
-            if (root == null || !root.activeSelf) return;
-            PopulateContent();   // SetCount + UpdateScrollHeight + ResetScroll + RefreshVisible
+            if (root == null || !root.activeSelf)
+                return;
+            PopulateContent(); // SetCount + UpdateScrollHeight + ResetScroll + RefreshVisible
             // After PopulateContent (which Recomputes the fresh model and refreshes content
             // synchronously), re-wire so the control callbacks capture the new ItemListViewModel
             // and the search field re-syncs. Order matters: PopulateContent must run first so its
@@ -272,18 +328,19 @@ namespace ItemChecklist.UI
         // ReSharper disable once UnusedMember.Local
         private void OnViewResultsChanged()
         {
-            if (root == null || !root.activeSelf) return;
+            if (root == null || !root.activeSelf)
+                return;
             RenderStatus();
             var content = Content;
-            if (content == null) return;
+            if (content == null)
+                return;
             var model = ItemChecklistMod.ListView;
             content.SetCount(model != null ? model.Count : 0);
             RewireScrollHeight();
             content.RefreshVisible();
         }
 
-        private static Rarity[] RarityFilterTiers() => new[]
-            { Rarity.Common, Rarity.Uncommon, Rarity.Rare, Rarity.Epic, Rarity.Legendary };
+        private static Rarity[] RarityFilterTiers() => new[] { Rarity.Common, Rarity.Uncommon, Rarity.Rare, Rarity.Epic, Rarity.Legendary };
 
         private static string RarityLabel(Rarity r) => Loc.T($"ItemChecklist-Rarities/{r}");
 

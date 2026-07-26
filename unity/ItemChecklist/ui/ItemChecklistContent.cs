@@ -42,9 +42,10 @@ namespace ItemChecklist.UI
         private readonly List<ItemRow> _pool = new List<ItemRow>();
         private GameObject _rowPrefab;
         private UIScrollWindow _scrollWindow;
-        private int _count;            // reported entry count (catalog.Count)
+        private int _count; // reported entry count (catalog.Count)
         private int _lastFirstIndex = -1;
-        private TooltipSlot _tooltipHelper;   // Iter-22: one shared hover-data helper
+        private TooltipSlot _tooltipHelper; // Iter-22: one shared hover-data helper
+
         // Iter-22: the window viewport (ContentsMask) for the row-hover bounds check —
         // row colliders extend past the mask, so a cursor in the header/footer/margin
         // must not hover a clipped row. One window → static.
@@ -75,8 +76,7 @@ namespace ItemChecklist.UI
             // it returns the sprite's native size), so guard on that; otherwise keep
             // the compile-time ItemRow.RowHeight fallback.
             var proto = rowPrefab != null ? rowPrefab.GetComponent<ItemRow>() : null;
-            if (proto != null && proto.background != null
-                && proto.background.drawMode != SpriteDrawMode.Simple)
+            if (proto != null && proto.background != null && proto.background.drawMode != SpriteDrawMode.Simple)
                 RowHeight = proto.background.size.y;
             if (_scrollWindow == null)
                 _scrollWindow = GetComponentInParent<UIScrollWindow>(true);
@@ -106,14 +106,15 @@ namespace ItemChecklist.UI
         /// not hover a clipped row. Mirrors PopupWidget.PointerOverPanel.</summary>
         public static bool PointerInViewport()
         {
-            if (s_viewportMask == null) return false;
+            if (s_viewportMask == null)
+                return false;
             var cam = Manager.camera != null ? Manager.camera.uiCamera : null;
-            if (cam == null) return false;
+            if (cam == null)
+                return false;
             Vector3 c = cam.ScreenToWorldPoint(Input.mousePosition);
             Vector3 p = s_viewportMask.position;
             Vector3 s = s_viewportMask.lossyScale;
-            return Mathf.Abs(c.x - p.x) <= s.x * 0.5f
-                && Mathf.Abs(c.y - p.y) <= s.y * 0.5f;
+            return Mathf.Abs(c.x - p.x) <= s.x * 0.5f && Mathf.Abs(c.y - p.y) <= s.y * 0.5f;
         }
 
         /// <summary>
@@ -124,7 +125,8 @@ namespace ItemChecklist.UI
         /// </summary>
         public void EnsurePool()
         {
-            if (_rowPrefab == null) return;
+            if (_rowPrefab == null)
+                return;
             int target = ComputePoolSize();
             for (int k = _pool.Count; k < target; k++)
             {
@@ -134,13 +136,13 @@ namespace ItemChecklist.UI
                 // runtime so it can be left enabled in the prefab without affecting the
                 // game. The window's ContentsMask does the real clipping.
                 var editorMask = go.transform.Find("ContentMask");
-                if (editorMask != null) editorMask.gameObject.SetActive(false);
+                if (editorMask != null)
+                    editorMask.gameObject.SetActive(false);
                 _pool.Add(go.GetComponent<ItemRow>());
             }
-            if (!_defaultLabelColorCaptured && _pool.Count > 0
-                && _pool[0] != null && _pool[0].label != null)
+            if (!_defaultLabelColorCaptured && _pool.Count > 0 && _pool[0] != null && _pool[0].label != null)
             {
-                _defaultLabelColor = _pool[0].label.color;   // PugText.color getter → style.color
+                _defaultLabelColor = _pool[0].label.color; // PugText.color getter → style.color
                 _defaultLabelColorCaptured = true;
             }
             // Iter-16.1: capture the pristine icon material once (before any pet-skin
@@ -156,15 +158,14 @@ namespace ItemChecklist.UI
                 _tooltipHelper = go.AddComponent<TooltipSlot>();
             }
             foreach (var row in _pool)
-                if (row != null) row.SetTooltipHelper(_tooltipHelper);
+                if (row != null)
+                    row.SetTooltipHelper(_tooltipHelper);
         }
 
         private int ComputePoolSize()
         {
-            float wh = (_scrollWindow != null && _scrollWindow.windowHeight > 0f)
-                ? _scrollWindow.windowHeight
-                : _fallbackWindowHeight;
-            return Mathf.CeilToInt(wh / RowHeight) + 4;   // +4 buffer: 2 partial/spare rows top + bottom (denser rows since RowHeight 1.5)
+            float wh = (_scrollWindow != null && _scrollWindow.windowHeight > 0f) ? _scrollWindow.windowHeight : _fallbackWindowHeight;
+            return Mathf.CeilToInt(wh / RowHeight) + 4; // +4 buffer: 2 partial/spare rows top + bottom (denser rows since RowHeight 1.5)
         }
 
         /// <summary>Set the total entry count; drives reported height + scrollbar.</summary>
@@ -186,19 +187,23 @@ namespace ItemChecklist.UI
         public void UpdateContainingElements(float scroll)
         {
             int first = ClampFirstIndex(Mathf.FloorToInt(scroll / RowHeight));
-            if (first == _lastFirstIndex) return;
+            if (first == _lastFirstIndex)
+                return;
             Rebind(first);
         }
 
         public bool IsBottomElementSelected() => false;
+
         public bool IsTopElementSelected() => false;
+
         public float GetCurrentWindowHeight() => _count * RowHeight;
 
         // ---------------------------------------------------------------------
 
         private int ClampFirstIndex(int first)
         {
-            if (_count <= 0) return 0;
+            if (_count <= 0)
+                return 0;
             return Mathf.Clamp(first, 0, Mathf.Max(0, _count - 1));
         }
 
@@ -211,14 +216,17 @@ namespace ItemChecklist.UI
             for (int k = 0; k < _pool.Count; k++)
             {
                 var row = _pool[k];
-                if (row == null) continue;
+                if (row == null)
+                    continue;
                 int displayIdx = first + k;
                 if (catalog == null || model == null || state == null || displayIdx >= _count)
                 {
-                    if (row.gameObject.activeSelf) row.gameObject.SetActive(false);
+                    if (row.gameObject.activeSelf)
+                        row.gameObject.SetActive(false);
                     continue;
                 }
-                if (!row.gameObject.activeSelf) row.gameObject.SetActive(true);
+                if (!row.gameObject.activeSelf)
+                    row.gameObject.SetActive(true);
                 // Pin row 0's TOP to _maskTopLocalY (flush) regardless of RowHeight:
                 // centre = top - RowHeight/2, each row RowHeight below the previous.
                 row.transform.localPosition = new Vector3(0f, _maskTopLocalY - RowHeight * (displayIdx + 0.5f), 0f);
@@ -227,8 +235,7 @@ namespace ItemChecklist.UI
                 // CK-authoritative rarity colour. useDefaultColorForCommon: true →
                 // Common/Poor resolve to the label's normal colour (no visible tint),
                 // Uncommon+ get slotBorderRarityColors[(int)(rarity+1)].
-                Color rarityColor = Manager.ui.GetSlotBorderRarityColor(
-                    entry.Rarity, useDefaultColorForCommon: true, defaultColor: _defaultLabelColor);
+                Color rarityColor = Manager.ui.GetSlotBorderRarityColor(entry.Rarity, useDefaultColorForCommon: true, defaultColor: _defaultLabelColor);
                 // Iter-16.1: pet skins decouple name (species discovered, CK var-0) from
                 // detail/icon (this skin collected, mod ledger); normal items use the same
                 // discovered flag for both. nameKnown gates only the ???/tooltip; the
@@ -239,16 +246,27 @@ namespace ItemChecklist.UI
                 // form is discovered (a cattle may be first met at a non-0 colour; a paintable
                 // item may be found coloured before plain), so the gate is "any variation",
                 // not var 0. The per-variant collected tick still routes through IsCollected.
-                bool nameKnown = entry.IsPetSkin
-                    ? state.IsDiscovered(entry.ObjectId, 0)
-                    : entry.IsColourVariant
-                        ? state.IsDiscoveredAnyVariation(entry.ObjectId)
-                        : state.IsDiscovered(entry.ObjectId, entry.Variation);
+                bool nameKnown =
+                    entry.IsPetSkin ? state.IsDiscovered(entry.ObjectId, 0)
+                    : entry.IsColourVariant ? state.IsDiscoveredAnyVariation(entry.ObjectId)
+                    : state.IsDiscovered(entry.ObjectId, entry.Variation);
                 bool showDetails = ItemChecklistMod.IsCollected(entry.ObjectId, entry.Variation);
                 int owned = ItemChecklistMod.OwnedCount(entry.ObjectId, entry.Variation);
-                row.Bind(entry.ObjectId, entry.Icon, entry.DisplayName, nameKnown, showDetails,
-                    rarityColor, entry.Rarity, entry.Level, entry.SellValue,
-                    owned, entry.IsPetSkin, entry.Variation, entry.NameIsFallback);
+                row.Bind(
+                    entry.ObjectId,
+                    entry.Icon,
+                    entry.DisplayName,
+                    nameKnown,
+                    showDetails,
+                    rarityColor,
+                    entry.Rarity,
+                    entry.Level,
+                    entry.SellValue,
+                    owned,
+                    entry.IsPetSkin,
+                    entry.Variation,
+                    entry.NameIsFallback
+                );
             }
         }
 
@@ -258,7 +276,8 @@ namespace ItemChecklist.UI
             // release pool resources before the GameObjects are torn down.
             foreach (var row in _pool)
             {
-                if (row == null) continue;
+                if (row == null)
+                    continue;
                 foreach (var pugText in row.GetComponentsInChildren<PugText>(true))
                     pugText.Clear();
             }

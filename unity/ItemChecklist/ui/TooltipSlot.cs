@@ -20,7 +20,12 @@ namespace ItemChecklist.UI
         {
             _obj = new ContainedObjectsBuffer
             {
-                objectData = new ObjectDataCD { objectID = id, variation = variation, amount = 1 }
+                objectData = new ObjectDataCD
+                {
+                    objectID = id,
+                    variation = variation,
+                    amount = 1,
+                },
             };
         }
 
@@ -37,7 +42,9 @@ namespace ItemChecklist.UI
 
         // Public delegators so the row (and the Task-1 spike) can pull each part.
         public TextAndFormatFields TitleFor() => GetHoverTitle();
+
         public List<TextAndFormatFields> DescriptionFor() => GetHoverDescription();
+
         public List<TextAndFormatFields> StatsFor() => GetHoverStats(false);
     }
 }

@@ -9,9 +9,9 @@ namespace ItemChecklist.UI
     /// </summary>
     public sealed class AscDescToggle : ClickButton
     {
-        public SpriteRenderer glyph;     // shows asc/desc sprite
-        public Sprite ascSprite;         // ui_icon_sort_order_asc
-        public Sprite descSprite;        // ui_icon_sort_order_desc
+        public SpriteRenderer glyph; // shows asc/desc sprite
+        public Sprite ascSprite; // ui_icon_sort_order_asc
+        public Sprite descSprite; // ui_icon_sort_order_desc
 
         private Action<bool> _onToggled;
         private bool _ascending = true;
@@ -32,7 +32,8 @@ namespace ItemChecklist.UI
 
         private void Apply()
         {
-            if (glyph != null) glyph.sprite = _ascending ? ascSprite : descSprite;
+            if (glyph != null)
+                glyph.sprite = _ascending ? ascSprite : descSprite;
         }
     }
 }
