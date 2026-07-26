@@ -1,0 +1,24 @@
+{
+  "exclude": ["Outsorted", "Background", "Search Field Complete", "Dropdown Complete"],
+  "sliced": ["Entry Background", "Entry Toggled", "Entry Selected", "Field Background",
+             "Dropdown Background", "Button Background", "Panel", "Rarity Border",
+             "Scrollbar Background", "Scrollbar Handler", "Scrollbar Highlight", "Scrollbar Selector"],
+  "borderOverride": [
+    {"name": "Window", "w": 16, "h": 16, "border": [4, 4, 4, 4]},
+    {"name": "Entry Selected", "w": 8, "h": 8, "border": [3, 3, 3, 3]},
+    {"name": "Entry Toggled", "w": 10, "h": 10, "border": [4, 4, 4, 4]},
+    {"name": "Scrollbar Selector", "w": 4, "h": 8, "border": [1, 3, 1, 3]},
+    {"name": "Caret", "w": 2, "h": 8, "border": [0, 1, 0, 1]},
+    {"name": "Checkbox empty", "w": 6, "h": 6, "border": [1, 1, 1, 1]}
+  ],
+  "rename": {
+    "Entry Background 8x1": "Option Background 8x8",
+    "Panel": "Option Panel",
+    "Entry Toggled 8x8": "Entry Toggled",
+    "Entry Toggled 10x10": "ItemRow Entry Toggled"
+  },
+  "pad": {
+    "Entry Background 8x1": {"w": 8, "h": 8, "anchor": "bottom"},
+    "Unknown Object": {"w": 16, "h": 16, "anchor": [5, 3]}
+  }
+}
