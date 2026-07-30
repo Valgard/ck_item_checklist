@@ -5,6 +5,22 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.2] - 2026-07-30
+
+Fixes owned-item counts being lost when a save is loaded away from your base.
+
+### Fixed
+
+- **Stored building materials no longer drop out of your owned counts.** Items the
+  game classes as world growth — stalagmites, mushrooms, grasses, cave furniture and
+  the like — were being removed from the remembered contents of your containers
+  every single time a world was loaded. Loading a save while standing far from your
+  base therefore showed them as not owned until you walked back, and the next
+  autosave made that loss permanent. Near your base the periodic scan put them back
+  within seconds, which is why this was easy to miss. **Nothing needs doing to
+  recover:** the counts are rebuilt from your containers the next time you are at
+  your base.
+
 ## [1.3.1] - 2026-07-23
 
 Fixes missing text on the locate feature from 1.3.0.
