@@ -36,20 +36,35 @@ namespace ItemChecklist.Possession
             return string.Join("\n", lines);
         }
 
-        public void LoadFrom(string text)
+        /// <summary>Parse a serialized collection, replacing everything currently held.
+        /// <para>Iter-44 (review C-3): this parser cannot throw on damaged input — it skipped
+        /// every unparseable line silently, so a file truncated mid-write parsed into a SUBSET
+        /// and the caller reported success. The store then stayed writable and the next autosave
+        /// persisted the subset over the intact file; the one after that took the
+        /// <c>.pugbackup</c> too. On an ever-owned set with no second source that is
+        /// unrecoverable. Truncation almost always leaves exactly one malformed line, so
+        /// counting the skips is a near-free detector.</para></summary>
+        /// <returns>How many non-empty lines could NOT be parsed. Any value > 0 means the file
+        /// is damaged, and the caller must treat the result as a FAILED load.</returns>
+        public int LoadFrom(string text)
         {
             _collected.Clear();
-            if (string.IsNullOrEmpty(text))
-                return;
-            foreach (var line in text.Split('\n'))
-            {
-                int colon = line.IndexOf(':');
-                if (colon <= 0)
-                    continue;
-                if (int.TryParse(line.Substring(0, colon), out int id) && int.TryParse(line.Substring(colon + 1), out int skin))
-                    _collected.Add(DiscoveredState.PackKey(id, skin));
-            }
             Dirty = false;
+            if (string.IsNullOrEmpty(text))
+                return 0;
+            int skipped = 0;
+            foreach (var raw in text.Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0)
+                    continue; // a trailing newline is not damage
+                int colon = line.IndexOf(':');
+                if (colon > 0 && int.TryParse(line.Substring(0, colon), out int id) && int.TryParse(line.Substring(colon + 1), out int skin))
+                    _collected.Add(DiscoveredState.PackKey(id, skin));
+                else
+                    skipped++;
+            }
+            return skipped;
         }
     }
 }

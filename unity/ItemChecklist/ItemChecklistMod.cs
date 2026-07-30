@@ -195,6 +195,12 @@ namespace ItemChecklist
         // the pet-skin one is unrecoverable (no second source), while the ledger self-rebuilds.
         private static bool s_ledgerReadOnly;
         private static bool s_petsReadOnly;
+
+        /// <summary>Iter-44: true while this character's possession data is NOT being persisted
+        /// because a store's load failed. The checklist footer shows a marker for it — see
+        /// <see cref="SavePossessionLedger"/> for why an invisible read-only mode is a problem in
+        /// its own right.</summary>
+        internal static bool PossessionReadOnly => s_ledgerReadOnly || s_petsReadOnly;
         private float _possessionTimer;
 
         // Prune grace: chunks stream in asynchronously after a world load/teleport, so
@@ -420,10 +426,28 @@ namespace ItemChecklist
         /// would cost everything on disk (and for pet skins that is unrecoverable).</para></summary>
         internal static void SavePossessionLedger()
         {
-            if (s_ledger != null && !s_ledgerReadOnly && !string.IsNullOrEmpty(s_ledgerGuid))
+            if (string.IsNullOrEmpty(s_ledgerGuid))
+                return;
+            if (s_ledger != null && !s_ledgerReadOnly)
                 PossessionStore.Save(s_ledgerGuid, s_ledger);
-            if (Pets != null && Pets.Dirty && !s_petsReadOnly && !string.IsNullOrEmpty(s_ledgerGuid))
+            if (Pets != null && Pets.Dirty && !s_petsReadOnly)
                 PetCollectionStore.Save(s_ledgerGuid, Pets);
+
+            // Iter-44: say — once per character per session — that a save was skipped. Iter-43
+            // put the read-only mode in place but surfaced it NOWHERE: the DIAG save lines live
+            // inside the Save() that is being skipped, and nothing in the UI reads the flags. For
+            // pet skins the visible symptom is then indistinguishable from the loss the read-only
+            // mode just prevented (every ever-owned skin renders uncollected, N drops), so the
+            // rescue looks exactly like the bug.
+            if (s_ledgerReadOnly || s_petsReadOnly)
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.SaveSkipped,
+                    PossessionIncidentStore.SaveSkipped + ":" + s_ledgerGuid,
+                    "guid=" + s_ledgerGuid + " ledgerReadOnly=" + s_ledgerReadOnly + " petsReadOnly=" + s_petsReadOnly,
+                    "possession data is NOT being saved this session because its file could not be read (see the "
+                        + "load-failed entry above). Nothing on disk is being overwritten. Owned counts and collected "
+                        + "pet skins may therefore look wrong in-game while the files themselves are intact."
+                );
         }
 
         public void Update()
@@ -522,6 +546,10 @@ namespace ItemChecklist
             {
                 ItemTracker.Clear(); // Iter-40: tracking is session-only — reset on any character/world switch
                 SavePossessionLedger(); // backstop: persist the outgoing char on switch
+                // Iter-44: the anomaly detectors compare against THIS ledger's size, so their
+                // per-character state must not carry over (this runs AFTER the backstop save,
+                // which is still the outgoing character's).
+                PossessionScanner.ResetSessionSignals();
                 if (string.IsNullOrEmpty(activeGuid))
                 {
                     s_ledger = null;

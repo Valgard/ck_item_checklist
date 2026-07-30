@@ -49,7 +49,12 @@ namespace ItemChecklist.Possession
         public static PossessionView Scan(PossessionLedger ledger, PetCollection pets, float radius, bool allowPrune)
         {
             bool diag = ModConfig.Diagnostics;
-            float dT0 = diag ? Time.realtimeSinceStartup : 0f;
+            // Iter-44: read the clock unconditionally. It was diag-gated, but the anomaly
+            // suppression below needs to know how long ago the previous scan ran — with the field
+            // only written under diagnostics, a default-off session had no cadence signal at all.
+            // One Time call per scan interval is free.
+            float nowRt = Time.realtimeSinceStartup;
+            float dT0 = diag ? nowRt : 0f;
             var world = ResolveWorld();
             if (world == null)
             {
@@ -58,16 +63,22 @@ namespace ItemChecklist.Possession
                 // 0 / M with no explanation anywhere. Display-only (with no world there is no
                 // scan, and the prune is skipped via havePlayer), so one warning per session is
                 // the right weight — not a durable incident.
-                if (!_worldNullWarned)
+                // Iter-44: gated on IsInPlayableWorld and RE-ARMED on every successful resolve.
+                // As a bare per-process one-shot it was spent by the benign case — Iter-43's own
+                // in-game notes record it firing during a world load, i.e. exactly where the
+                // message says it is harmless — so a genuine mid-play world loss, the case worth
+                // hearing about, would then have been silent for the rest of the session.
+                if (!_worldNullWarned && WorldState.IsInPlayableWorld)
                 {
                     _worldNullWarned = true;
                     Debug.LogWarning(
-                        "[ItemChecklist] possession scan skipped: no ECS world resolved. Owned counts will "
-                            + "read 0 until a world is available. (Harmless on the main menu / during a load.)"
+                        "[ItemChecklist] possession scan skipped while in a playable world: no ECS world resolved. "
+                            + "Owned counts will read 0 until a world is available."
                     );
                 }
                 return PossessionView.Empty;
             }
+            _worldNullWarned = false; // a resolve worked → re-arm, so the next real loss is heard
             var em = world.EntityManager;
             float dTWorld = diag ? Time.realtimeSinceStartup : 0f;
 
@@ -101,12 +112,13 @@ namespace ItemChecklist.Possession
             // the unconditional dict replacement that used to make this self-heal automatic, and
             // Iter-44 defines exactly what replaced it:
             //   • on a tile that is re-observed, `PossessionLedger.Publish` drops the no-longer-
-            //     written id only when that tile's contents may shrink — a container was observed
-            //     there, OR the tile is DEFINITELY OBSERVABLE (player within PruneRadius AND
+            //     written id only when that tile's contents may shrink — the world is past the
+            //     streaming grace (`allowPrune`) AND either a container was observed there OR the
+            //     scan would have seen anything standing there (player within PruneRadius AND
             //     anchor-covered). A tile observed from far away (only its co-located torch in
             //     range at ~95 tiles) deliberately keeps the id: that is the I4 protection.
             //   • on a tile that held nothing else, `PruneStaleNear` drops the whole tile under
-            //     the same player-near + anchor-covered premise.
+            //     the same grace + player-near + anchor-covered premise.
             // So a blacklist addition self-heals on the next visit to that tile, not merely on any
             // scan that sees it — and note both paths need the tile to stay anchor-covered, so if
             // its workbench is gone (or AnchorRadius was lowered past it) the entry simply
@@ -175,10 +187,10 @@ namespace ItemChecklist.Possession
             var auxScan = new Dictionary<long, Dictionary<long, int>>(); // per-tile remembered aux (pets/cattle/paint)
             var liveKeys = new HashSet<long>();
             // Iter-43: tiles where a CONTAINER entity was actually observed this scan, i.e. whose
-            // stored CONTENTS this scan confirmed. Iter-44: it is reported as ONE piece of
-            // evidence (TileObservation.ContainerObserved) and is no longer read as a permission
-            // for both dimensions — a container says nothing about a tile's cattle/paint aux,
-            // which has entirely different producers (see TileObservation).
+            // stored CONTENTS this scan confirmed. Iter-44: this is the ONE fact the scanner
+            // uniquely knows and the only per-tile evidence it still passes to `Publish` — it is no
+            // longer read as a permission for both dimensions, because a container says nothing
+            // about a tile's cattle/paint aux, which has entirely different producers.
             var containerTiles = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
@@ -249,13 +261,16 @@ namespace ItemChecklist.Possession
                 // move) — so a moving cow maps to the SAME tile every scan.
                 // Iter-44: that stability is what makes the aux shrink rule work, and the old
                 // "SetLiveAux replaces, no accumulation" wording no longer describes it. The
-                // publish MERGES, and this tile's aux may shrink only when the pen was observed
-                // (a cow produced aux here) or the tile is definitely observable (player within
-                // PruneRadius AND anchor-covered). So the pen's last animal of a colour is now
-                // actually dropped when the player stands at the empty pen — the C-1 case, where
-                // this key could never shrink at all because an anchor tile carries CraftingCD and
-                // is therefore never in `containerTiles`. While away the anchor tile stays
-                // remembered (nothing observed ⇒ nothing may shrink), as Iter-41 requires.
+                // publish MERGES, and this tile's aux may shrink only past the streaming grace AND
+                // when the scan would have seen anything here (player within PruneRadius AND
+                // anchor-covered) — "some aux was observed on this tile" is deliberately not
+                // evidence, since one tile's aux can have several unrelated producers. So the
+                // pen's last animal of a colour is now actually dropped when the player stands at
+                // the empty pen — the C-1 case, where this key could never shrink at all, because
+                // `containerTiles` is added to only by the container branch and a station tile
+                // carries CraftingCD (it therefore lands there only by co-location with an
+                // unrelated chest, i.e. never for a reason connected to this aux). While away the
+                // anchor tile stays remembered (nothing may shrink), as Iter-41 requires.
                 if (em.HasComponent<CattleCD>(e))
                 {
                     long cckey = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
@@ -339,16 +354,16 @@ namespace ItemChecklist.Possession
             // destruction range (you must stand next to a container to destroy it). It is
             // INDEPENDENT of AnchorRadius (which only shares the 48 *default* and is user-settable
             // to 96): it must stay under the observed-dropout regardless of AnchorRadius.
-            // Iter-44 hoisted it above the flush because BOTH consumers need it now: the tile
-            // publish (as TileObservation.DefinitelyObservable) and PruneStaleNear below. The
-            // publish is the strictly SMALLER inference of the two — it drops a tile's
-            // unconfirmed ids where the prune deletes the whole tile.
+            // Iter-44: the radius is handed to the ledger, which now owns the "would this scan
+            // have seen that tile" test and applies it to BOTH consumers — the per-tile publish
+            // and the prune. Note the two act on DISJOINT tile sets (every published key joins
+            // liveKeys, which the prune skips), so they share this premise but never the same
+            // tile; see PossessionLedger.Publish's residual note.
             const float PruneRadius = 48f; // the "loaded" half (player-near); anchor-cover is the "observed" half
-            float pruneR2 = PruneRadius * PruneRadius;
 
             // Iter-44: ONE publish per tile, over the union of both accumulators' keys, carrying
             // the EVIDENCE this scan gathered; the ledger derives from it what each dimension may
-            // shrink (PossessionLedger.TileObservation holds the rules + their justification).
+            // shrink (PossessionLedger.Publish holds the rules + their justification).
             // This replaces Iter-43's three separate writers — SetLiveContainer / SetLiveAux /
             // ClearAux — and with them two hand-kept-in-step flush loops plus a reconcile pass:
             //   • the "skip empty aux dicts" guard is gone. It existed only because SetLiveAux
@@ -362,67 +377,59 @@ namespace ItemChecklist.Possession
             //   • `containerTiles` stops being a universal confirmation predicate. It confirms
             //     CONTENTS only, which is all it ever meant: it is filled solely in the
             //     `isContainer` branch, so a cattle/paint aux tile (a station tile carrying
-            //     CraftingCD, or a plain placeable) was never in it and its aux could therefore
-            //     never shrink — the stale colour that survived restarts.
+            //     CraftingCD, or a plain placeable) reached it only by co-location with an
+            //     unrelated chest — effectively never, and never for a reason connected to that
+            //     tile's aux, so the aux could not shrink and a stale colour survived restarts.
+            // Hand the scan's facts over ONCE. The lambda is the scan's own WithinAnchor gate, so
+            // the ledger asks the identical question about a tile that the scan would have asked.
+            ledger.BeginScan(
+                havePlayer,
+                playerPos.x,
+                playerPos.y,
+                PruneRadius,
+                key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2),
+                allowPrune
+            );
+
             int droppedUnits = 0,
-                droppedAuxKeys = 0,
-                shrunkTiles = 0;
+                auxKeysReduced = 0,
+                shrunkContentTiles = 0,
+                shrunkAuxTiles = 0;
             var flushKeys = new HashSet<long>(scan.Keys);
             flushKeys.UnionWith(auxScan.Keys);
             foreach (var key in flushKeys)
             {
                 scan.TryGetValue(key, out var tileContents);
                 auxScan.TryGetValue(key, out var tileAux);
-                float pdx = PossessionLedger.KeyX(key) - playerPos.x,
-                    pdz = PossessionLedger.KeyZ(key) - playerPos.y;
-                var obs = new TileObservation
-                {
-                    ContainerObserved = containerTiles.Contains(key),
-                    AuxProducerObserved = tileAux != null && tileAux.Count > 0,
-                    // PruneStaleNear's own premise, one granularity down: player-near AND
-                    // anchor-covered ⇒ anything still standing here WOULD have been seen.
-                    DefinitelyObservable =
-                        havePlayer && pdx * pdx + pdz * pdz <= pruneR2 && WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2),
-                    PastGrace = allowPrune,
-                };
-                var published = ledger.Publish(key, tileContents, tileAux, obs);
+                var published = ledger.Publish(key, tileContents, tileAux, containerTiles.Contains(key));
                 droppedUnits += published.DroppedUnits;
-                droppedAuxKeys += published.DroppedAuxKeys;
-                if (published.DroppedUnits > 0 || published.DroppedAuxKeys > 0)
-                    shrunkTiles++;
+                auxKeysReduced += published.AuxKeysReduced;
+                // Iter-44: counted SEPARATELY. A single combined counter was the input to the
+                // ≥5-tile detector, and aux reductions are ordinary play (repainting a row of
+                // furniture, a herd drifting to a different nearest anchor), so folding them in
+                // would have made a benign redecoration trip a durable data-loss report — and,
+                // with the old flat dedup key, consume the channel for the rest of the session.
+                if (published.DroppedUnits > 0)
+                    shrunkContentTiles++;
+                if (published.AuxKeysReduced > 0)
+                    shrunkAuxTiles++;
                 liveKeys.Add(key);
             }
 
-            // Self-heal: drop a remembered tile the player is close enough to that it is
-            // DEFINITELY still OBSERVABLE (within PruneRadius, anchor-covered) yet was not seen
-            // at all this snapshot — genuinely destroyed/emptied. See PruneRadius above for why
-            // both halves are required and where 48 comes from.
-            int prunedTiles = 0;
-            if (allowPrune && havePlayer)
-                prunedTiles = ledger.PruneStaleNear(
-                    playerPos.x,
-                    playerPos.y,
-                    PruneRadius,
-                    liveKeys,
-                    key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2)
-                );
+            // Self-heal, and the end of the scan: drop remembered tiles the scan WOULD have seen
+            // something on yet saw nothing on. Self-gating on the grace + a known player position,
+            // so the conditions live in one place instead of being repeated here.
+            int prunedTiles = ledger.PruneStaleNear(liveKeys);
 
-            // Iter-43: one anomaly report, chosen to be false-positive-free. A confirmed shrink is
-            // NORMAL — emptying a chest legitimately drops its whole content — so neither a unit
-            // threshold nor "any shrink" can be the trigger. But losing units on MANY tiles inside
-            // a single 3 s scan is not normal play: nobody empties five chests at once, while the
-            // Iter-42 sweep hit exactly 5 tiles in one pass. That shape is the signal.
-            // Iter-44: a tile now counts as shrunk when it lost contents OR aux keys, so the
-            // detector finally sees aux losses too (they reached nothing at all before).
-            if (shrunkTiles >= 5)
-                PossessionIncidentStore.Record(
-                    PossessionIncidentStore.Shrink,
-                    PossessionIncidentStore.Shrink + ":session",
-                    "tiles=" + shrunkTiles + " units=" + droppedUnits + " auxKeys=" + droppedAuxKeys + " ledgerC=" + lcBefore + "->" + ledger.TileCount,
-                    $"{droppedUnits} owned unit(s) and {droppedAuxKeys} colour/skin entr(ies) dropped from {shrunkTiles} "
-                        + "tiles in a single scan. That is expected if you just emptied several containers at once — "
-                        + "otherwise it may be a tracking bug; please report this file."
-                );
+            // Cadence bookkeeping — used by the anomaly suppression below and by the DIAG dt=
+            // field. Deliberately after the early world-null return: a run of scans with no world
+            // does not advance the clock, so the next real scan correctly reads as "after a gap".
+            float sinceLast = _lastScanRt > 0f ? nowRt - _lastScanRt : 0f;
+            bool firstPostGrace = allowPrune && !_prevAllowPrune;
+            _lastScanRt = nowRt;
+            _prevAllowPrune = allowPrune;
+
+            ReportAnomalies(firstPostGrace, sinceLast, lcBefore, ledger.TileCount, shrunkContentTiles, droppedUnits, auxKeysReduced, prunedTiles);
 
             // Iter-16.1: any skin currently owned (carried/active/container) is collected
             // forever. Iterate the live carried aux + every scanned tile's aux.
@@ -459,21 +466,26 @@ namespace ItemChecklist.Possession
                     $"[ItemChecklist] DIAG scan total={(dTEnd - dT0) * 1000f:F1}ms "
                         + $"(world={(dTWorld - dT0) * 1000f:F1} setup={(dTAnchors - dTWorld) * 1000f:F1} "
                         + $"loop={(dTLoop - dTAnchors) * 1000f:F1} build={(dTEnd - dTLoop) * 1000f:F1}) "
-                        + $"interval={ModConfig.ScanIntervalSeconds:F0}s dt={(_lastScanRt > 0f ? dT0 - _lastScanRt : 0f):F2}s "
+                        + $"interval={ModConfig.ScanIntervalSeconds:F0}s dt={sinceLast:F2}s "
                         // Iter-43: report the TRANSITION, not just the endpoint. The old line
                         // printed ledgerC/pairs only after every mutation, so a collapse was
                         // visible solely by hand-diffing two consecutive lines and the pre-scan
                         // value was never shown at all. A single line reading
                         // "ledgerC=505->505 lostUnits=2677" would have made Iter-42 self-evident
                         // on the first far-from-base load instead of costing a month.
-                        + $"ledgerC={lcBefore}->{lc} pairs={lpBefore}->{lp} pruned={prunedTiles} "
-                        // Iter-44: auxDrops= surfaces removals on the aux axis (pet skins, cattle
-                        // and paint colours). Iter-43 reported content units only, so an aux loss
-                        // — the C-1 defect's own dimension — reached no channel whatsoever.
-                        + $"shrunk={shrunkTiles} lostUnits={droppedUnits} auxDrops={droppedAuxKeys} "
+                        // ledgerC/pairs count DIFFERENT things: ledgerC is every remembered tile,
+                        // cPairs only (tile, objectID) CONTENT pairs. An aux-only tile therefore moves
+                        // ledgerC without moving cPairs. auxReduced counts aux keys REDUCED or removed,
+                        // and it is not a subset of lostUnits — the two axes are disjoint.
+                        // Not covered by any of them: what PruneStaleNear removed, which is reported as
+                        // whole tiles (pruned=) with no per-id or per-unit breakdown.
+                        + $"ledgerC={lcBefore}->{lc} cPairs={lpBefore}->{lp} pruned={prunedTiles} "
+                        // Iter-44: aux removals reach a channel at all for the first time — Iter-43
+                        // reported content units only, so a loss on the C-1 defect's own dimension
+                        // was invisible everywhere.
+                        + $"shrunkC={shrunkContentTiles} shrunkAux={shrunkAuxTiles} lostUnits={droppedUnits} auxReduced={auxKeysReduced} "
                         + $"ents={ents.Length} near={dNear} anchors={anchors.Count}"
                 );
-                _lastScanRt = dT0; // Iter-38.1: anchor the next scan's dt=
                 DiagDumpObjectsOnce();
             }
             return view;
@@ -486,9 +498,112 @@ namespace ItemChecklist.Possession
         // placeable that is obviously wild nature (leaking past the blacklist in a new biome)
         // is visible and its tag/ID can be added to PossessionClassifier.
         private static bool _diagObjectsDumped;
-        private static bool _worldNullWarned; // Iter-43: one warning per session, not per scan
-        private static float _lastScanRt; // Iter-38.1: realtime of the previous diag-logged scan, for the dt= cadence field
+        private static bool _worldNullWarned; // Iter-44: re-armed on every successful resolve (see Scan)
+        private static float _lastScanRt; // realtime of the previous scan: the DIAG dt= field + the gap suppression
         private static readonly Dictionary<int, (int count, string sig)> _diagObjects = new();
+
+        // --- Anomaly reporting (Iter-43, recalibrated in Iter-44) ---
+        private static bool _prevAllowPrune;
+        private static int _prunedThisSession;
+        private static int _maxTilesSeen;
+
+        /// <summary>Iter-44: clear the per-character anomaly state. Called on a character/world
+        /// switch, because the cumulative drain detector compares against THIS ledger's size and
+        /// would otherwise carry one character's totals into the next.</summary>
+        internal static void ResetSessionSignals()
+        {
+            _prevAllowPrune = false;
+            _prunedThisSession = 0;
+            _maxTilesSeen = 0;
+        }
+
+        /// <summary>
+        /// Decide whether this scan's removals are worth a durable incident.
+        ///
+        /// <para><strong>Why two channels.</strong> Iter-43 shipped one, on the shrink path, with
+        /// the reasoning "nobody empties five chests at once". But the largest ledger collapse this
+        /// subsystem has ever actually MEASURED — Iter-41's <c>ledgerC</c> 402→0 while walking away
+        /// from base — happened entirely through <c>PruneStaleNear</c>, which the detector did not
+        /// watch at all. A detector calibrated to one failure while the historically real one goes
+        /// unwatched is worse than none, because its silence reads as an all-clear.</para>
+        ///
+        /// <para><strong>Suppression (both channels).</strong> Two situations legitimately look
+        /// like an anomaly and would otherwise burn the report on a benign event:
+        /// <list type="bullet">
+        /// <item>the FIRST scan after the streaming grace — every withdrawal made since the world
+        /// load is confirmed at once, in one batch;</item>
+        /// <item>any scan after an unusual GAP, i.e. the ledger has not tracked the world for a
+        /// while: the mod was switched off via <c>ModConfig.Enabled</c> (saves continue!), the
+        /// process was paused/minimised, or a stretch of scans found no ECS world.</item>
+        /// </list>
+        /// Iter-43's "cannot false-positive" claim was wrong on exactly these two, plus a third
+        /// that is handled by scaling below.</para>
+        ///
+        /// <para><strong>Why the thresholds scale.</strong> "Five tiles in one scan" was calibrated
+        /// at the 3 s default cadence, but Iter-38 made the interval user-settable up to 30 s, and
+        /// ten times the window contains ten times the ordinary activity. Capped at 4× so a slow
+        /// cadence cannot disable the detector outright.</para>
+        ///
+        /// <para><strong>Aux is deliberately NOT a trigger</strong> — only a reported number.
+        /// Repainting a row of furniture, or a herd drifting so its nearest anchor changes,
+        /// reduces aux keys in ordinary play; on the contents axis there is no comparable benign
+        /// bulk event.</para>
+        /// </summary>
+        private static void ReportAnomalies(
+            bool firstPostGrace,
+            float sinceLast,
+            int tilesBefore,
+            int tilesAfter,
+            int shrunkContentTiles,
+            int droppedUnits,
+            int auxKeysReduced,
+            int prunedTiles
+        )
+        {
+            _prunedThisSession += prunedTiles;
+            if (tilesBefore > _maxTilesSeen)
+                _maxTilesSeen = tilesBefore;
+
+            float interval = ModConfig.ScanIntervalSeconds;
+            if (firstPostGrace || (sinceLast > 3f * interval))
+                return;
+
+            int scale = Mathf.Clamp(Mathf.RoundToInt(interval / 3f), 1, 4);
+            string ledgerPart = " ledgerC=" + tilesBefore + "->" + tilesAfter + " interval=" + interval.ToString("F0") + "s";
+
+            // (a) CONTENT units lost on many tiles at once.
+            if (shrunkContentTiles >= 5 * scale)
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.Shrink,
+                    PossessionIncidentStore.Shrink + ":" + PossessionIncidentStore.MagnitudeBucket(shrunkContentTiles),
+                    "tiles=" + shrunkContentTiles + " units=" + droppedUnits + " auxReduced=" + auxKeysReduced + ledgerPart,
+                    $"{droppedUnits} owned unit(s) vanished from {shrunkContentTiles} separate containers in a single scan. "
+                        + "That is expected if you just emptied or picked up several containers at once; otherwise it may be "
+                        + "a tracking bug, so please report this file."
+                );
+
+            // (b) the prune took an implausible SHARE of the ledger in one scan.
+            if (prunedTiles >= Mathf.Max(5 * scale, tilesBefore / 4))
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.Prune,
+                    PossessionIncidentStore.Prune + ":scan:" + PossessionIncidentStore.MagnitudeBucket(prunedTiles),
+                    "pruned=" + prunedTiles + ledgerPart,
+                    $"{prunedTiles} remembered container tiles were forgotten in a single scan. That is expected if you "
+                        + "just dismantled part of your base; otherwise your owned counts may drop, so please report this file."
+                );
+
+            // (c) a gradual DRAIN. (b) cannot see this: Iter-41's collapse removed a modest number
+            // of tiles per scan over many scans, which is why it needed a walk to reproduce.
+            if (_maxTilesSeen >= 40 && _prunedThisSession >= Mathf.Max(20, _maxTilesSeen / 2))
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.Prune,
+                    PossessionIncidentStore.Prune + ":drain:" + PossessionIncidentStore.MagnitudeBucket(_prunedThisSession),
+                    "prunedTotal=" + _prunedThisSession + " maxTiles=" + _maxTilesSeen + ledgerPart,
+                    $"{_prunedThisSession} remembered container tiles have been forgotten this session, against a peak of "
+                        + $"{_maxTilesSeen}. If you did not dismantle that much, your owned counts are draining and this "
+                        + "file is worth reporting."
+                );
+        }
 
         private static void DiagRecordPlaced(int id, ObjectInfo info)
         {

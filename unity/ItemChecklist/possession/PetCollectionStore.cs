@@ -70,7 +70,26 @@ namespace ItemChecklist.Possession
                 var chars = new char[bytes.Length];
                 for (int i = 0; i < bytes.Length; i++)
                     chars[i] = (char)bytes[i];
-                col.LoadFrom(new string(chars));
+                int skipped = col.LoadFrom(new string(chars));
+                if (skipped > 0)
+                {
+                    // Iter-44 (review C-3): this parser cannot throw, it skips — so a file
+                    // truncated mid-write parsed into a SUBSET and Iter-43 reported `Loaded`.
+                    // On THIS store that is the unrecoverable case: 3 of 40 skins parsed, the
+                    // next MarkCollected sets Dirty, Save writes 4 entries over the file, and
+                    // 37 ever-owned skins are gone with nothing logged. Any unaccepted line
+                    // makes the load a failure.
+                    status = StoreLoadStatus.Failed;
+                    PossessionIncidentStore.Record(
+                        PossessionIncidentStore.LoadFailed,
+                        PossessionIncidentStore.LoadFailed + ":petskins:" + guid,
+                        "petskins guid=" + guid + " reason=damaged bytes=" + bytes.Length + " skippedLines=" + skipped + " readOnly=yes",
+                        $"the pet-skin collection for {guid} is DAMAGED — {skipped} line(s) could not be read. It "
+                            + "will NOT be overwritten, so nothing more is lost, but skins collected this session "
+                            + "cannot be saved. Keep a copy of the file if you want it looked at."
+                    );
+                    return col;
+                }
                 status = StoreLoadStatus.Loaded;
             }
             catch (System.Exception e)

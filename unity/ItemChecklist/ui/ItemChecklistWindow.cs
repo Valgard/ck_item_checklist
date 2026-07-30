@@ -270,7 +270,17 @@ namespace ItemChecklist.UI
         private string FormatShown()
         {
             var model = ItemChecklistMod.ListView;
-            return (model != null && model.IsFiltered) ? Loc.F("ItemChecklist-General/Shown", model.Count) : "";
+            string shown = (model != null && model.IsFiltered) ? Loc.F("ItemChecklist-General/Shown", model.Count) : "";
+
+            // Iter-44: a read-only possession session — a store's file could not be read, so
+            // nothing is being written back — has to be visible somewhere. Here rather than on the
+            // always-on HUD: it is a rare diagnostic state, not something to put permanently on
+            // screen, and the player who notices the odd counts is the one who opens the
+            // checklist. Without it the rescue is indistinguishable from the loss it prevented.
+            if (!ItemChecklistMod.PossessionReadOnly)
+                return shown;
+            string marker = Loc.T("ItemChecklist-General/NotSaving");
+            return string.IsNullOrEmpty(shown) ? marker : shown + "  " + marker;
         }
 
         private void RenderStatus()

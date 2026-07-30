@@ -47,8 +47,14 @@ namespace ItemChecklist.Possession
         //
         // Iter-42: ADDING an id here no longer evicts it from existing ledgers — the one-time
         // sweep that used to do that deleted chest-stored copies too and was removed. A newly
-        // blacklisted id therefore lingers as an over-count on already-remembered tiles until
-        // they are re-observed (the safe direction); see the note at the top of `Scan`.
+        // blacklisted id therefore lingers as an over-count on already-remembered tiles (the safe
+        // direction). Re-observation ALONE no longer clears it, which is what this comment used to
+        // claim: since Iter-43's I4 the entry is dropped only when that tile's contents may SHRINK
+        // — past the streaming grace, and either a container was observed there or the player is
+        // within PruneRadius (48) of the tile and it is still anchor-covered. If the tile holds
+        // nothing else, `PruneStaleNear` drops it whole under the same premise. So it clears on a
+        // close visit, not on any scan that happens to see the tile — and not at all if its
+        // workbench is gone. See the note at the top of `Scan`.
         //
         // No object-level signal separates wild nature from placed objects in CK — across
         // cat/stack/icon/craft/sell/tags/DontDropSelfCD/Diggable/Destructible, wild nature

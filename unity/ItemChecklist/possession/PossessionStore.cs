@@ -81,8 +81,7 @@ namespace ItemChecklist.Possession
                 {
                     if (diag)
                         Debug.Log(
-                            $"[ItemChecklist] DIAG save SKIPPED unchanged serialize={(t1 - t0) * 1000f:F1}ms "
-                                + $"bytes={text.Length} containers={ledger.TileCount}"
+                            $"[ItemChecklist] DIAG save SKIPPED unchanged serialize={(t1 - t0) * 1000f:F1}ms " + $"bytes={text.Length} tiles={ledger.TileCount}"
                         );
                     return;
                 }
@@ -97,7 +96,7 @@ namespace ItemChecklist.Possession
                 if (diag)
                     Debug.Log(
                         $"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms "
-                            + $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.TileCount}"
+                            + $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} tiles={ledger.TileCount}"
                     );
             }
             catch (System.Exception e)
@@ -141,7 +140,7 @@ namespace ItemChecklist.Possession
                 for (int i = 0; i < bytes.Length; i++)
                     chars[i] = (char)bytes[i];
                 string text = new string(chars);
-                int tiles = ledger.LoadFrom(text);
+                int tiles = ledger.LoadFrom(text, out int skipped);
                 // A discard is NOT a failure: it is the intended version migration, and the store
                 // must stay writable so the base can repopulate it. But it is also what a corrupt
                 // file looks like, so report it — that is the whole point (Iter-43). The first
@@ -160,11 +159,31 @@ namespace ItemChecklist.Possession
                             + "next base visit. If this was not a mod update, the file was corrupt."
                     );
                 }
+                else if (skipped > 0)
+                {
+                    // Iter-44 (review C-3): the parser cannot THROW on damaged input — it skips
+                    // what it cannot read — so a file truncated mid-write parsed into a SUBSET
+                    // and the Iter-43 status flag reported `Loaded`. The store then stayed
+                    // writable and the next autosave persisted the subset over the intact file;
+                    // the one after that took the `.pugbackup` too. Treat any unaccepted data
+                    // line as damage: read-only for this character, and the base repopulates the
+                    // in-memory ledger without ever writing the partial state back.
+                    status = StoreLoadStatus.Failed;
+                    PossessionIncidentStore.Record(
+                        PossessionIncidentStore.LoadFailed,
+                        PossessionIncidentStore.LoadFailed + ":ledger:" + guid,
+                        "ledger guid=" + guid + " reason=damaged bytes=" + bytes.Length + " tiles=" + tiles + " skippedLines=" + skipped + " readOnly=yes",
+                        $"the possession ledger for {guid} is DAMAGED — {skipped} line(s) could not be read, so only "
+                            + $"{tiles} of its tiles loaded. It will NOT be overwritten; owned counts rebuild from your "
+                            + "containers at base. Keep a copy of the file if you want it looked at."
+                    );
+                    return ledger;
+                }
                 status = StoreLoadStatus.Loaded;
             }
             catch (System.Exception e)
             {
-                // Set Failed FIRST — LoadFrom clears both dicts before parsing, so a mid-parse
+                // Set Failed FIRST — LoadFrom clears `_tiles` before parsing, so a mid-parse
                 // throw leaves a PARTIAL ledger that looks exactly like a complete one.
                 status = StoreLoadStatus.Failed;
                 Debug.LogWarning($"[ItemChecklist] possession load failed: {e.Message}");
