@@ -594,6 +594,12 @@ namespace ItemChecklist
                     s_ledgerReadOnly = ledgerStatus == StoreLoadStatus.Failed;
                     s_petsReadOnly = petsStatus == StoreLoadStatus.Failed;
                     _possessionPlayableTime = 0f; // fresh load → withhold prune until grace
+                    // Iter-44: set BEFORE the scan. `ReportAnomalies` keys its dedup on
+                    // `PossessionGuid`, so with the assignment below the scan it reported the
+                    // OUTGOING character's guid. Unreachable today (this scan passes
+                    // allowPrune: false, so nothing can be removed), but it is an ordering invariant
+                    // living in a different file from the code that depends on it.
+                    s_ledgerGuid = activeGuid;
                     Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, false);
                 }
                 s_ledgerGuid = activeGuid;

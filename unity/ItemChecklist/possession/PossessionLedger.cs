@@ -33,12 +33,36 @@ namespace ItemChecklist.Possession
         private readonly Dictionary<int, int> _contents = new Dictionary<int, int>();
         private readonly Dictionary<long, int> _aux = new Dictionary<long, int>();
 
-        // Consecutive scans in which a removal was authorized by INFERENCE (the scan would have
-        // seen this tile) but not CONFIRMED (no container observed here), and something was in
-        // fact missing. A removal on that basis waits for the second one — see
-        // PossessionLedger.ApplyScan's "one miss is not evidence" note.
-        private int _contentsSoftMisses;
-        private int _auxSoftMisses;
+        // The keys that were unconfirmed-absent on the PREVIOUS scan, per dimension — the state
+        // behind "one miss is not evidence" (see PossessionLedger.ApplyScan). Per KEY, not a
+        // per-tile counter: with one counter, a key's FIRST miss counted as its second whenever any
+        // neighbour on the same tile had missed before it, which is the common shape on the aux axis
+        // (a pen keys every colour to one anchor tile, and a drifting herd misses them in turn).
+        // Null while nothing is pending, which is the steady state.
+        private HashSet<int> _contentsMissed;
+        private HashSet<long> _auxMissed;
+        private int _contentsMissedSeq = -1;
+        private int _auxMissedSeq = -1;
+
+        // The scan on which the prune last found this WHOLE tile stale. The prune needs its own
+        // mark because it never reaches the merge: a tile whose only producer missed a scan is not
+        // in liveKeys at all, so without this the delay would protect multi-producer tiles and drop
+        // the single-chest tile — the common shape — on one flicker, which would have made the whole
+        // rule cosmetic.
+        private int _staleSeq = -1;
+
+        /// <summary>The prune found this tile stale on <paramref name="scanSeq"/>. Returns true when
+        /// the immediately preceding scan found it stale too, i.e. when it may be dropped.</summary>
+        public bool NoteStaleAndShouldDrop(int scanSeq)
+        {
+            bool second = _staleSeq == scanSeq - 1;
+            _staleSeq = scanSeq;
+            return second;
+        }
+
+        /// <summary>This tile was in scope but NOT stale (it was observed, or it was out of range) —
+        /// break any stale streak, so "two consecutive" cannot span an arbitrary gap.</summary>
+        public void ClearStaleStreak() => _staleSeq = -1;
 
         /// <summary>Nothing remembered here any more — the ledger drops such a tile, so an emptied
         /// tile does not linger as a remembered one that the prune skips for as long as something
@@ -122,12 +146,19 @@ namespace ItemChecklist.Possession
         /// <para>Both permissions are the LEDGER's decision, never the caller's — see
         /// <see cref="PossessionLedger.ApplyScan"/> for what they mean and why there are two.</para></summary>
         /// <returns>The UNITS lost — the Iter-42 detector's input.</returns>
-        public int MergeContents(Dictionary<int, int> observed, bool mayShrink, bool absenceIsConfirmed)
+        public int MergeContents(Dictionary<int, int> observed, bool mayShrink, bool absenceIsConfirmed, int scanSeq)
         {
+            _staleSeq = -1; // observed this scan → the prune's stale streak, if any, is broken
             int droppedUnits = 0;
             HashSet<int> restore = null;
             List<int> drop = null;
-            bool sawSoftAbsence = false;
+            HashSet<int> missedNow = null;
+            // Only the IMMEDIATELY preceding scan counts. Without the adjacency test, "the previous
+            // scan" meant "the previous scan that merged this tile", which can be an hour and a
+            // teleport earlier — and a tile whose chunk streams in late (the very case the grace
+            // exists for) could carry a stale miss into the first post-grace scan and lose an id on
+            // its first real miss.
+            bool streakLive = _contentsMissed != null && _contentsMissedSeq == scanSeq - 1;
             foreach (var kv in _contents)
             {
                 int now = Observed(observed, kv.Key);
@@ -144,18 +175,19 @@ namespace ItemChecklist.Possession
                     droppedUnits += kv.Value - now;
                     continue;
                 }
-                if (absenceIsConfirmed || _contentsSoftMisses >= 1)
+                if (absenceIsConfirmed || (streakLive && _contentsMissed.Contains(kv.Key)))
                 {
                     droppedUnits += kv.Value;
                     (drop ??= new List<int>()).Add(kv.Key);
                 }
                 else
                 {
-                    sawSoftAbsence = true;
+                    (missedNow ??= new HashSet<int>()).Add(kv.Key);
                     (restore ??= new HashSet<int>()).Add(kv.Key);
                 }
             }
-            _contentsSoftMisses = sawSoftAbsence ? _contentsSoftMisses + 1 : 0;
+            _contentsMissed = mayShrink ? missedNow : null;
+            _contentsMissedSeq = scanSeq;
             if (observed != null)
                 foreach (var kv in observed)
                     if (kv.Value >= 1 && (restore == null || !restore.Contains(kv.Key)))
@@ -176,12 +208,14 @@ namespace ItemChecklist.Possession
         /// meaningful here: an aux count is "how many of this skin/colour", and it is the key
         /// that can go stale — hence <see cref="TilePublishResult.AuxKeysReduced"/>, not
         /// "dropped".</returns>
-        public int MergeAux(Dictionary<long, int> observed, bool mayShrink, bool absenceIsConfirmed)
+        public int MergeAux(Dictionary<long, int> observed, bool mayShrink, int scanSeq)
         {
+            _staleSeq = -1;
             int reducedKeys = 0;
             HashSet<long> restore = null;
             List<long> drop = null;
-            bool sawSoftAbsence = false;
+            HashSet<long> missedNow = null;
+            bool streakLive = _auxMissed != null && _auxMissedSeq == scanSeq - 1;
             foreach (var kv in _aux)
             {
                 int now = Observed(observed, kv.Key);
@@ -197,18 +231,28 @@ namespace ItemChecklist.Possession
                     reducedKeys++;
                     continue;
                 }
-                if (absenceIsConfirmed || _auxSoftMisses >= 1)
+                // NOTE there is no `absenceIsConfirmed` here, unlike the contents merge. An observed
+                // container's buffer IS authoritative for the pet-skin keys it wrote to this tile —
+                // but it says nothing about the OTHER aux producers that key to the same tile (a
+                // pen's colours land on its nearest anchor tile, a paint colour on the placeable's
+                // own tile). Passing it in would authorize dropping one producer's keys because a
+                // different one was seen — the C-1 defect shape that this class's own rule text
+                // rejects two paragraphs above. Distinguishing them needs per-key provenance, i.e. a
+                // schema change; until then aux always waits for the second miss. The cost is one
+                // extra scan interval before an emptied pen's last colour goes.
+                if (streakLive && _auxMissed.Contains(kv.Key))
                 {
                     reducedKeys++;
                     (drop ??= new List<long>()).Add(kv.Key);
                 }
                 else
                 {
-                    sawSoftAbsence = true;
+                    (missedNow ??= new HashSet<long>()).Add(kv.Key);
                     (restore ??= new HashSet<long>()).Add(kv.Key);
                 }
             }
-            _auxSoftMisses = sawSoftAbsence ? _auxSoftMisses + 1 : 0;
+            _auxMissed = mayShrink ? missedNow : null;
+            _auxMissedSeq = scanSeq;
             if (observed != null)
                 foreach (var kv in observed)
                     if (kv.Value >= 1 && (restore == null || !restore.Contains(kv.Key)))
@@ -446,12 +490,17 @@ namespace ItemChecklist.Possession
                 pastGrace = false;
             }
 
+            _scanSeq++;
             _player = player;
             _pruneR2 = pruneRadius * pruneRadius;
             _coveredByLoadedAnchor = coveredByLoadedAnchor;
             _havePlayer = havePlayer;
 
-            // One publish per observed tile, over the union of both accumulators' keys.
+            // One publish per observed tile, over the union of both accumulators' keys. Cleared
+            // first: a caller that reused the set would otherwise feed stale keys in as "observed
+            // with nothing", which is the latent-protocol hole this single entry point exists to
+            // make unrepresentable.
+            liveKeys.Clear();
             foreach (var pair in contents)
                 liveKeys.Add(pair.Key);
             foreach (var pair in aux)
@@ -481,8 +530,8 @@ namespace ItemChecklist.Possession
                     absenceIsConfirmed = containerObserved;
                 }
 
-                int units = entry.MergeContents(tileContents, mayShrinkContents, absenceIsConfirmed);
-                int auxKeys = entry.MergeAux(tileAux, mayShrinkAux, absenceIsConfirmed);
+                int units = entry.MergeContents(tileContents, mayShrinkContents, absenceIsConfirmed, _scanSeq);
+                int auxKeys = entry.MergeAux(tileAux, mayShrinkAux, _scanSeq);
                 result.DroppedUnits += units;
                 result.AuxKeysReduced += auxKeys;
                 if (units > 0)
@@ -521,6 +570,11 @@ namespace ItemChecklist.Possession
         private float _pruneR2;
         private bool _havePlayer;
         private Func<long, bool> _coveredByLoadedAnchor;
+
+        // Counts scans, so "the previous scan" can mean the IMMEDIATELY previous one. Starts at 0
+        // and is incremented before any tile is touched, so the first scan is 1 and the per-entry
+        // marks (which default to -1) cannot be mistaken for a streak from before the load.
+        private int _scanSeq;
 
         /// <summary>
         /// Would this scan have observed anything standing on <paramref name="key"/>? True iff the
@@ -579,10 +633,21 @@ namespace ItemChecklist.Possession
             {
                 long key = pair.Key;
                 if (liveKeys.Contains(key))
-                    continue; // observed this scan → not stale
+                    continue; // observed this scan → the merge already cleared its stale streak
                 if (!ScanWouldSeeTile(key))
-                    continue; // out of range, or no loaded anchor would have observed it → keep
-                (drop ??= new List<long>()).Add(key);
+                {
+                    // Out of range, or no loaded anchor would have observed it → keep, and break the
+                    // streak: with no information this scan, the next stale one must not count as
+                    // the "second consecutive".
+                    pair.Value.ClearStaleStreak();
+                    continue;
+                }
+                // The same rule the merge uses: one miss is not evidence. On most tiles the chest IS
+                // the only producer, so a single query flicker took the whole tile here while a
+                // multi-producer tile got two scans of grace — which would have left the delay
+                // protecting the rarer shape and not the common one.
+                if (pair.Value.NoteStaleAndShouldDrop(_scanSeq))
+                    (drop ??= new List<long>()).Add(key);
             }
             if (drop == null)
                 return 0;
@@ -722,7 +787,14 @@ namespace ItemChecklist.Possession
             skipped = 0;
             _tiles.Clear();
             if (string.IsNullOrEmpty(text))
+            {
+                // A zero-byte file is damage: Serialize always emits at least the version marker, so
+                // no version of this mod can produce one, and a new character has no file at all
+                // (the store returns before reaching here). Reporting 0/0 would have made it a
+                // clean, WRITABLE empty ledger. Note this also bypassed the marker check below.
+                skipped = 1;
                 return 0;
+            }
             // Compare the FIRST LINE exactly, not a prefix: `StartsWith("#icl-ledger-v3")` would
             // also accept a future "#icl-ledger-v30" and then parse it under the wrong schema.
             int nl = text.IndexOf('\n');

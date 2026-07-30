@@ -79,6 +79,7 @@ namespace ItemChecklist.Possession
 
         private static bool _loaded;
         private static bool _capNoted;
+        private static bool _everAppended; // once true, a file reading as "absent" is a lying API, not a fresh start
         private static int _lines;
         private static readonly System.Collections.Generic.HashSet<string> _known = new System.Collections.Generic.HashSet<string>();
 
@@ -192,11 +193,36 @@ namespace ItemChecklist.Possession
                 );
                 return false;
             }
-            string text = string.IsNullOrEmpty(existing) ? Header + "\n" + line : existing + line;
+            if (string.IsNullOrEmpty(existing) && _everAppended)
+            {
+                // We appended successfully this session, so the file exists — yet it now reads as
+                // absent or empty. Writing would rebuild it from scratch: the C-2 failure mode
+                // again, reached through a lying FileExists instead of a failing Read. This
+                // project's own history includes Unity-Mono's File.Exists lying about save paths
+                // (the 1.2.1.3 initial-save regression), so this is not hypothetical.
+                Debug.LogWarning("[ItemChecklist] possession-incidents.txt vanished mid-session — NOT rewriting it from scratch.");
+                return false;
+            }
+            // A file an editor stripped the final newline from would otherwise get the next record
+            // glued onto its last line.
+            string tail = string.IsNullOrEmpty(existing) || existing.EndsWith("\n") ? "" : "\n";
+            string text = string.IsNullOrEmpty(existing) ? Header + "\n" + line : existing + tail + line;
             var bytes = new byte[text.Length];
             for (int i = 0; i < text.Length; i++)
                 bytes[i] = (byte)text[i]; // ASCII content only
             API.ConfigFilesystem.Write(Path, bytes);
+
+            // Iter-44: VERIFY. CK's file layer swallows the whole IOException class without
+            // rethrowing (see PossessionStore.Save), so `Write` returning normally proves nothing —
+            // and this is the fallback channel for every other report in this subsystem, whose only
+            // justification for existing is that it is durable where Player.log is not. A silent
+            // failure here would consume the dedup key and lose the incident entirely.
+            if (!TryReadAll(out string check) || check == null || check.Length != text.Length)
+            {
+                Debug.LogWarning("[ItemChecklist] possession-incident append did not land (the file does not match what was written).");
+                return false;
+            }
+            _everAppended = true;
             return true;
         }
 

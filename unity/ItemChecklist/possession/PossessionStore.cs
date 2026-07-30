@@ -92,6 +92,35 @@ namespace ItemChecklist.Possession
                 for (int i = 0; i < text.Length; i++)
                     bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
+
+                // Iter-44: VERIFY by reading back, because "Write did not throw" does not mean
+                // "the write landed". CK's StandaloneFilesystem.Write ends in
+                // `catch (IOException) { Debug.LogError(...) }` with NO rethrow (verified in the
+                // decompile), and its inner File.Replace/File.Move retry loop gives up after ten
+                // attempts with only a LogError. So the entire IOException class — disk full,
+                // sharing violation, and the Wine file-API faults this project ships six IL patches
+                // for — is invisible to the caller. Two consequences, and the second is the worse
+                // one: the failure went unreported, AND the hash below cached "the disk holds this"
+                // for content that was never written, so every later save with unchanged content
+                // hash-matched and was SKIPPED. One poisoned cache entry could suppress saving for
+                // the rest of the session. The hash is therefore only cached after a verified
+                // read-back, which costs one extra read on the writes that actually happen (the
+                // skip still elides the rest).
+                if (!Verify(PathFor(guid), hash))
+                {
+                    WriteFailed = true;
+                    _lastSavedHash.Remove(guid); // never let an unverified write suppress the next one
+                    Debug.LogWarning("[ItemChecklist] possession save did not land (write reported no error but the file does not match).");
+                    PossessionIncidentStore.Record(
+                        PossessionIncidentStore.SaveFailed,
+                        PossessionIncidentStore.SaveFailed + ":ledger:" + guid,
+                        "ledger guid=" + guid + " reason=verify-failed bytes=" + text.Length,
+                        $"the possession ledger for {guid} could not be written — the game's file layer reported no error, "
+                            + "but reading the file back does not match what was saved (a full disk or a locked file will do "
+                            + "this). Owned counts changed this session will be missing after a restart."
+                    );
+                    return;
+                }
                 _lastSavedHash[guid] = hash;
                 WriteFailed = false;
                 if (diag)
@@ -119,10 +148,33 @@ namespace ItemChecklist.Possession
             }
         }
 
-        /// <summary>Iter-44: the last write attempt failed. Distinct from a failed LOAD (which
+        /// <summary>Iter-44: the last write attempt did not land. Distinct from a failed LOAD (which
         /// makes the store read-only on purpose): here the mod is trying to save and cannot, so the
-        /// data at risk is this session's, not the file's.</summary>
+        /// data at risk is this session's, not the file's. Reset per character in
+        /// <see cref="Load"/>, so one character's fault cannot mark another as not-saving.</summary>
         internal static bool WriteFailed { get; private set; }
+
+        /// <summary>Read a just-written file back and compare content hashes. Any failure — a read
+        /// that throws, a short file, different bytes — counts as "did not land", because the point
+        /// is to distrust a silent success (see <see cref="Save"/>).</summary>
+        private static bool Verify(string path, ulong expected)
+        {
+            try
+            {
+                var bytes = API.ConfigFilesystem.Read(path);
+                if (bytes == null)
+                    return false;
+                var chars = new char[bytes.Length];
+                for (int i = 0; i < bytes.Length; i++)
+                    chars[i] = (char)bytes[i];
+                return Fnv1a64(new string(chars)) == expected;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[ItemChecklist] possession save verify failed: {e.Message}");
+                return false;
+            }
+        }
 
         /// <summary>Read the ledger for <paramref name="guid"/>. <paramref name="status"/> tells
         /// the caller whether an empty result means "new character" or "could not read" — see
@@ -133,6 +185,10 @@ namespace ItemChecklist.Possession
         public static PossessionLedger Load(string guid, out StoreLoadStatus status)
         {
             status = StoreLoadStatus.NoFile;
+            // Per character: a write fault on the previous character must not leave this one
+            // showing "not saving" for a session it could not clear (the clear path runs only on a
+            // successful write, and a character with nothing to save never reaches it).
+            WriteFailed = false;
             var ledger = new PossessionLedger();
             if (string.IsNullOrEmpty(guid))
                 return ledger;

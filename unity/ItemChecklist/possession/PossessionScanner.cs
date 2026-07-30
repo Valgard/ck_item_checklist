@@ -55,6 +55,18 @@ namespace ItemChecklist.Possession
             // One Time call per scan interval is free.
             float nowRt = Time.realtimeSinceStartup;
             float dT0 = diag ? nowRt : 0f;
+
+            // Iter-44: at most ONE scan per frame. `ItemChecklistMod.Update` has two call sites with
+            // no return between them — the interval timer and the hotkey open — so pressing the
+            // toggle on the frame the timer fires ran two scans against an IDENTICAL ECS world;
+            // nothing steps the simulation inside our Update. That used to be merely wasted work,
+            // but the ledger's "one miss is not evidence" rule counts scans, so the same read twice
+            // looked like two independent observations and voided the delay entirely — on the
+            // routine action of opening the checklist at base. Returning the cached view is also
+            // exactly as fresh as re-reading would be.
+            if (_lastScanFrame == Time.frameCount && _lastView != null)
+                return _lastView;
+
             var world = ResolveWorld();
             if (world == null)
             {
@@ -461,6 +473,8 @@ namespace ItemChecklist.Possession
                 );
                 DiagDumpObjectsOnce();
             }
+            _lastScanFrame = Time.frameCount;
+            _lastView = view;
             return view;
         }
 
@@ -476,6 +490,8 @@ namespace ItemChecklist.Possession
         private static readonly Dictionary<int, (int count, string sig)> _diagObjects = new();
 
         // --- Anomaly reporting (Iter-43, recalibrated in Iter-44) ---
+        private static int _lastScanFrame = -1; // one scan per frame — see Scan
+        private static PossessionView _lastView;
         private static bool _prevAllowPrune;
         private static int _prunedThisSession;
         private static int _shrunkContentTilesThisSession;
@@ -492,6 +508,10 @@ namespace ItemChecklist.Possession
         /// decline rather than a gross count.</para></summary>
         internal static void ResetSessionSignals()
         {
+            // Also drops the one-scan-per-frame cache: this runs before the incoming character's
+            // ledger is loaded, and a cached view belongs to the outgoing one.
+            _lastScanFrame = -1;
+            _lastView = null;
             _prevAllowPrune = false;
             _prunedThisSession = 0;
             _shrunkContentTilesThisSession = 0;
@@ -533,8 +553,11 @@ namespace ItemChecklist.Possession
         ///
         /// <para><strong>Aux is a reported number, never a trigger.</strong> Repainting a row of
         /// furniture, or a herd drifting so its nearest anchor changes, reduces aux keys in
-        /// ordinary play. Its session total rides along in every detail line so an aux regression
-        /// is at least visible in a reported file.</para>
+        /// ordinary play, and no threshold separates that from a fault. Its session total rides in
+        /// the detail of any incident that IS recorded — which means an aux-only regression still
+        /// ships nothing unless some other channel fires in the same session, and otherwise reaches
+        /// only the default-off DIAG line. That is a known gap, accepted because the alternative is
+        /// a channel that cries wolf.</para>
         ///
         /// <para><strong>The cumulative channel requires a NET decline.</strong> Gross prunes are
         /// not a fault signal: Iter-43's own verification measured "8 tiles removed / 7 added in a
@@ -555,7 +578,8 @@ namespace ItemChecklist.Possession
                 _maxTilesSeen = tilesBefore;
 
             float interval = ModConfig.ScanIntervalSeconds;
-            bool batched = firstPostGrace || sinceLast > 3f * interval;
+            bool afterGap = sinceLast > 3f * interval;
+            bool batched = firstPostGrace || afterGap;
             int scale = Mathf.Clamp(Mathf.RoundToInt(interval / 3f), 1, 4);
 
             // The guid keeps one character's benign event from consuming another's slot: the dedup
@@ -579,10 +603,21 @@ namespace ItemChecklist.Possession
                 + " peakTiles="
                 + _maxTilesSeen;
 
-            // (a) CONTENT units lost on many places at once. On a batched scan only the override
-            // bound applies — a quarter of the whole ledger, floored at 20, which no ordinary
-            // play reaches even with automation running.
-            int trigger = batched ? Mathf.Max(20, tilesBefore / 4) : 5 * scale;
+            // (a) CONTENT units lost on many places at once.
+            // The two "batched" causes need different bounds, and lumping them together made this
+            // blind to the only event of this class ever MEASURED: Iter-42 lost units on 5 tiles of
+            // a 505-tile ledger, while a `tilesBefore / 4` override needs 126 — 25× the real
+            // magnitude, growing worse with base size. So:
+            //   • firstPostGrace: at a clean load the ledger SHOULD already match the world, so the
+            //     legitimate shrink count is near zero. The bound stays close to the ordinary one.
+            //     (The one benign mass event here is a blacklist edit shipped with a mod update,
+            //     which is rare, one-off per update, and worth a line in the file anyway.)
+            //   • afterGap: an arbitrary amount of unobserved play — the mod switched off, the
+            //     process suspended — genuinely needs a high bound.
+            int trigger =
+                firstPostGrace ? Mathf.Max(5, 2 * scale)
+                : afterGap ? Mathf.Max(20, tilesBefore / 4)
+                : 5 * scale;
             if (applied.ShrunkContentTiles >= trigger)
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Shrink,
@@ -607,14 +642,30 @@ namespace ItemChecklist.Possession
             // (c) a NET drain across the session. (b) cannot see this: Iter-41's collapse removed a
             // modest number of tiles per scan over many scans, which is why it needed a walk to
             // reproduce. The net test is what keeps ordinary remodelling out.
-            if (_maxTilesSeen >= 40 && tilesAfter <= _maxTilesSeen / 2 && _prunedThisSession >= Mathf.Max(20, _maxTilesSeen / 2))
+            // The removal count is prunes OR merge-emptied tiles: a tile also disappears when a
+            // merge drops its last content and last aux, and that is not a prune, so a drain
+            // delivered entirely through the merge path satisfied the net test and was then blocked
+            // by a prune-only counter forever.
+            bool netCollapse = _maxTilesSeen >= 40 && tilesAfter <= _maxTilesSeen / 2;
+            int removedTotal = _prunedThisSession > _shrunkContentTilesThisSession ? _prunedThisSession : _shrunkContentTilesThisSession;
+            if (netCollapse && removedTotal >= Mathf.Max(20, _maxTilesSeen / 2))
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Prune,
-                    PossessionIncidentStore.Prune + ":drain:" + guid + ":" + PossessionIncidentStore.MagnitudeBucket(_prunedThisSession),
+                    // Bucket on the DEPTH of the collapse, not on the removal total: that total only
+                    // ever grows, so its bucket pinned at "200+" and no further drain report could
+                    // ever be minted for the character — and a deduped Record reaches no channel at
+                    // all, not even the log. One legitimate remodel early on therefore used to blind
+                    // the only cumulative detector for the rest of the session.
+                    PossessionIncidentStore.Prune
+                        + ":drain:"
+                        + guid
+                        + ":"
+                        + PossessionIncidentStore.MagnitudeBucket(100 - (tilesAfter * 100 / Mathf.Max(1, _maxTilesSeen))),
                     "prunedTotal=" + _prunedThisSession + ctx,
                     $"the number of remembered places has fallen to {tilesAfter} from a peak of {_maxTilesSeen} this "
-                        + $"session, with {_prunedThisSession} forgotten along the way. If you did not dismantle that "
-                        + "much, your owned counts may be draining, so please report this file."
+                        + $"session, with {_prunedThisSession} forgotten and {_shrunkContentTilesThisSession} emptied along "
+                        + "the way. If you did not dismantle that much, your owned counts may be draining, so please "
+                        + "report this file."
                 );
         }
 

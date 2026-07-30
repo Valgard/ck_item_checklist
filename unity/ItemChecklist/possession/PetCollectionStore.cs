@@ -25,6 +25,26 @@ namespace ItemChecklist.Possession
                 for (int i = 0; i < text.Length; i++)
                     bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
+
+                // Iter-44: verify by reading back — CK's file layer swallows the whole IOException
+                // class without rethrowing (see PossessionStore.Save for the decompiled proof), so
+                // "no exception" is not "it landed". Here that mattered twice over: the failure was
+                // unreported AND `ClearDirty()` ran, cancelling the retry its own placement after
+                // the write was meant to guarantee. Only a verified write clears the flag.
+                if (!Verify(PathFor(guid), text))
+                {
+                    WriteFailed = true;
+                    Debug.LogWarning("[ItemChecklist] pet-skin save did not land (write reported no error but the file does not match).");
+                    PossessionIncidentStore.Record(
+                        PossessionIncidentStore.SaveFailed,
+                        PossessionIncidentStore.SaveFailed + ":petskins:" + guid,
+                        "petskins guid=" + guid + " reason=verify-failed bytes=" + text.Length,
+                        $"the pet-skin collection for {guid} could not be written — the game's file layer reported no error, "
+                            + "but reading the file back does not match what was saved. Skins collected this session will be "
+                            + "missing after a restart, and this store has no second source to rebuild from."
+                    );
+                    return; // stays Dirty → the next autosave retries
+                }
                 col.ClearDirty();
                 WriteFailed = false;
             }
@@ -45,9 +65,33 @@ namespace ItemChecklist.Possession
             }
         }
 
-        /// <summary>Iter-44: the last write attempt failed — see
-        /// <see cref="PossessionStore.WriteFailed"/>.</summary>
+        /// <summary>Iter-44: the last write attempt did not land — see
+        /// <see cref="PossessionStore.WriteFailed"/>. Reset per character in <see cref="Load"/>:
+        /// without that, a fault on one character showed "pet skins not saving" for a healthy next
+        /// one all session, because the clear path needs a successful write and a character that
+        /// collects no new skin never writes at all.</summary>
         internal static bool WriteFailed { get; private set; }
+
+        /// <summary>Read a just-written file back and compare it to what was saved. Any failure
+        /// counts as "did not land" — see <see cref="PossessionStore.Save"/>.</summary>
+        private static bool Verify(string path, string expected)
+        {
+            try
+            {
+                var bytes = API.ConfigFilesystem.Read(path);
+                if (bytes == null || bytes.Length != expected.Length)
+                    return false;
+                for (int i = 0; i < bytes.Length; i++)
+                    if ((char)bytes[i] != expected[i])
+                        return false;
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[ItemChecklist] pet-skin save verify failed: {e.Message}");
+                return false;
+            }
+        }
 
         /// <summary>Read the collection for <paramref name="guid"/>, reporting how it ended.
         /// <para><strong>Iter-43 — this is the most damaging instance of the failed-load pattern
@@ -61,6 +105,7 @@ namespace ItemChecklist.Possession
         public static PetCollection Load(string guid, out StoreLoadStatus status)
         {
             status = StoreLoadStatus.NoFile;
+            WriteFailed = false; // per character — see the field's note
             var col = new PetCollection();
             if (string.IsNullOrEmpty(guid))
                 return col;

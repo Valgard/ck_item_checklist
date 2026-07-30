@@ -61,7 +61,14 @@ namespace ItemChecklist.Possession
             _collected.Clear();
             Dirty = false;
             if (string.IsNullOrEmpty(text))
-                return 0;
+                // A ZERO-BYTE file is damage, not an empty collection. No version of this mod can
+                // write one: `Save` only runs while `Dirty`, which needs at least one collected
+                // skin, and since Iter-44 `Serialize` always emits the header. A genuinely new
+                // character has NO file, which the store handles before reaching this parser. It
+                // matters on this platform in particular: corekeeper-patch's Patch 3 replaced CK's
+                // atomic tmp+File.Replace with a direct write to work around the Wine initial-save
+                // regression, so a crash mid-write can leave exactly this.
+                return 1;
             int skipped = 0;
             int declared = -1; // -1 = no header ⇒ a pre-Iter-44 file, nothing to check against
             foreach (var raw in text.Split('\n'))
@@ -86,6 +93,13 @@ namespace ItemChecklist.Possession
             // indistinguishable from a shorter one, and every skin past the cut is gone silently.
             if (declared >= 0 && declared != _collected.Count)
                 skipped++;
+            // A headerless file is a pre-Iter-44 one: accepted as-is (no migration, nothing lost),
+            // but mark it dirty so the very next character save rewrites it WITH the header.
+            // Otherwise the detector above stays inert forever for exactly the characters that have
+            // most to lose — a stable, complete collection never sets Dirty on its own, since only
+            // a genuinely new skin does.
+            if (declared < 0 && skipped == 0 && _collected.Count > 0)
+                Dirty = true;
             return skipped;
         }
     }
