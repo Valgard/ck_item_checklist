@@ -1981,12 +1981,17 @@ The `PruneByPredicate` call, the `WorldNaturePruned` flag and the now-unused
 `PruneByPredicate` method are gone (+21/−39 across `PossessionScanner.cs`/`PossessionLedger.cs`).
 This is not the lesser evil but the correct end state: the Iter-28 **write gate** keeps path-#3
 nature out of the ledger at the source, and the Iter-31/41 `v2`/`v3` **discard migrations** threw
-away every pre-gate ledger outright — so no v3 ledger can carry a path-#1 nature backlog for the
-sweep to clear. Should a future blacklist addition leave stragglers, `PruneStaleNear` (the Iter-41
-two-condition self-heal) removes them on the next base visit. Persisting the flag was rejected: it
+away every pre-gate ledger outright — so no v3 ledger can carry a path-#3 nature backlog for the
+sweep to clear. Should a future blacklist addition leave stragglers, they self-heal on the next
+visit (an over-count meanwhile, never a loss). Persisting the flag was rejected: it
 would keep a mechanism that deletes unattributable entries, so the same data loss would recur
 (once) on every future blacklist edit, and it would cost another schema bump + discard migration.
-The ledger now has exactly **two** removers: `PruneStaleNear` and the `LoadFrom` marker discard.
+**Two claims in this entry were wrong and Iter-43 corrected them** (found by the Iter-42 review,
+recorded here rather than silently edited): the count-path numbering above (`AddOne` is path **#3**
+under the canonical scheme — #1 is *carried*; the Iter-28-era code comments numbered it #1 and were
+unified in Iter-43), and "the ledger now has exactly **two** removers" — `ClearAux` is a third and
+`SetLiveContainer` removes by *replacing* an observed tile's dict. The invariant that IS true after
+Iter-42: **no path deletes from the ledger by id-predicate any more.**
 The replaced code is documented in place (a comment block at the top of `Scan` + one on the
 ledger) so a later reader does not "fix" it by persisting the flag and reintroducing the loss.
 

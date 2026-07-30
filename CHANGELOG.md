@@ -11,13 +11,13 @@ Fixes owned-item counts being lost when a save is loaded away from your base.
 
 ### Fixed
 
-- **Stored building materials no longer drop out of your owned counts.** Items the
-  game classes as world growth — stalagmites, mushrooms, grasses, cave furniture and
+- **Stored plants and cave decorations no longer drop out of your owned counts.** Items
+  the game classes as world growth — stalagmites, mushrooms, grasses, cave furniture and
   the like — were being removed from the remembered contents of your containers
   every single time a world was loaded. Loading a save while standing far from your
   base therefore showed them as not owned until you walked back, and the next
-  autosave made that loss permanent. Near your base the periodic scan put them back
-  within seconds, which is why this was easy to miss. **Nothing needs doing to
+  autosave wrote that loss to your save file. Near your base the periodic scan put them
+  back within seconds, which is why this was easy to miss. **Nothing needs doing to
   recover:** the counts are rebuilt from your containers the next time you are at
   your base.
 

@@ -262,11 +262,13 @@ remaining backlog.
   CavelingFloorTile, GraveTree ≡ WayPoint), proven over three in-game probe rounds — so the
   filter is a **curated tag+ObjectID blacklist** (`PossessionClassifier.IsWorldNature`: tags
   Greenery/Destructible/CattleKelpFood/Ruins + a short tag-less-straggler ID list, editable).
-  Gated on **path #1 only** (placed-object count) — container contents + carried untouched,
+  Gated on **path #3 only** (placed-object count; numbered #1 in the Iter-28-era text, unified
+  in Iter-43) — container contents + carried untouched,
   so nature stored in a chest still counts and remember-from-afar is preserved. A **one-time
   `PruneByPredicate` at first scan** evicts the pre-existing backlog (`PruneStaleNear`'s
   180-tile window was far too slow), ledger **5503→~520**, save spike + host-overrun warnings
-  gone. Verified smooth in-game (1.2.1.5). Process lesson: a runaway background decompile-grep
+  gone. **(That eviction was REMOVED in Iter-42: its gate was never serialized so it ran on
+  every load, and the sweep could not tell chest-stored nature from placed — see Iter-42.)** Verified smooth in-game (1.2.1.5). Process lesson: a runaway background decompile-grep
   ate CPU through every test and confounded the "is it smooth?" signal for several rounds —
   kill stray background jobs before measuring perf.
 - **Iter-30 -- config-gated possession diagnostic log. DONE** (see
@@ -522,8 +524,10 @@ remaining backlog.
   dropped every pre-gate ledger, so nothing is left for the sweep to clear; stragglers from a
   future blacklist edit self-heal via `PruneStaleNear`. Persisting the flag was rejected: it keeps
   a mechanism that deletes unattributable entries (same loss, once per future blacklist edit) and
-  costs another schema bump. The ledger now has exactly two removers (`PruneStaleNear` + the
-  `LoadFrom` marker discard). **General lesson (`docs/gotchas.md`):** a "one-time" cleanup must
+  costs another schema bump. (The "exactly two removers" claim first written here was **wrong** —
+  `ClearAux` is a third and `SetLiveContainer` removes by replacing an observed tile's dict;
+  corrected in Iter-43. The true invariant: no path deletes by id-predicate any more.)
+  **General lesson (`docs/gotchas.md`):** a "one-time" cleanup must
   keep its done-mark IN the store, never run a predicate delete over a store without provenance,
   and test remembered-state changes by loading **far from base** — the at-base case self-repairs
   and proves nothing. Verified in-game (1.2.1.5) against the ledger file: across a far-from-base

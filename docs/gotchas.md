@@ -1316,14 +1316,17 @@ Two independent defects, both in the Iter-28 eviction above, each sufficient to 
    to live IN the store** — for this ledger that means the version marker (`#icl-ledger-vN`),
    which is the mechanism the migrations already use.
 2. **The predicate could not distinguish what it deleted.** The ledger holds one flat
-   `Dictionary<int,int>` per tile, filled by *both* scan path #1 (`AddOne`, the placed object —
+   `Dictionary<int,int>` per tile, filled by *both* scan path #3 (`AddOne`, the placed object —
    the intended eviction target) and path #2 (`AddBuffer`, container contents — legitimate
    possession). An id-predicate sweep sees only `(tile, id, count)`, so evicting "wild
    Stalagmite" necessarily also evicted **1129 Stalagmite stored in a chest**. The Iter-28
    comment's promise that "legitimately-stored items re-add themselves via the live scan" holds
    **only where the container is observed**, i.e. at base. **Never run a predicate delete over a
    store that does not record provenance** — gate at the write site (as the `IsWorldNature`
-   path-#1 gate correctly does) or discard the whole file.
+   path-#3 gate correctly does) or discard the whole file. (Count-path numbering — #1 carried,
+   #2 container contents, #3 the placed object — is defined once at the top of
+   `PossessionScanner.Scan`; the Iter-28-era code comments used to number `AddOne` as #1 and
+   were corrected in Iter-43.)
 
 **Why it stayed invisible for ~4 weeks, and the test that exposes this bug class.** At base the
 next 3 s scan re-observed the containers and `SetLiveContainer` wrote the true contents straight
@@ -1334,8 +1337,9 @@ touching remembered/persisted spatial state, **the load-far-from-base case is th
 load-at-base case; the latter is self-repairing and proves nothing. (Diagnosed with no build at
 all, by diffing the ledger against its own `.pugbackup`: 21 ids / 2677 units gone, every one of
 them an `IsWorldNature` match and no other — the predicate left its fingerprint in the data.
-Cf. `docs/gotchas.md § Possession Base Scope` and the [[feedback_validate_against_savegame]]
-habit of parsing the real save instead of reasoning about it.)
+Cf. § Possession Base Scope & Persistence (Iter-31) below and the
+[[feedback_validate_against_savegame]] habit of parsing the real save instead of reasoning
+about it.)
 
 ## Possession Base Scope & Persistence (Iter-31)
 

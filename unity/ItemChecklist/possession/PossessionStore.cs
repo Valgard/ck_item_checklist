@@ -51,8 +51,10 @@ namespace ItemChecklist.Possession
                 ulong hash = Fnv1a64(text);
 
                 // Unchanged since the last write → no disk I/O at all (also skips the
-                // DirectoryExists probe). The first save per character always lands
-                // (no _lastSavedHash entry), persisting the Iter-28 cleaned ledger.
+                // DirectoryExists probe). The first save per character always lands: the cache
+                // is per-session, so a fresh launch has no entry for this guid and cannot
+                // hash-match. Note what that means — the first save of a session ALWAYS
+                // overwrites the file, whatever the in-memory ledger currently holds.
                 if (_lastSavedHash.TryGetValue(guid, out var prev) && prev == hash)
                 {
                     if (diag)

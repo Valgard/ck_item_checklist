@@ -51,21 +51,38 @@ namespace ItemChecklist.Possession
             var em = world.EntityManager;
             float dTWorld = diag ? Time.realtimeSinceStartup : 0f;
 
+            // COUNT PATHS — the canonical numbering, used by every comment here and in
+            // docs/architecture.md § possession. Do not renumber:
+            //   #1 = carried        (the player's own ContainedObjectsBuffer; never persisted)
+            //   #2 = container contents (AddBuffer — legitimate stored possession)
+            //   #3 = the placed object itself (AddOne — gated by IsWorldNature)
+            // #2 and #3 both write the SAME per-tile dict in the ledger, which records no
+            // provenance — that missing distinction is what Iter-42 below is about.
+
             // Iter-42: the Iter-28 one-time world-nature eviction used to run here, gated on a
             // `WorldNaturePruned` ledger flag. It was REMOVED because it destroyed real possession:
             // the flag lived only in memory (Serialize never wrote it), so a ledger freshly read
             // from disk always started `false` and the "one-time" sweep ran on EVERY world load —
-            // and `PruneByPredicate` cannot tell path #1 (the placed object, which SHOULD be
+            // and `PruneByPredicate` cannot tell path #3 (the placed object, which SHOULD be
             // evicted) from path #2 (the same id STORED in a chest, legitimate possession), since
             // both land in the same per-tile dict. So every load wiped stored nature (measured on a
             // real save: 21 ids / 2677 units, incl. 1129 stored Stalagmite + 598 Mushroom). At base
             // the live scan wrote it straight back — invisible; loading FAR from base left it gone
             // until the player returned, and the next autosave persisted the loss.
-            // Removing it is safe, not merely a lesser evil: the Iter-28 scan gate keeps path-#1
-            // nature out of the ledger at the source, and the Iter-31/41 v2→v3 discard migrations
-            // dropped every pre-gate ledger, so no v3 ledger can hold a path-#1 nature backlog.
-            // A newly blacklisted id's leftovers are self-healed by PruneStaleNear on the next
-            // base visit (unobserved + player-near + anchor-covered ⇒ dropped).
+            // Removing it is safe, not merely a lesser evil: the Iter-28 write gate below keeps
+            // path-#3 nature out of the ledger at the source (with one narrow exception — the
+            // locked-chest / boss-statue branch AddOnes before `info` is fetched, so it never
+            // consults IsWorldNature; those ids are deliberately owned furniture), and the
+            // Iter-31/41 v2→v3 discard migrations dropped every pre-gate ledger, so no v3 ledger
+            // can hold a path-#3 nature backlog.
+            // If an id is ever ADDED to the blacklist, existing ledgers keep their path-#3 entries
+            // for it (an over-count — the safe direction, never a loss) until either mechanism
+            // clears them on a later visit: on a tile that is still observed, `SetLiveContainer`
+            // replaces the tile's whole dict, so the id is simply not written back (the dominant
+            // case); on a tile that held nothing else, `PruneStaleNear` drops the tile once the
+            // player is within PruneRadius of THAT tile and it is anchor-covered. Neither deletes
+            // by id — and note the prune needs the tile to stay anchor-covered, so if its
+            // workbench is gone (or AnchorRadius was lowered past it) the entry simply persists.
 
             // Anchors = WORKBENCHES + the crafting stations standing within a workbench's
             // radius. Iter-31: a base is SEEDED by a workbench — the first thing a player
@@ -391,7 +408,7 @@ namespace ItemChecklist.Possession
             _diagObjectsDumped = true;
             foreach (var kv in _diagObjects)
                 Debug.Log($"[ItemChecklist] DIAG placed id={kv.Key} count={kv.Value.count} {kv.Value.sig}");
-            Debug.Log($"[ItemChecklist] DIAG placed distinct={_diagObjects.Count} (nature=True ones are excluded from path #1)");
+            Debug.Log($"[ItemChecklist] DIAG placed distinct={_diagObjects.Count} (nature=True ones are excluded from path #3)");
         }
 
         private static bool WithinAnchor(List<Vector2> anchors, float x, float z, float r2)

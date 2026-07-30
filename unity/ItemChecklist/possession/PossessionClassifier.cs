@@ -39,10 +39,16 @@ namespace ItemChecklist.Possession
 
         // Iter-28: world-spawned nature (bushes/grass/kelp/stalagmites/lilies/ruins/…) is
         // NOT a player possession. It must be excluded from the "count the placed object
-        // itself" path (PossessionScanner path #1) so it never enters the per-(x,z) ledger
+        // itself" path (PossessionScanner path #3) so it never enters the per-(x,z) ledger
         // — that ledger had grown to ~5500 entries (≈90% wild nature), and re-serialising it
         // every autosave was a 12–37ms main-thread spike. Nature still counts when actually
-        // STORED in a container or carried (path #2), which this predicate does NOT touch.
+        // STORED in a container (path #2) or carried (path #1), which this predicate does NOT
+        // touch. (Count-path numbering is defined once at the top of PossessionScanner.Scan.)
+        //
+        // Iter-42: ADDING an id here no longer evicts it from existing ledgers — the one-time
+        // sweep that used to do that deleted chest-stored copies too and was removed. A newly
+        // blacklisted id therefore lingers as an over-count on already-remembered tiles until
+        // they are re-observed (the safe direction); see the note at the top of `Scan`.
         //
         // No object-level signal separates wild nature from placed objects in CK — across
         // cat/stack/icon/craft/sell/tags/DontDropSelfCD/Diggable/Destructible, wild nature
