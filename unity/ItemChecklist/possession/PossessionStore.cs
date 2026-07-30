@@ -82,7 +82,7 @@ namespace ItemChecklist.Possession
                     if (diag)
                         Debug.Log(
                             $"[ItemChecklist] DIAG save SKIPPED unchanged serialize={(t1 - t0) * 1000f:F1}ms "
-                                + $"bytes={text.Length} containers={ledger.Containers.Count}"
+                                + $"bytes={text.Length} containers={ledger.TileCount}"
                         );
                     return;
                 }
@@ -97,7 +97,7 @@ namespace ItemChecklist.Possession
                 if (diag)
                     Debug.Log(
                         $"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms "
-                            + $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.Containers.Count}"
+                            + $"write={(UnityEngine.Time.realtimeSinceStartup - t1) * 1000f:F1}ms bytes={text.Length} containers={ledger.TileCount}"
                     );
             }
             catch (System.Exception e)

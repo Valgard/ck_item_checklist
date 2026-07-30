@@ -96,13 +96,21 @@ namespace ItemChecklist.Possession
             // Iter-31/41 v2→v3 discard migrations dropped every pre-gate ledger, so no v3 ledger
             // can hold a path-#3 nature backlog.
             // If an id is ever ADDED to the blacklist, existing ledgers keep their path-#3 entries
-            // for it (an over-count — the safe direction, never a loss) until either mechanism
-            // clears them on a later visit: on a tile that is still observed, `SetLiveContainer`
-            // replaces the tile's whole dict, so the id is simply not written back (the dominant
-            // case); on a tile that held nothing else, `PruneStaleNear` drops the tile once the
-            // player is within PruneRadius of THAT tile and it is anchor-covered. Neither deletes
-            // by id — and note the prune needs the tile to stay anchor-covered, so if its
-            // workbench is gone (or AnchorRadius was lowered past it) the entry simply persists.
+            // for it (an over-count — the safe direction, never a loss) until one of two
+            // mechanisms clears them, both of which now need the SAME premise. Iter-43's I4 ended
+            // the unconditional dict replacement that used to make this self-heal automatic, and
+            // Iter-44 defines exactly what replaced it:
+            //   • on a tile that is re-observed, `PossessionLedger.Publish` drops the no-longer-
+            //     written id only when that tile's contents may shrink — a container was observed
+            //     there, OR the tile is DEFINITELY OBSERVABLE (player within PruneRadius AND
+            //     anchor-covered). A tile observed from far away (only its co-located torch in
+            //     range at ~95 tiles) deliberately keeps the id: that is the I4 protection.
+            //   • on a tile that held nothing else, `PruneStaleNear` drops the whole tile under
+            //     the same player-near + anchor-covered premise.
+            // So a blacklist addition self-heals on the next visit to that tile, not merely on any
+            // scan that sees it — and note both paths need the tile to stay anchor-covered, so if
+            // its workbench is gone (or AnchorRadius was lowered past it) the entry simply
+            // persists. Neither path deletes by id-predicate.
 
             // Anchors = WORKBENCHES + the crafting stations standing within a workbench's
             // radius. Iter-31: a base is SEEDED by a workbench — the first thing a player
@@ -166,18 +174,21 @@ namespace ItemChecklist.Possession
             var carriedAux = new Dictionary<long, int>(); // Iter-41: live carried + active-pet skins/colours
             var auxScan = new Dictionary<long, Dictionary<long, int>>(); // per-tile remembered aux (pets/cattle/paint)
             var liveKeys = new HashSet<long>();
-            // Iter-43: tiles where a CONTAINER entity was actually observed this scan. Only those
-            // can confirm a tile's stored contents, so only they may shrink the remembered dict —
-            // see PossessionLedger.SetLiveContainer.
+            // Iter-43: tiles where a CONTAINER entity was actually observed this scan, i.e. whose
+            // stored CONTENTS this scan confirmed. Iter-44: it is reported as ONE piece of
+            // evidence (TileObservation.ContainerObserved) and is no longer read as a permission
+            // for both dimensions — a container says nothing about a tile's cattle/paint aux,
+            // which has entirely different producers (see TileObservation).
             var containerTiles = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
             bool havePlayer = false;
 
             // Accumulate per tile (x,z): multiple counted entities can share a tile
-            // (e.g. a torch standing on a mannequin's tile). Their contents MERGE — an
-            // earlier SetLiveContainer must not be overwritten by the next entity on the
-            // same tile (that lost the mannequin's displayed armor → counted 0).
+            // (e.g. a torch standing on a mannequin's tile). Their contents MERGE, and the tile is
+            // published to the ledger ONCE at the end — an earlier entity's contribution must not
+            // be overwritten by the next entity on the same tile (Iter-20: publishing per entity
+            // lost the mannequin's displayed armor → counted 0).
             var scan = new Dictionary<long, Dictionary<int, int>>();
             int dNear = 0;
 
@@ -235,10 +246,16 @@ namespace ItemChecklist.Possession
                 // accumulated a stale entry per visited tile (a per-colour over-count in the
                 // 48..~91 ring, where old tiles are neither pruned nor reconciled). Key it by its
                 // NEAREST loaded ANCHOR tile instead — a stable per-pen location (anchors don't
-                // move) — so a moving cow maps to the SAME tile each scan (SetLiveAux replaces, no
-                // accumulation) while still riding the per-tile remember/persist/prune: the anchor
-                // tile stays remembered while away, and is reconciled/pruned once the pen empties
-                // and the player is near it.
+                // move) — so a moving cow maps to the SAME tile every scan.
+                // Iter-44: that stability is what makes the aux shrink rule work, and the old
+                // "SetLiveAux replaces, no accumulation" wording no longer describes it. The
+                // publish MERGES, and this tile's aux may shrink only when the pen was observed
+                // (a cow produced aux here) or the tile is definitely observable (player within
+                // PruneRadius AND anchor-covered). So the pen's last animal of a colour is now
+                // actually dropped when the player stands at the empty pen — the C-1 case, where
+                // this key could never shrink at all because an anchor tile carries CraftingCD and
+                // is therefore never in `containerTiles`. While away the anchor tile stays
+                // remembered (nothing observed ⇒ nothing may shrink), as Iter-41 requires.
                 if (em.HasComponent<CattleCD>(e))
                 {
                     long cckey = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
@@ -298,86 +315,88 @@ namespace ItemChecklist.Possession
                 }
             }
 
-            // Iter-43: a tile's remembered contents may only SHRINK when this scan actually
-            // confirmed them — a container entity observed here AND past the streaming grace.
-            // Otherwise (e.g. only the co-located torch was observed, its chunk still loaded while
-            // the chest's is not) the remembered ids are kept. `droppedUnits` counts what a
-            // confirmed shrink removed; it is reported below, because an unseen deletion is what
-            // made Iter-42 invisible for a month.
             // Iter-43: capture the pre-mutation ledger size so the DIAG line can report the
-            // TRANSITION rather than just the endpoint. `Containers.Count` is O(1) so the tile
-            // count is always available; the pair sum costs an iteration and is diag-only.
-            int lcBefore = ledger.Containers.Count;
-            int lpBefore = 0;
-            if (diag)
-                foreach (var c in ledger.Containers)
-                    lpBefore += c.Value.Count;
+            // TRANSITION rather than just the endpoint. `TileCount` is O(1) so the tile count is
+            // always available; the pair sum costs an iteration and is diag-only.
+            int lcBefore = ledger.TileCount;
+            int lpBefore = diag ? ledger.PairCount : 0;
 
-            int droppedUnits = 0,
-                shrunkTiles = 0;
-            foreach (var kv in scan)
-            {
-                int dropped = ledger.SetLiveContainer(kv.Key, kv.Value, allowShrink: allowPrune && containerTiles.Contains(kv.Key));
-                if (dropped > 0)
-                {
-                    droppedUnits += dropped;
-                    shrunkTiles++;
-                }
-                liveKeys.Add(kv.Key);
-            }
-            // Iter-43: publish ONLY tiles that actually produced aux. `TileAux(auxScan, key)` is
-            // evaluated as an ARGUMENT at the AddBuffer call above, so auxScan gains a key for
-            // EVERY container tile whether or not any aux was added — and `SetLiveAux` REPLACES,
-            // so writing an empty dict is a deletion in all but name, performed here UNGATED while
-            // the acknowledged deletion paths below are allowPrune-gated. That bypassed the gate
-            // in exactly the case its comment describes: a tile with a co-located chest IS in
-            // auxScan (empty), so ClearAux never fired for it and the empty write had already
-            // wiped the remembered aux — during the post-load grace, when the cattle's archetype
-            // chunk may simply not have streamed in yet. Skipping empties routes every aux removal
-            // through the one gated path below.
-            foreach (var kv in auxScan)
-            {
-                if (kv.Value.Count == 0)
-                    continue;
-                ledger.SetLiveAux(kv.Key, kv.Value, allowShrink: allowPrune && containerTiles.Contains(kv.Key));
-                liveKeys.Add(kv.Key);
-            }
-
-            // Iter-41: a live tile re-observed WITHOUT aux this scan must drop any stale remembered
-            // aux — a mobile penned cattle that moved off a tile still kept live by a co-located
-            // chest/placeable (whose non-container path never refreshes that tile's aux). Only LIVE
-            // (observed) tiles are reconciled, so remembered-away aux is preserved. Prevents a
-            // per-colour over-count that would not self-heal. Gated on allowPrune for the same
-            // reason as PruneStaleNear below: during the post-load streaming grace a co-located
-            // creature may not have streamed in yet, and this is a DELETION path — deleting its
-            // remembered aux then would be the unsafe direction (a transient over-count is safer).
-            // Iter-43: "present but empty" counts as absent — see the skip above; without this the
-            // predicate would read "aux was observed here" for a tile that produced none.
-            if (allowPrune)
-                foreach (var key in liveKeys)
-                    if (!auxScan.TryGetValue(key, out var observedAux) || observedAux.Count == 0)
-                        ledger.ClearAux(key);
-
-            // Self-heal: drop a remembered container/aux tile the player is close enough to that
-            // it is DEFINITELY still OBSERVABLE (within PruneRadius) yet was not seen this snapshot
-            // — genuinely destroyed/emptied. Iter-41 grounded PruneRadius in the CK code AND an
-            // in-game measurement (they disagree, and the smaller one governs):
+            // Iter-41/44: the radius at which "not observed" may be read as "gone". Iter-41
+            // grounded it in the CK code AND an in-game measurement (they disagree, and the
+            // smaller one governs):
             //   • Hard load floor (decompile, Pug.Base PLAYER_DISTANCE_TO_LOAD/UNLOAD): the server
             //     force-loads chunks within 200 tiles of the player and unloads past 300 — NOT
             //     shrinkable by any setting (defaultSimDistance/SimulationDistance are dead) — so a
             //     placed container within 200 is a live, queryable entity.
             //   • BUT empirically (DIAG maxSeen/minGhost) base containers left the *observed* scan
             //     set at ~91-115 — well below 200, matching no named constant (best explanation:
-            //     DOTS archetype-chunk unload granularity + camera-frame offset). The prune infers
+            //     DOTS archetype-chunk unload granularity + camera-frame offset). The inference is
             //     "unobserved ⇒ destroyed", so it must stay below where observation is RELIABLE
             //     (~91), NOT below the 200 load radius. The old 180 conflated "loaded" (200) with
             //     "observed" (~91) and pruned loaded-but-unobserved containers in the 91-180 band
-            //     as the player walked away — the K collapse this iteration fixes.
+            //     as the player walked away — the K collapse Iter-41 fixed.
             // 48 sits well below BOTH (~91 observed dropout and the 200 hard floor) and far exceeds
             // destruction range (you must stand next to a container to destroy it). It is
             // INDEPENDENT of AnchorRadius (which only shares the 48 *default* and is user-settable
-            // to 96): the prune must stay under the observed-dropout regardless of AnchorRadius.
-            const float PruneRadius = 48f; // the "loaded" half (player-near); the closure is the "anchor-covered" half
+            // to 96): it must stay under the observed-dropout regardless of AnchorRadius.
+            // Iter-44 hoisted it above the flush because BOTH consumers need it now: the tile
+            // publish (as TileObservation.DefinitelyObservable) and PruneStaleNear below. The
+            // publish is the strictly SMALLER inference of the two — it drops a tile's
+            // unconfirmed ids where the prune deletes the whole tile.
+            const float PruneRadius = 48f; // the "loaded" half (player-near); anchor-cover is the "observed" half
+            float pruneR2 = PruneRadius * PruneRadius;
+
+            // Iter-44: ONE publish per tile, over the union of both accumulators' keys, carrying
+            // the EVIDENCE this scan gathered; the ledger derives from it what each dimension may
+            // shrink (PossessionLedger.TileObservation holds the rules + their justification).
+            // This replaces Iter-43's three separate writers — SetLiveContainer / SetLiveAux /
+            // ClearAux — and with them two hand-kept-in-step flush loops plus a reconcile pass:
+            //   • the "skip empty aux dicts" guard is gone. It existed only because SetLiveAux
+            //     REPLACED, so an ungated empty write was a deletion; an empty observation is now
+            //     just an observation and goes through the same rule as any other.
+            //   • the `ClearAux` reconcile is gone. Its job — dropping stale aux from a tile that
+            //     was re-observed WITHOUT aux (a mobile penned cow that left a tile still kept
+            //     live by a co-located chest) — is now simply "aux producer not observed AND the
+            //     tile is definitely observable ⇒ aux may shrink", and it is STRICTER than the old
+            //     block, which needed only allowPrune.
+            //   • `containerTiles` stops being a universal confirmation predicate. It confirms
+            //     CONTENTS only, which is all it ever meant: it is filled solely in the
+            //     `isContainer` branch, so a cattle/paint aux tile (a station tile carrying
+            //     CraftingCD, or a plain placeable) was never in it and its aux could therefore
+            //     never shrink — the stale colour that survived restarts.
+            int droppedUnits = 0,
+                droppedAuxKeys = 0,
+                shrunkTiles = 0;
+            var flushKeys = new HashSet<long>(scan.Keys);
+            flushKeys.UnionWith(auxScan.Keys);
+            foreach (var key in flushKeys)
+            {
+                scan.TryGetValue(key, out var tileContents);
+                auxScan.TryGetValue(key, out var tileAux);
+                float pdx = PossessionLedger.KeyX(key) - playerPos.x,
+                    pdz = PossessionLedger.KeyZ(key) - playerPos.y;
+                var obs = new TileObservation
+                {
+                    ContainerObserved = containerTiles.Contains(key),
+                    AuxProducerObserved = tileAux != null && tileAux.Count > 0,
+                    // PruneStaleNear's own premise, one granularity down: player-near AND
+                    // anchor-covered ⇒ anything still standing here WOULD have been seen.
+                    DefinitelyObservable =
+                        havePlayer && pdx * pdx + pdz * pdz <= pruneR2 && WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2),
+                    PastGrace = allowPrune,
+                };
+                var published = ledger.Publish(key, tileContents, tileAux, obs);
+                droppedUnits += published.DroppedUnits;
+                droppedAuxKeys += published.DroppedAuxKeys;
+                if (published.DroppedUnits > 0 || published.DroppedAuxKeys > 0)
+                    shrunkTiles++;
+                liveKeys.Add(key);
+            }
+
+            // Self-heal: drop a remembered tile the player is close enough to that it is
+            // DEFINITELY still OBSERVABLE (within PruneRadius, anchor-covered) yet was not seen
+            // at all this snapshot — genuinely destroyed/emptied. See PruneRadius above for why
+            // both halves are required and where 48 comes from.
             int prunedTiles = 0;
             if (allowPrune && havePlayer)
                 prunedTiles = ledger.PruneStaleNear(
@@ -393,14 +412,16 @@ namespace ItemChecklist.Possession
             // threshold nor "any shrink" can be the trigger. But losing units on MANY tiles inside
             // a single 3 s scan is not normal play: nobody empties five chests at once, while the
             // Iter-42 sweep hit exactly 5 tiles in one pass. That shape is the signal.
+            // Iter-44: a tile now counts as shrunk when it lost contents OR aux keys, so the
+            // detector finally sees aux losses too (they reached nothing at all before).
             if (shrunkTiles >= 5)
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Shrink,
                     PossessionIncidentStore.Shrink + ":session",
-                    "tiles=" + shrunkTiles + " units=" + droppedUnits + " ledgerC=" + lcBefore + "->" + ledger.Containers.Count,
-                    $"{droppedUnits} owned unit(s) dropped from {shrunkTiles} container tiles in a single scan. "
-                        + "That is expected if you just emptied several containers at once — otherwise it may be a "
-                        + "tracking bug; please report this file."
+                    "tiles=" + shrunkTiles + " units=" + droppedUnits + " auxKeys=" + droppedAuxKeys + " ledgerC=" + lcBefore + "->" + ledger.TileCount,
+                    $"{droppedUnits} owned unit(s) and {droppedAuxKeys} colour/skin entr(ies) dropped from {shrunkTiles} "
+                        + "tiles in a single scan. That is expected if you just emptied several containers at once — "
+                        + "otherwise it may be a tracking bug; please report this file."
                 );
 
             // Iter-16.1: any skin currently owned (carried/active/container) is collected
@@ -432,13 +453,8 @@ namespace ItemChecklist.Possession
             if (diag)
             {
                 float dTEnd = Time.realtimeSinceStartup;
-                int lc = 0,
-                    lp = 0;
-                foreach (var c in ledger.Containers)
-                {
-                    lc++;
-                    lp += c.Value.Count;
-                }
+                int lc = ledger.TileCount,
+                    lp = ledger.PairCount;
                 Debug.Log(
                     $"[ItemChecklist] DIAG scan total={(dTEnd - dT0) * 1000f:F1}ms "
                         + $"(world={(dTWorld - dT0) * 1000f:F1} setup={(dTAnchors - dTWorld) * 1000f:F1} "
@@ -451,7 +467,10 @@ namespace ItemChecklist.Possession
                         // "ledgerC=505->505 lostUnits=2677" would have made Iter-42 self-evident
                         // on the first far-from-base load instead of costing a month.
                         + $"ledgerC={lcBefore}->{lc} pairs={lpBefore}->{lp} pruned={prunedTiles} "
-                        + $"shrunk={shrunkTiles} lostUnits={droppedUnits} "
+                        // Iter-44: auxDrops= surfaces removals on the aux axis (pet skins, cattle
+                        // and paint colours). Iter-43 reported content units only, so an aux loss
+                        // — the C-1 defect's own dimension — reached no channel whatsoever.
+                        + $"shrunk={shrunkTiles} lostUnits={droppedUnits} auxDrops={droppedAuxKeys} "
                         + $"ents={ents.Length} near={dNear} anchors={anchors.Count}"
                 );
                 _lastScanRt = dT0; // Iter-38.1: anchor the next scan's dt=
