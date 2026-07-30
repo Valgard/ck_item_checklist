@@ -416,7 +416,8 @@ unity/ItemChecklist/
   possession/                     possession scan/ledger/persist package (Iter-20)
     PossessionScanner.cs          live ECS scan: carried + workbench-anchored base storage
     PossessionLedger.cs           per-(x,z) tile ledger; merge + "remembered" remotes; #icl-ledger-v3 marker (Iter-31/41)
-    PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem); FNV-64 save-write-skip (Iter-31)
+    PossessionStore.cs            per-character-GUID persistence (API.ConfigFilesystem); FNV-64 save-write-skip (Iter-31); StoreLoadStatus (Iter-43)
+    PossessionIncidentStore.cs    durable, ungated data-loss reporting: load-failed / ledger-discarded / shrink (Iter-43)
     PossessionView.cs             immutable per-refresh snapshot (Count(objectId))
     PossessionClassifier.cs       type/ID predicates (PlaceablePrefab, locked chests, boss statues, IsWorldNature (Iter-28), IsWorkbench (Iter-31))
     PetCollection.cs              persistent ever-owned per-(objectID,skinIndex) ledger (Iter-16.1)

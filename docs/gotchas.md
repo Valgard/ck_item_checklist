@@ -1341,6 +1341,53 @@ Cf. § Possession Base Scope & Persistence (Iter-31) below and the
 [[feedback_validate_against_savegame]] habit of parsing the real save instead of reasoning
 about it.)
 
+### A load that fails "softly" gets persisted over the good file (Iter-43)
+
+The generalisable shape, found by the Iter-42 review in code Iter-42 never touched. A load
+returning an **empty store** for a *failure* is not a display bug — it is a delayed **write** bug,
+because the next save persists that emptiness over the intact file:
+
+1. `Load` returned a bare empty object for four different outcomes — empty id, no file, `Read`
+   returned null (**not even logged**), any exception — so the caller could not tell "new
+   character" from "could not read".
+2. Nothing checked. The scan then repopulated whatever was live, which **at base looks entirely
+   plausible** — the same masking as Iter-42.
+3. The write-skip cache is **per-session**, so the first save of a launch always lands: an empty
+   store can never hash-match a populated file. ~14 bytes replaced ~14 KB, and the *next* autosave
+   overwrote the `.pugbackup` — the last copy.
+
+**Rules that fall out of this, worth applying to any persisted store:**
+- **Return a load STATUS, not just data.** "Empty because new" and "empty because broken" must be
+  distinguishable at the call site, and a failed load must make the store **read-only** until the
+  next successful load. Not saving costs one session; saving costs everything on disk.
+- **Set the failure flag BEFORE anything else can throw.** Our `LoadFrom` clears its dicts *before*
+  parsing, so a mid-parse throw leaves a **partially** populated store that is indistinguishable
+  from a complete one — the worst case, because it looks like success.
+- **A silent `null` return is worse than an exception.** The `Read`-returned-null branch had no log
+  at all and was the one path no amount of `catch` would have surfaced.
+- **Weigh recoverability per store, and fix the unrecoverable one first.** The possession ledger
+  self-rebuilds from the player's containers; the pet-skin collection is an *ever-owned* set with
+  no second source, so an empty write is final. Same bug, different blast radius.
+- **A wholesale-replace write path needs a confirmation predicate.** `_containers[key] = contents`
+  deletes everything the previous scan knew. When two producers write one record for *different*
+  entities that can leave the observed set independently (a container and a torch sit in different
+  DOTS archetype chunks), only the *confirmed* part may shrink it — here: a container entity was
+  actually observed on that tile, and the world is past the post-load streaming grace. Gating on
+  the grace alone is not enough; that covers loading far from base but not walking away, which is
+  the same loss in normal play.
+- **Count and report every deletion, even the legitimate ones.** Not one destructive path here
+  logged anything, and the diagnostic printed only the *endpoint* after all mutations. Report the
+  **transition** (`ledgerC=505->505 lostUnits=2677`) — that one line would have made Iter-42
+  self-evident on the first far-from-base load instead of costing a month.
+- **Pick an anomaly trigger that cannot false-positive, or don't ship one.** A shrink is normal
+  (emptying a chest drops its content), so neither a magnitude threshold nor "any shrink" is usable.
+  Trigger on a *shape* that normal play cannot produce — units lost on ≥5 tiles within one 3 s scan.
+  A false alarm about data loss is worse than no alarm.
+- **Durable beats logged for anything a user must report.** `Player.log` rotates every launch, so a
+  warning is gone by the time someone writes the bug report. Persist it (here
+  `PossessionIncidentStore` → `mods/ItemChecklist/possession-incidents.txt`) and keep it **ungated**
+  by the default-off diagnostics flag — a report that requires prior suspicion reports nothing.
+
 ## Possession Base Scope & Persistence (Iter-31)
 
 ### Workbench = the semantic "is this the player's base?" discriminator

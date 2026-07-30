@@ -2009,3 +2009,126 @@ original counts (`5610` Stalagmite 1129, `5500` Mushroom 598, `5700` CavelingFlo
 **Recovery for existing players:** none needed — the deleted entries are rewritten by the live
 scan on the next base visit (that same self-repair is what masked the bug). Pure behavioural C#;
 no prefab/art/loc touch, no schema change.
+
+**Iter-43 (the possession subsystem's remaining silent data-loss paths) — DONE (2026-07-30,
+branch `iter-43`).** Not a user report: this iteration is **what the Iter-42 review found**. After
+1.3.2 shipped, the user asked for the `review-pr` gate to be run retroactively; four reviewers
+(code / comments / type-design / silent-failure) went over the Iter-42 diff. The diff itself came
+back with **zero Critical findings** — but two of my own documentation claims were wrong, and the
+reviewers found **four further data-loss paths in the surrounding code**, none of them introduced
+by Iter-42. The user chose to fix everything in one iteration rather than staging it.
+
+**Iter-42's own errors, corrected first** (they are recorded, not silently rewritten, in the entry
+above): the **count-path numbering** contradicted itself — the canonical scheme is #1 carried /
+#2 container contents / #3 the placed object, but the Iter-28-era code comments numbered `AddOne`
+as #1 and the Iter-42 comments inherited that, so read against `architecture.md` the comment
+claimed the sweep could not tell *carried* from *stored* (false — `_carried` is a separate field,
+never persisted, never swept). Unified, with the legend now stated **once** at the top of
+`PossessionScanner.Scan`. And **"the ledger now has exactly two removers" was simply untrue** —
+`ClearAux` is a third, `LoadFrom` clears unconditionally, and `SetLiveContainer` removes by
+*replacing* a tile's dict. It had been written into four documents as an audit invariant, in a
+data-loss context, i.e. exactly where the next investigator would lean on it. Replaced by the
+invariant that *is* true: **no path deletes from the ledger by id-predicate any more.**
+
+**C1 — a failed load was indistinguishable from "no file", and the next autosave persisted the
+emptiness.** Both stores returned a bare empty object for four different outcomes (empty guid /
+no file / `Read` returned null — *not even a warning* / any exception); the caller checked
+nothing; and the FNV save-skip cache is per-session, so the **first save of a launch always
+lands**. A transient read fault therefore replaced a populated file with a ~14-byte stub, and the
+following autosave overwrote the `.pugbackup` too — the last copy. Under Wine this is not
+theoretical: the project ships **six IL patches** for file APIs that lie or fail there. Worst
+variant: `LoadFrom` clears both dicts *before* parsing, so a mid-parse throw yields a **partially**
+populated ledger indistinguishable from a complete one. Fix: `Load(guid, out StoreLoadStatus)`
+(`NoFile`/`Loaded`/`Failed`, set to `Failed` **first**, before anything else can throw) +
+`s_ledgerReadOnly`/`s_petsReadOnly` in `ItemChecklistMod`, and `SavePossessionLedger` skips a store
+whose load failed. Not saving costs this session's changes; saving costs everything on disk.
+**`PetCollectionStore` was fixed first and carries the reasoning in its docstring:** it is the
+unrecoverable one — an ever-owned set with no second source (CK tracks no per-skin discovery), so
+an empty write destroys the only record and re-earning a skin needs another random egg hatch.
+
+**I2 — the version discard threw a whole ledger away with no log, while `Load` reported success.**
+So even the new status flag could not catch it, and a truncated/corrupt file (Wine, power loss,
+disk full) was indistinguishable from a legitimate v2→v3 migration — from the outside, byte-for-byte
+the Iter-42 symptom. `LoadFrom` now returns the tiles parsed (or `-1` for a marker mismatch) and the
+caller records the discard with the byte count and the actual first line: `#icl-ledger-v2` reads as
+a migration, anything else as damage. A discard deliberately does **not** set `Failed` — it is the
+intended migration and the store must stay writable; only the silence was the bug. Two hardening
+details in the same path: the marker is compared as an **exact first line** (the old
+`StartsWith("#icl-ledger-v3")` would accept a future `…v30` and parse it under the wrong schema),
+and **non-positive counts are rejected at the parse boundary** (a hand-edited file could carry
+`id:0`, which `BuildView` summed while the Iter-40 reverse index defensively filtered `>= 1` — two
+readers disagreeing about what "present" means).
+
+**I3 — an ungated empty-aux write bypassed the very guard written for it.** `TileAux(auxScan, key)`
+is evaluated as an *argument* to `AddBuffer`, so `auxScan` gained a key for **every** container tile
+whether or not aux followed; the flush then called `SetLiveAux(key, emptyDict)`, and `SetLiveAux`
+REPLACES — a deletion in all but name, **ungated**, while the `ClearAux` reconcile immediately below
+is `allowPrune`-gated with a comment arguing precisely that deleting remembered aux during the
+streaming grace "would be the unsafe direction". A tile with a co-located chest *is* in `auxScan`
+(empty), so `ClearAux` never fired for it — the empty write had already wiped the aux. Concrete
+case: a base tile that is a pen's nearest-anchor tile and also carries a chest; scan #1 after a load
+sees the chest's archetype chunk but not the cattle's. Fix: don't publish a tile that produced no
+aux, and treat "present but empty" as absent in the reconcile — every aux removal now goes through
+the one gated path.
+
+**I4 — `SetLiveContainer` was an unconditional, ungated delete, and this is the one that changed my
+own plan mid-flight.** Two producers write a tile's dict for *different* entities (`AddOne` the
+placed object, `AddBuffer` a container's contents), and a container and a torch necessarily sit in
+different DOTS archetype chunks, so per Iter-41 they leave the observed set **independently** at
+~91–115 tiles. Iter-20 documents that exact co-location (a wall torch on a mannequin's tile). At
+~95 tiles the scan sees only the torch, builds `{torch:1}`, and silently discards four armour
+pieces; the tile is in `liveKeys`, so `PruneStaleNear` skips it and would refuse past 48 anyway.
+Same loss shape as Iter-42, no predicate involved, zero conditions, no gate — next to a prune that
+requires three conditions *plus* `allowPrune`. **I had announced "merge during the grace" and that
+was wrong:** grace-only merging fixes loading far from base but not the walk-away case, which
+happens in normal play. The shipped rule is the type-design reviewer's: a tile may shrink only when
+its contents were **confirmed this scan** — a container entity observed there **AND** past the grace
+(`allowShrink: allowPrune && containerTiles.Contains(key)`); otherwise remembered ids are kept (a
+transient over-count, the direction this codebase has repeatedly chosen). Known residue, documented
+in place: two containers on one tile with only one observed still shrinks the unobserved one —
+retiring that needs real provenance in the stored record, i.e. a schema change.
+
+**I5 — nothing that destroys data was reported.** Not the prune's removals, not the whole-file
+discard, not a null read, and the per-scan `ledgerC` was printed only *after* every mutation and
+only under a default-off flag, so a collapse was visible solely by hand-diffing two consecutive
+lines. New `PossessionIncidentStore` (modelled on `PhantomViolationStore`, same rationale one tier
+more serious) persists incidents to `mods/ItemChecklist/possession-incidents.txt`, **ungated by
+`ModConfig.Diagnostics`** — a data-loss report that only appears once someone already suspected a
+problem reports nothing when it matters. Deduped by a caller-supplied key, capped at 200 lines (the
+Iter-28 unbounded-store lesson), timestamps from `Time.realtimeSinceStartup` rather than
+`System.DateTime` (unproven sandbox surface; not worth a whole-mod compile failure for a log
+field). The DIAG line now reports the **transition**: `ledgerC=<before>-><after>
+pairs=<before>-><after> pruned= shrunk= lostUnits=` — a single line reading
+`ledgerC=505->505 lostUnits=2677` would have made Iter-42 self-evident on the first far-from-base
+load. **The incident trigger was the hardest design call:** a confirmed shrink is *normal* (emptying
+a chest legitimately drops its whole content), so neither a unit threshold nor "any shrink" works
+without false positives — and a false alarm here would be worse than none. The chosen shape is one
+that cannot occur in normal play: **units lost on ≥5 tiles inside a single 3 s scan** (nobody empties
+five chests at once; the Iter-42 sweep hit exactly five). Plus two entry-path fixes: the
+`ResolveWorld` null case logged nothing ever (one warning per session now), and the max-count world
+pick started at `-1`, letting a world with **zero** `ContainedObjectsBuffer` entities win — it starts
+at 0 now, since the player entity always carries one.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997).** Build: 0 `error CS`, and the new
+`PossessionIncidentStore.cs` reached both the install `Scripts/` **and** the generated
+`ModManifest.json` (62 files, was 61) with its committed GUID — the check that matters for a new
+file, since a missing manifest entry fails the *sandbox* compile invisibly to the Editor build.
+Runtime: `Successfully compiled ItemChecklist safetyCheck=True`, 0 `CompileFailed`, 0 NRE.
+
+Four behavioural checks, all read from the ledger FILE rather than the UI:
+- **The Iter-42 regression holds:** all **21/21** formerly-deleted nature ids are present, Stalagmite
+  still exactly `1129`.
+- **The shrink is still honoured** — the check aimed at *this* iteration's own risk, not the old bug:
+  over-merging would have turned a deletion bug into a phantom-ownership bug. Real deltas across a
+  session: `1001: 814→764` (−50), `1610: 6683→6583` (−100), `301: +12`. Ordinary withdrawals and one
+  deposit, tracked exactly.
+- **Pruning still runs:** 8 tiles removed / 7 added in a single write interval. This retired a real
+  suspicion — the ledger had grown 504 → 681 tiles over ~1.5 h of play, which is what blocked
+  cleanup would also look like; the removals prove the growth is newly-claimed base area, not
+  entries the merge refuses to drop.
+- **No false alarm:** `possession-incidents.txt` stayed **absent**. The one new ungated warning that
+  did fire is the `ResolveWorld` null case during a load ("harmless on the main menu / during a
+  load") — exactly the diagnosis that was missing before.
+
+Pure behavioural C# + one new file; no prefab/art/loc touch, no schema change (the v3 marker is
+unchanged, so no migration and no player re-scan).

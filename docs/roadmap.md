@@ -535,6 +535,57 @@ remaining backlog.
   the pre-fix pair lost 2677 units) and all 21 ids are back at their original counts;
   `safetyCheck=True`, 0 `CompileFailed`/NRE. Reported + done 2026-07-30.
 
+- **Iter-43 -- the possession subsystem's remaining silent data-loss paths. DONE** (see
+  `docs/iteration-history.md`). **Not a user report — this is what the Iter-42 review found** when
+  the `review-pr` gate was run retroactively after 1.3.2 shipped. The Iter-42 diff itself came back
+  with **0 Critical**, but two of its documentation claims were wrong and four further data-loss
+  paths surfaced in surrounding code (none introduced by Iter-42). Fixed in one iteration at the
+  user's choice.
+  - **Iter-42's own errors:** the count-path numbering contradicted itself (canonical: #1 carried /
+    #2 container contents / #3 placed object — the Iter-28-era comments numbered `AddOne` #1 and
+    Iter-42 inherited it, so the comment read as "could not tell *carried* from stored", which is
+    false); and "exactly two removers" was untrue (`ClearAux` is a third, `SetLiveContainer` removes
+    by replacing). Both corrected, the legend now stated once in `Scan`, and the true invariant put
+    in its place: **no path deletes by id-predicate any more.**
+  - **C1 (critical):** a failed load was indistinguishable from "no file" — four outcomes returned a
+    bare empty store, `Read`-returned-null was not even logged, and the per-session save-skip cache
+    means the first save of a launch always lands, so ~14 bytes replaced ~14 KB and the next autosave
+    took the `.pugbackup` too. Under Wine this is real (six IL patches ship for such file APIs).
+    Fix: `Load(guid, out StoreLoadStatus)` + `s_ledgerReadOnly`/`s_petsReadOnly`, and
+    `SavePossessionLedger` skips a store whose load failed. **`PetCollectionStore` first** — it is
+    the unrecoverable one (ever-owned set, no second source, random egg hatch to re-earn).
+  - **I2:** the version discard threw a whole ledger away unlogged *while `Load` reported success*,
+    so corruption was indistinguishable from a legitimate migration. Now reported with byte count +
+    actual first line; marker compared as an exact first line (not `StartsWith`, which would accept
+    a future `…v30`); non-positive counts rejected at the parse boundary.
+  - **I3:** `TileAux` evaluated as an argument registered every container tile, so the flush wrote
+    an empty aux dict — an **ungated** deletion that bypassed the `allowPrune` gate in exactly the
+    co-located-chest case that gate was written for.
+  - **I4:** `SetLiveContainer` was an unconditional ungated delete of a tile's remembered contents;
+    a container and a co-located torch sit in different DOTS archetype chunks and leave the observed
+    set independently (~91-115), so seeing only the torch discarded the chest's contents. **The
+    shipped rule is stricter than first planned:** shrink only when a container was actually
+    observed on that tile AND past the grace — merging during the grace alone would fix loading far
+    from base but not walking away.
+  - **I5:** nothing destructive was reported. New **`PossessionIncidentStore`** (durable, **ungated**
+    by the default-off `Diagnostics`, deduped, 200-line cap) + the DIAG line now reports the
+    **transition** (`ledgerC=505->505 lostUnits=2677` would have made Iter-42 self-evident at once).
+    Anomaly trigger deliberately chosen false-positive-free: units lost on **≥5 tiles in one scan**
+    (a shrink itself is normal; nobody empties five chests within 3 s). Plus: the `ResolveWorld`
+    null case logged nothing ever, and the world pick started at `-1` so a world with **zero**
+    inventory entities could win.
+  - **General lesson (`docs/gotchas.md § A load that fails "softly" …`):** a load returning an empty
+    store on *failure* is a delayed WRITE bug; return a status and make the store read-only; set the
+    failure flag before anything can throw; fix the unrecoverable store first; a wholesale-replace
+    write path needs a confirmation predicate; count and report every deletion; and pick an anomaly
+    trigger that cannot false-positive or ship none. Verified in-game (1.2.1.5) against the ledger
+    file: `safetyCheck=True`, 0 `CompileFailed`/NRE, the new file present in both install `Scripts/`
+    and the generated manifest; **21/21** Iter-42 nature ids still present (Stalagmite 1129); the
+    shrink still honoured (`1001` −50, `1610` −100, `301` +12 — the check against this iteration's
+    OWN risk of over-merging into phantom ownership); pruning still active (8 tiles removed / 7 added
+    in one interval, retiring the suspicion behind the 504→681 tile growth); and
+    `possession-incidents.txt` absent, i.e. no false alarm. Reported + done 2026-07-30.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
