@@ -12,10 +12,18 @@ ItemChecklist-General:
     hint: "Footer left label. {0} = count of items visible after filtering."
     en: "{0} shown"
     de: "{0} angezeigt"
-  NotSaving:
-    hint: "Footer marker, shown only when a possession file could not be read so nothing is being saved this session."
+  NotSavingBoth:
+    hint: "Footer marker: neither possession file is being written this session. Rare diagnostic state."
     en: "! not saving - see possession-incidents.txt"
     de: "! wird nicht gespeichert - siehe possession-incidents.txt"
+  NotSavingCounts:
+    hint: "Footer marker: the owned-counts ledger is not being written, but pet skins are."
+    en: "! owned counts not saving"
+    de: "! Besitzzahlen werden nicht gespeichert"
+  NotSavingPetSkins:
+    hint: "Footer marker: the pet-skin collection is not being written, but owned counts are."
+    en: "! pet skins not saving"
+    de: "! Tier-Skins werden nicht gespeichert"
   Level:
     hint: "Per-row level column. {0} = level number."
     en: "Lv {0}"

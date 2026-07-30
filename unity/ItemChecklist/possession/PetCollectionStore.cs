@@ -26,12 +26,28 @@ namespace ItemChecklist.Possession
                     bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
                 col.ClearDirty();
+                WriteFailed = false;
             }
             catch (System.Exception e)
             {
+                // Iter-44: see PossessionStore.Save — a failed WRITE was reported nowhere durable.
+                // `ClearDirty()` is deliberately after the write, so the collection stays dirty and
+                // the next autosave retries; what was missing is the player ever hearing about it.
+                WriteFailed = true;
                 Debug.LogWarning($"[ItemChecklist] pet-skin save failed: {e.Message}");
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.SaveFailed,
+                    PossessionIncidentStore.SaveFailed + ":petskins:" + guid,
+                    "petskins guid=" + guid + " reason=exception msg=" + e.Message,
+                    $"could not WRITE the pet-skin collection for {guid} ({e.Message}). Skins collected this session "
+                        + "will be missing after a restart, and this store has no second source to rebuild from."
+                );
             }
         }
+
+        /// <summary>Iter-44: the last write attempt failed — see
+        /// <see cref="PossessionStore.WriteFailed"/>.</summary>
+        internal static bool WriteFailed { get; private set; }
 
         /// <summary>Read the collection for <paramref name="guid"/>, reporting how it ended.
         /// <para><strong>Iter-43 — this is the most damaging instance of the failed-load pattern
@@ -76,9 +92,10 @@ namespace ItemChecklist.Possession
                     // Iter-44 (review C-3): this parser cannot throw, it skips — so a file
                     // truncated mid-write parsed into a SUBSET and Iter-43 reported `Loaded`.
                     // On THIS store that is the unrecoverable case: 3 of 40 skins parsed, the
-                    // next MarkCollected sets Dirty, Save writes 4 entries over the file, and
-                    // 37 ever-owned skins are gone with nothing logged. Any unaccepted line
-                    // makes the load a failure.
+                    // next MarkCollected sets Dirty, Save writes 4 entries over the file (the
+                    // intact copy then survives in `<file>.pugbackup` only until the write after
+                    // that), and 37 ever-owned skins are gone with nothing logged. Any
+                    // unaccepted line makes the load a failure.
                     status = StoreLoadStatus.Failed;
                     PossessionIncidentStore.Record(
                         PossessionIncidentStore.LoadFailed,

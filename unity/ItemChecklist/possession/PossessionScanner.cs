@@ -354,72 +354,44 @@ namespace ItemChecklist.Possession
             // destruction range (you must stand next to a container to destroy it). It is
             // INDEPENDENT of AnchorRadius (which only shares the 48 *default* and is user-settable
             // to 96): it must stay under the observed-dropout regardless of AnchorRadius.
-            // Iter-44: the radius is handed to the ledger, which now owns the "would this scan
-            // have seen that tile" test and applies it to BOTH consumers — the per-tile publish
-            // and the prune. Note the two act on DISJOINT tile sets (every published key joins
-            // liveKeys, which the prune skips), so they share this premise but never the same
-            // tile; see PossessionLedger.Publish's residual note.
+            // Iter-44: the radius is handed to the ledger, which owns the "would this scan have
+            // seen that tile" test and applies it to BOTH removal paths — the per-tile merge and
+            // the prune. They act on DISJOINT tile sets (every observed key joins liveKeys, which
+            // the prune skips), so they share this premise but never the same tile.
             const float PruneRadius = 48f; // the "loaded" half (player-near); anchor-cover is the "observed" half
 
-            // Iter-44: ONE publish per tile, over the union of both accumulators' keys, carrying
-            // the EVIDENCE this scan gathered; the ledger derives from it what each dimension may
-            // shrink (PossessionLedger.Publish holds the rules + their justification).
+            // Iter-44: ONE call does the whole snapshot — merge every observed tile, then prune.
+            // The ledger owns every rule; the scanner hands over only what it uniquely knows (the
+            // two accumulators, which tiles carried an observed CONTAINER, the player position,
+            // its own anchor gate, and whether the streaming grace has passed) and gets back
+            // everything that was removed. `liveKeys` is FILLED here for BuildView below.
             // This replaces Iter-43's three separate writers — SetLiveContainer / SetLiveAux /
             // ClearAux — and with them two hand-kept-in-step flush loops plus a reconcile pass:
             //   • the "skip empty aux dicts" guard is gone. It existed only because SetLiveAux
             //     REPLACED, so an ungated empty write was a deletion; an empty observation is now
             //     just an observation and goes through the same rule as any other.
             //   • the `ClearAux` reconcile is gone. Its job — dropping stale aux from a tile that
-            //     was re-observed WITHOUT aux (a mobile penned cow that left a tile still kept
-            //     live by a co-located chest) — is now simply "aux producer not observed AND the
-            //     tile is definitely observable ⇒ aux may shrink", and it is STRICTER than the old
-            //     block, which needed only allowPrune.
+            //     was re-observed WITHOUT aux — is now part of the merge rule, and STRICTER than
+            //     the old block, which needed only allowPrune.
             //   • `containerTiles` stops being a universal confirmation predicate. It confirms
             //     CONTENTS only, which is all it ever meant: it is filled solely in the
             //     `isContainer` branch, so a cattle/paint aux tile (a station tile carrying
             //     CraftingCD, or a plain placeable) reached it only by co-location with an
             //     unrelated chest — effectively never, and never for a reason connected to that
             //     tile's aux, so the aux could not shrink and a stale colour survived restarts.
-            // Hand the scan's facts over ONCE. The lambda is the scan's own WithinAnchor gate, so
-            // the ledger asks the identical question about a tile that the scan would have asked.
-            ledger.BeginScan(
+            //     It is still passed, because for a tile that HAS an observed container the
+            //     buffer is authoritative: absence there is confirmed, not merely inferred.
+            var applied = ledger.ApplyScan(
+                scan,
+                auxScan,
+                containerTiles,
                 havePlayer,
-                playerPos.x,
-                playerPos.y,
+                playerPos,
                 PruneRadius,
                 key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2),
-                allowPrune
+                allowPrune,
+                liveKeys
             );
-
-            int droppedUnits = 0,
-                auxKeysReduced = 0,
-                shrunkContentTiles = 0,
-                shrunkAuxTiles = 0;
-            var flushKeys = new HashSet<long>(scan.Keys);
-            flushKeys.UnionWith(auxScan.Keys);
-            foreach (var key in flushKeys)
-            {
-                scan.TryGetValue(key, out var tileContents);
-                auxScan.TryGetValue(key, out var tileAux);
-                var published = ledger.Publish(key, tileContents, tileAux, containerTiles.Contains(key));
-                droppedUnits += published.DroppedUnits;
-                auxKeysReduced += published.AuxKeysReduced;
-                // Iter-44: counted SEPARATELY. A single combined counter was the input to the
-                // ≥5-tile detector, and aux reductions are ordinary play (repainting a row of
-                // furniture, a herd drifting to a different nearest anchor), so folding them in
-                // would have made a benign redecoration trip a durable data-loss report — and,
-                // with the old flat dedup key, consume the channel for the rest of the session.
-                if (published.DroppedUnits > 0)
-                    shrunkContentTiles++;
-                if (published.AuxKeysReduced > 0)
-                    shrunkAuxTiles++;
-                liveKeys.Add(key);
-            }
-
-            // Self-heal, and the end of the scan: drop remembered tiles the scan WOULD have seen
-            // something on yet saw nothing on. Self-gating on the grace + a known player position,
-            // so the conditions live in one place instead of being repeated here.
-            int prunedTiles = ledger.PruneStaleNear(liveKeys);
 
             // Cadence bookkeeping — used by the anomaly suppression below and by the DIAG dt=
             // field. Deliberately after the early world-null return: a run of scans with no world
@@ -429,7 +401,7 @@ namespace ItemChecklist.Possession
             _lastScanRt = nowRt;
             _prevAllowPrune = allowPrune;
 
-            ReportAnomalies(firstPostGrace, sinceLast, lcBefore, ledger.TileCount, shrunkContentTiles, droppedUnits, auxKeysReduced, prunedTiles);
+            ReportAnomalies(firstPostGrace, sinceLast, lcBefore, ledger.TileCount, applied);
 
             // Iter-16.1: any skin currently owned (carried/active/container) is collected
             // forever. Iterate the live carried aux + every scanned tile's aux.
@@ -479,11 +451,12 @@ namespace ItemChecklist.Possession
                         // and it is not a subset of lostUnits — the two axes are disjoint.
                         // Not covered by any of them: what PruneStaleNear removed, which is reported as
                         // whole tiles (pruned=) with no per-id or per-unit breakdown.
-                        + $"ledgerC={lcBefore}->{lc} cPairs={lpBefore}->{lp} pruned={prunedTiles} "
+                        + $"ledgerC={lcBefore}->{lc} cPairs={lpBefore}->{lp} pruned={applied.PrunedTiles} "
                         // Iter-44: aux removals reach a channel at all for the first time — Iter-43
                         // reported content units only, so a loss on the C-1 defect's own dimension
                         // was invisible everywhere.
-                        + $"shrunkC={shrunkContentTiles} shrunkAux={shrunkAuxTiles} lostUnits={droppedUnits} auxReduced={auxKeysReduced} "
+                        + $"shrunkC={applied.ShrunkContentTiles} shrunkAux={applied.ShrunkAuxTiles} "
+                        + $"lostUnits={applied.DroppedUnits} auxReduced={applied.AuxKeysReduced} "
                         + $"ents={ents.Length} near={dNear} anchors={anchors.Count}"
                 );
                 DiagDumpObjectsOnce();
@@ -505,15 +478,24 @@ namespace ItemChecklist.Possession
         // --- Anomaly reporting (Iter-43, recalibrated in Iter-44) ---
         private static bool _prevAllowPrune;
         private static int _prunedThisSession;
+        private static int _shrunkContentTilesThisSession;
+        private static int _auxKeysReducedThisSession;
         private static int _maxTilesSeen;
 
-        /// <summary>Iter-44: clear the per-character anomaly state. Called on a character/world
-        /// switch, because the cumulative drain detector compares against THIS ledger's size and
-        /// would otherwise carry one character's totals into the next.</summary>
+        /// <summary>Iter-44: clear the per-character anomaly state. Called when the active
+        /// character GUID changes, because the cumulative detectors compare against THIS ledger's
+        /// size and would otherwise carry one character's totals into the next.
+        /// <para>Known gap: loading the SAME character into a different world does not change the
+        /// GUID, so the totals carry over. Iter-20 established that CK's GUID-clear does not fire
+        /// reliably on Save &amp; Quit, so there is no cheap signal for it. The consequence is a
+        /// slightly earlier cumulative trigger, which is why that trigger also requires a NET
+        /// decline rather than a gross count.</para></summary>
         internal static void ResetSessionSignals()
         {
             _prevAllowPrune = false;
             _prunedThisSession = 0;
+            _shrunkContentTilesThisSession = 0;
+            _auxKeysReducedThisSession = 0;
             _maxTilesSeen = 0;
         }
 
@@ -527,81 +509,112 @@ namespace ItemChecklist.Possession
         /// watch at all. A detector calibrated to one failure while the historically real one goes
         /// unwatched is worse than none, because its silence reads as an all-clear.</para>
         ///
-        /// <para><strong>Suppression (both channels).</strong> Two situations legitimately look
-        /// like an anomaly and would otherwise burn the report on a benign event:
+        /// <para><strong>Suppression, and why it is not absolute.</strong> Two situations
+        /// legitimately look like an anomaly:
         /// <list type="bullet">
-        /// <item>the FIRST scan after the streaming grace — every withdrawal made since the world
-        /// load is confirmed at once, in one batch;</item>
+        /// <item>the FIRST scan after the streaming grace — every change made since the world load
+        /// is confirmed at once, in one batch;</item>
         /// <item>any scan after an unusual GAP, i.e. the ledger has not tracked the world for a
         /// while: the mod was switched off via <c>ModConfig.Enabled</c> (saves continue!), the
         /// process was paused/minimised, or a stretch of scans found no ECS world.</item>
         /// </list>
-        /// Iter-43's "cannot false-positive" claim was wrong on exactly these two, plus a third
-        /// that is handled by scaling below.</para>
+        /// Iter-43's "cannot false-positive" claim was wrong on exactly these two. But suppressing
+        /// them OUTRIGHT trades a false positive for a false negative in the worst possible place:
+        /// the first post-grace scan is the ONLY scan on which a load-time contents bug can strike
+        /// (a removal requires <c>pastGrace</c>), it is the shape Iter-42 actually had, and it
+        /// recurs after every teleport — <c>_possessionPlayableTime</c> is reset whenever the world
+        /// stops being playable. So the contents channel keeps a much higher OVERRIDE bound that
+        /// reports even on a batched scan.</para>
         ///
         /// <para><strong>Why the thresholds scale.</strong> "Five tiles in one scan" was calibrated
         /// at the 3 s default cadence, but Iter-38 made the interval user-settable up to 30 s, and
         /// ten times the window contains ten times the ordinary activity. Capped at 4× so a slow
         /// cadence cannot disable the detector outright.</para>
         ///
-        /// <para><strong>Aux is deliberately NOT a trigger</strong> — only a reported number.
-        /// Repainting a row of furniture, or a herd drifting so its nearest anchor changes,
-        /// reduces aux keys in ordinary play; on the contents axis there is no comparable benign
-        /// bulk event.</para>
+        /// <para><strong>Aux is a reported number, never a trigger.</strong> Repainting a row of
+        /// furniture, or a herd drifting so its nearest anchor changes, reduces aux keys in
+        /// ordinary play. Its session total rides along in every detail line so an aux regression
+        /// is at least visible in a reported file.</para>
+        ///
+        /// <para><strong>The cumulative channel requires a NET decline.</strong> Gross prunes are
+        /// not a fault signal: Iter-43's own verification measured "8 tiles removed / 7 added in a
+        /// single write interval" as healthy churn in a session whose ledger GREW 504→681. Counting
+        /// removals alone would have reported that session, and a durable false alarm is worse than
+        /// none — its noise reads as a fault exactly as its silence would read as an all-clear.
+        /// The historical failure (Iter-41: <c>ledgerC</c> 402→0) was a net collapse, so that is
+        /// what is tested. Note the session counters accumulate BEFORE the suppression check, on
+        /// purpose: a batched scan's removals are real removals even when they are not reportable
+        /// on their own.</para>
         /// </summary>
-        private static void ReportAnomalies(
-            bool firstPostGrace,
-            float sinceLast,
-            int tilesBefore,
-            int tilesAfter,
-            int shrunkContentTiles,
-            int droppedUnits,
-            int auxKeysReduced,
-            int prunedTiles
-        )
+        private static void ReportAnomalies(bool firstPostGrace, float sinceLast, int tilesBefore, int tilesAfter, TilePublishResult applied)
         {
-            _prunedThisSession += prunedTiles;
+            _prunedThisSession += applied.PrunedTiles;
+            _shrunkContentTilesThisSession += applied.ShrunkContentTiles;
+            _auxKeysReducedThisSession += applied.AuxKeysReduced;
             if (tilesBefore > _maxTilesSeen)
                 _maxTilesSeen = tilesBefore;
 
             float interval = ModConfig.ScanIntervalSeconds;
-            if (firstPostGrace || (sinceLast > 3f * interval))
-                return;
-
+            bool batched = firstPostGrace || sinceLast > 3f * interval;
             int scale = Mathf.Clamp(Mathf.RoundToInt(interval / 3f), 1, 4);
-            string ledgerPart = " ledgerC=" + tilesBefore + "->" + tilesAfter + " interval=" + interval.ToString("F0") + "s";
 
-            // (a) CONTENT units lost on many tiles at once.
-            if (shrunkContentTiles >= 5 * scale)
+            // The guid keeps one character's benign event from consuming another's slot: the dedup
+            // set is process-wide and survives a character switch.
+            string guid = ItemChecklistMod.PossessionGuid ?? "";
+            string ctx =
+                " ledgerC="
+                + tilesBefore
+                + "->"
+                + tilesAfter
+                + " interval="
+                + interval.ToString("F0")
+                + "s batched="
+                + batched
+                + " sessionShrunkC="
+                + _shrunkContentTilesThisSession
+                + " sessionAuxReduced="
+                + _auxKeysReducedThisSession
+                + " sessionPruned="
+                + _prunedThisSession
+                + " peakTiles="
+                + _maxTilesSeen;
+
+            // (a) CONTENT units lost on many places at once. On a batched scan only the override
+            // bound applies — a quarter of the whole ledger, floored at 20, which no ordinary
+            // play reaches even with automation running.
+            int trigger = batched ? Mathf.Max(20, tilesBefore / 4) : 5 * scale;
+            if (applied.ShrunkContentTiles >= trigger)
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Shrink,
-                    PossessionIncidentStore.Shrink + ":" + PossessionIncidentStore.MagnitudeBucket(shrunkContentTiles),
-                    "tiles=" + shrunkContentTiles + " units=" + droppedUnits + " auxReduced=" + auxKeysReduced + ledgerPart,
-                    $"{droppedUnits} owned unit(s) vanished from {shrunkContentTiles} separate containers in a single scan. "
-                        + "That is expected if you just emptied or picked up several containers at once; otherwise it may be "
-                        + "a tracking bug, so please report this file."
+                    PossessionIncidentStore.Shrink + ":" + guid + ":" + PossessionIncidentStore.MagnitudeBucket(applied.ShrunkContentTiles),
+                    "tiles=" + applied.ShrunkContentTiles + " units=" + applied.DroppedUnits + " auxReduced=" + applied.AuxKeysReduced + ctx,
+                    $"{applied.DroppedUnits} owned unit(s) vanished from {applied.ShrunkContentTiles} separate places "
+                        + "(containers or other tracked objects) in a single scan. That is expected if you just emptied "
+                        + "several containers, or if automation is moving items out of them; otherwise it may be a "
+                        + "tracking bug, so please report this file."
                 );
 
             // (b) the prune took an implausible SHARE of the ledger in one scan.
-            if (prunedTiles >= Mathf.Max(5 * scale, tilesBefore / 4))
+            if (!batched && applied.PrunedTiles >= Mathf.Max(5 * scale, tilesBefore / 4))
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Prune,
-                    PossessionIncidentStore.Prune + ":scan:" + PossessionIncidentStore.MagnitudeBucket(prunedTiles),
-                    "pruned=" + prunedTiles + ledgerPart,
-                    $"{prunedTiles} remembered container tiles were forgotten in a single scan. That is expected if you "
-                        + "just dismantled part of your base; otherwise your owned counts may drop, so please report this file."
+                    PossessionIncidentStore.Prune + ":scan:" + guid + ":" + PossessionIncidentStore.MagnitudeBucket(applied.PrunedTiles),
+                    "pruned=" + applied.PrunedTiles + ctx,
+                    $"{applied.PrunedTiles} remembered places were forgotten in a single scan. That is expected if you just "
+                        + "dismantled part of your base; otherwise your owned counts may drop, so please report this file."
                 );
 
-            // (c) a gradual DRAIN. (b) cannot see this: Iter-41's collapse removed a modest number
-            // of tiles per scan over many scans, which is why it needed a walk to reproduce.
-            if (_maxTilesSeen >= 40 && _prunedThisSession >= Mathf.Max(20, _maxTilesSeen / 2))
+            // (c) a NET drain across the session. (b) cannot see this: Iter-41's collapse removed a
+            // modest number of tiles per scan over many scans, which is why it needed a walk to
+            // reproduce. The net test is what keeps ordinary remodelling out.
+            if (_maxTilesSeen >= 40 && tilesAfter <= _maxTilesSeen / 2 && _prunedThisSession >= Mathf.Max(20, _maxTilesSeen / 2))
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.Prune,
-                    PossessionIncidentStore.Prune + ":drain:" + PossessionIncidentStore.MagnitudeBucket(_prunedThisSession),
-                    "prunedTotal=" + _prunedThisSession + " maxTiles=" + _maxTilesSeen + ledgerPart,
-                    $"{_prunedThisSession} remembered container tiles have been forgotten this session, against a peak of "
-                        + $"{_maxTilesSeen}. If you did not dismantle that much, your owned counts are draining and this "
-                        + "file is worth reporting."
+                    PossessionIncidentStore.Prune + ":drain:" + guid + ":" + PossessionIncidentStore.MagnitudeBucket(_prunedThisSession),
+                    "prunedTotal=" + _prunedThisSession + ctx,
+                    $"the number of remembered places has fallen to {tilesAfter} from a peak of {_maxTilesSeen} this "
+                        + $"session, with {_prunedThisSession} forgotten along the way. If you did not dismantle that "
+                        + "much, your owned counts may be draining, so please report this file."
                 );
         }
 

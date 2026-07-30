@@ -196,11 +196,25 @@ namespace ItemChecklist
         private static bool s_ledgerReadOnly;
         private static bool s_petsReadOnly;
 
-        /// <summary>Iter-44: true while this character's possession data is NOT being persisted
-        /// because a store's load failed. The checklist footer shows a marker for it — see
-        /// <see cref="SavePossessionLedger"/> for why an invisible read-only mode is a problem in
-        /// its own right.</summary>
-        internal static bool PossessionReadOnly => s_ledgerReadOnly || s_petsReadOnly;
+        /// <summary>Iter-44: the active character GUID, so an incident's dedup key can be
+        /// per-character. The quantitative reports (shrink/prune) keyed on magnitude alone, and the
+        /// dedup set is process-wide, so one character's benign event silenced another's real
+        /// one.</summary>
+        internal static string PossessionGuid => s_ledgerGuid;
+
+        /// <summary>Iter-44: owned counts are not reaching disk — either the ledger's load failed
+        /// (deliberately read-only) or its last write failed. The checklist footer shows a marker;
+        /// see <see cref="SavePossessionLedger"/> for why an invisible not-saving state is a
+        /// problem in its own right.
+        /// <para>Split from the pet-skin flag on purpose: the two are separate files that fail
+        /// independently, and a blanket "not saving" is a false statement about the one that is
+        /// still saving normally — the fact a player weighs when deciding whether to keep
+        /// playing.</para></summary>
+        internal static bool CountsNotSaving => s_ledgerReadOnly || PossessionStore.WriteFailed;
+
+        /// <summary>Iter-44: collected pet skins are not reaching disk. Worse than its sibling:
+        /// this store is an ever-owned set with no second source.</summary>
+        internal static bool PetSkinsNotSaving => s_petsReadOnly || PetCollectionStore.WriteFailed;
         private float _possessionTimer;
 
         // Prune grace: chunks stream in asynchronously after a world load/teleport, so
@@ -440,14 +454,25 @@ namespace ItemChecklist
             // mode just prevented (every ever-owned skin renders uncollected, N drops), so the
             // rescue looks exactly like the bug.
             if (s_ledgerReadOnly || s_petsReadOnly)
+            {
+                // Name WHICH store. The two are separate files that fail independently, and the
+                // likelier case is the pet file alone — so a blanket "nothing is being saved" would
+                // be false about the ledger that was just written one line above.
+                bool both = s_ledgerReadOnly && s_petsReadOnly;
+                string what =
+                    both ? "owned counts and collected pet skins are"
+                    : s_ledgerReadOnly ? "owned counts are"
+                    : "collected pet skins are";
                 PossessionIncidentStore.Record(
                     PossessionIncidentStore.SaveSkipped,
-                    PossessionIncidentStore.SaveSkipped + ":" + s_ledgerGuid,
+                    PossessionIncidentStore.SaveSkipped + ":" + s_ledgerGuid + ":" + (s_ledgerReadOnly ? "L" : "") + (s_petsReadOnly ? "P" : ""),
                     "guid=" + s_ledgerGuid + " ledgerReadOnly=" + s_ledgerReadOnly + " petsReadOnly=" + s_petsReadOnly,
-                    "possession data is NOT being saved this session because its file could not be read (see the "
-                        + "load-failed entry above). Nothing on disk is being overwritten. Owned counts and collected "
-                        + "pet skins may therefore look wrong in-game while the files themselves are intact."
+                    $"{what} NOT being saved this session, because that file could not be read (see the load-failed entry "
+                        + "above). It is not being overwritten either, so what is on disk is intact — but it will look "
+                        + "wrong in-game until the file is restored and the character re-selected."
+                        + (both ? "" : " The other one is saving normally.")
                 );
+            }
         }
 
         public void Update()

@@ -53,6 +53,7 @@ namespace ItemChecklist.Possession
         private const string Dir = "ItemChecklist";
         private const string Path = Dir + "/possession-incidents.txt";
         private const string Header = "#icl-possession-incidents v1";
+        private const string CapMarker = "#full";
         private const int MaxLines = 200;
 
         // Incident kinds. Strings, not an enum: they are written to a file a human reads.
@@ -70,6 +71,11 @@ namespace ItemChecklist.Possession
         /// load. Reported once, because the symptom the player sees (a dropping counter, an
         /// uncollected pet skin) looks exactly like the data loss the read-only mode PREVENTED.</summary>
         public const string SaveSkipped = "save-skipped";
+
+        /// <summary>Iter-44: a write was ATTEMPTED and failed — the mirror of a failed load, and
+        /// until now reported only to the rotating log. Here the data at risk is this session's
+        /// changes, not what is on disk.</summary>
+        public const string SaveFailed = "save-failed";
 
         private static bool _loaded;
         private static bool _capNoted;
@@ -102,11 +108,11 @@ namespace ItemChecklist.Possession
         {
             try
             {
+                // Only mark it loaded when the count is actually known — otherwise a transient read
+                // fault would leave `_lines` at 0 for the rest of the session and let this session
+                // append a second MaxLines' worth onto an already-full file.
                 if (!_loaded)
-                {
-                    LoadKnown();
-                    _loaded = true;
-                }
+                    _loaded = LoadKnown();
                 if (!_known.Add(dedupKey))
                     return false;
 
@@ -119,11 +125,14 @@ namespace ItemChecklist.Possession
                     // Full. Say so IN the file (one '#' line, so LoadKnown skips it and it does
                     // not count toward the cap), then stop writing — and report that nothing was
                     // persisted, which the Iter-43 `return true` here did not.
+                    // `_capNoted` is set from the WRITE's own result, not before it: setting it
+                    // first meant that if this one write failed (the file unreadable, i.e. exactly
+                    // the C-2 situation) the marker was never written and never retried. And
+                    // LoadKnown sets it when it finds an existing marker, so a long-lived file does
+                    // not collect one more `#full` line per launch — the unbounded growth the
+                    // Iter-28 lesson is about, in the very mechanism meant to bound it.
                     if (!_capNoted)
-                    {
-                        _capNoted = true;
-                        AppendLine("#full after " + MaxLines + " incidents - further ones reach Player.log only\n");
-                    }
+                        _capNoted = AppendLine(CapMarker + " after " + MaxLines + " incidents - further ones reach Player.log only\n");
                     return false;
                 }
 
@@ -191,34 +200,46 @@ namespace ItemChecklist.Possession
             return true;
         }
 
-        private static void LoadKnown()
+        /// <summary>Count what is already on disk (and notice an existing cap marker).</summary>
+        /// <returns><c>false</c> when the file could not be read, so the caller must NOT treat
+        /// <c>_lines == 0</c> as "the file is empty" and must retry on the next incident. Getting
+        /// that wrong lets a transient read fault — the Wine fault class this project ships six IL
+        /// patches for — append a second 200 lines onto an already-full file.</returns>
+        private static bool LoadKnown()
         {
             try
             {
+                _lines = 0; // this may be a retry after a failed attempt — never count twice
                 if (!TryReadAll(out string text))
                 {
-                    // Present but unreadable. Not fatal here (the dedup set is only an anti-spam
-                    // device), but it must be audible: it means this session cannot append either.
-                    Debug.LogWarning("[ItemChecklist] possession-incident history could not be read — new incidents will not be appended.");
-                    return;
+                    Debug.LogWarning("[ItemChecklist] possession-incident history could not be read — the line count is unknown; will retry.");
+                    return false;
                 }
                 if (string.IsNullOrEmpty(text))
-                    return;
+                    return true;
                 foreach (var raw in text.Split('\n'))
                 {
                     var l = raw.Trim();
-                    if (l.Length == 0 || l[0] == '#')
+                    if (l.Length == 0)
                         continue;
+                    if (l[0] == '#')
+                    {
+                        if (l.StartsWith(CapMarker))
+                            _capNoted = true;
+                        continue;
+                    }
                     _lines++;
                     // The dedup key is not stored (details carry timestamps); a restart may
                     // therefore re-record a still-present structural fault ONCE, which is
                     // wanted — it dates the incident to the new session. The line cap is what
                     // bounds growth.
                 }
+                return true;
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[ItemChecklist] possession-incident load failed: {e.Message}");
+                return false; // count unknown → retry rather than assume an empty file
             }
         }
 

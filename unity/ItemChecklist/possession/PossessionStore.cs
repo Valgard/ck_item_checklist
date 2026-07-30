@@ -93,6 +93,7 @@ namespace ItemChecklist.Possession
                     bytes[i] = (byte)text[i]; // ASCII content only
                 API.ConfigFilesystem.Write(PathFor(guid), bytes);
                 _lastSavedHash[guid] = hash;
+                WriteFailed = false;
                 if (diag)
                     Debug.Log(
                         $"[ItemChecklist] DIAG save serialize={(t1 - t0) * 1000f:F1}ms "
@@ -101,9 +102,27 @@ namespace ItemChecklist.Possession
             }
             catch (System.Exception e)
             {
+                // Iter-44: a failed WRITE is the mirror image of Iter-43's failed load, and it was
+                // still a bare log line — no status, no durable record, and the footer's
+                // not-saving marker stayed off. The player then sees this session's
+                // changes gone on the next launch: indistinguishable from the data loss the whole
+                // read-only mechanism exists to prevent. Player.log rotates, so it must be durable.
+                WriteFailed = true;
                 Debug.LogWarning($"[ItemChecklist] possession save failed: {e.Message}");
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.SaveFailed,
+                    PossessionIncidentStore.SaveFailed + ":ledger:" + guid,
+                    "ledger guid=" + guid + " reason=exception msg=" + e.Message,
+                    $"could not WRITE the possession ledger for {guid} ({e.Message}). Owned counts changed this session "
+                        + "will be missing after a restart. The file on disk still holds the last successful save."
+                );
             }
         }
+
+        /// <summary>Iter-44: the last write attempt failed. Distinct from a failed LOAD (which
+        /// makes the store read-only on purpose): here the mod is trying to save and cannot, so the
+        /// data at risk is this session's, not the file's.</summary>
+        internal static bool WriteFailed { get; private set; }
 
         /// <summary>Read the ledger for <paramref name="guid"/>. <paramref name="status"/> tells
         /// the caller whether an empty result means "new character" or "could not read" — see
