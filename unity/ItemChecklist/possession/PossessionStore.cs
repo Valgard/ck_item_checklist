@@ -140,7 +140,26 @@ namespace ItemChecklist.Possession
                 var chars = new char[bytes.Length];
                 for (int i = 0; i < bytes.Length; i++)
                     chars[i] = (char)bytes[i];
-                ledger.LoadFrom(new string(chars));
+                string text = new string(chars);
+                int tiles = ledger.LoadFrom(text);
+                // A discard is NOT a failure: it is the intended version migration, and the store
+                // must stay writable so the base can repopulate it. But it is also what a corrupt
+                // file looks like, so report it — that is the whole point (Iter-43). The first
+                // line goes into the record: `#icl-ledger-v2` reads as a migration, anything else
+                // as damage.
+                if (tiles < 0)
+                {
+                    int nl = text.IndexOf('\n');
+                    string firstLine = (nl < 0 ? text : text.Substring(0, nl)).Trim();
+                    PossessionIncidentStore.Record(
+                        PossessionIncidentStore.LedgerDiscarded,
+                        PossessionIncidentStore.LedgerDiscarded + ":" + guid + ":" + firstLine,
+                        "ledger guid=" + guid + " bytes=" + bytes.Length + " firstLine=" + firstLine,
+                        $"the possession ledger for {guid} was DISCARDED — expected '{PossessionLedger.VersionMarker}', got "
+                            + $"'{firstLine}' ({bytes.Length} bytes). Owned counts rebuild from your containers on the "
+                            + "next base visit. If this was not a mod update, the file was corrupt."
+                    );
+                }
                 status = StoreLoadStatus.Loaded;
             }
             catch (System.Exception e)

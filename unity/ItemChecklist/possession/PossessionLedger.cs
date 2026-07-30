@@ -164,7 +164,9 @@ namespace ItemChecklist.Possession
         // counted as bases). A version marker on line 1 lets LoadFrom discard any pre-fix file
         // exactly once; the base then re-scans and repopulates cleanly. The marker has no '|'
         // so the per-line parser skips it like any non-data line.
-        private const string VersionMarker = "#icl-ledger-v3";
+        // internal (Iter-43): PossessionStore names it when reporting a discard, so the expected
+        // marker in the incident record cannot drift from the one actually enforced here.
+        internal const string VersionMarker = "#icl-ledger-v3";
 
         public string Serialize()
         {
@@ -193,14 +195,27 @@ namespace ItemChecklist.Possession
             return string.Join("\n", lines);
         }
 
-        public void LoadFrom(string text)
+        /// <summary>Parse a serialized ledger, replacing everything currently held.
+        /// <para>Iter-43 made the outcome reportable. Discarding a whole file is a total
+        /// data-loss event, and it used to happen with NO log while <c>Load</c> reported success
+        /// — so a truncated or corrupted file (Wine, power loss, disk full) was indistinguishable
+        /// from a legitimate version migration, and looked byte-for-byte like the Iter-42 symptom.
+        /// The caller logs and records what happened; only the count can tell it apart.</para>
+        /// </summary>
+        /// <returns>Tiles parsed, or <c>-1</c> when the version marker did not match and the
+        /// whole file was therefore discarded.</returns>
+        public int LoadFrom(string text)
         {
             _containers.Clear();
             _auxContainers.Clear();
             if (string.IsNullOrEmpty(text))
-                return;
-            if (!text.StartsWith(VersionMarker))
-                return; // discard pre-v3 → base re-scans clean
+                return 0;
+            // Compare the FIRST LINE exactly, not a prefix: `StartsWith("#icl-ledger-v3")` would
+            // also accept a future "#icl-ledger-v30" and then parse it under the wrong schema.
+            int nl = text.IndexOf('\n');
+            string firstLine = (nl < 0 ? text : text.Substring(0, nl)).Trim();
+            if (firstLine != VersionMarker)
+                return -1; // discard (pre-v3 migration, or a corrupt file — the caller reports it)
             foreach (var line in text.Split('\n'))
             {
                 if (line.Length == 0 || line[0] == '#')
@@ -213,13 +228,17 @@ namespace ItemChecklist.Possession
                     continue;
                 long key = Key(x, z);
 
+                // Iter-43: reject non-positive counts at the PARSE boundary. A hand-edited or
+                // truncated file could carry `id:0` / `id:-5`, which BuildView would have summed
+                // as-is while the Iter-40 reverse index defensively filtered `>= 1` — two readers
+                // disagreeing about what "present" means. Enforcing it here makes them agree.
                 var cont = new Dictionary<int, int>();
                 foreach (var pair in seg[1].Split(','))
                 {
                     int colon = pair.IndexOf(':');
                     if (colon <= 0)
                         continue;
-                    if (int.TryParse(pair.Substring(0, colon), out int id) && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                    if (int.TryParse(pair.Substring(0, colon), out int id) && int.TryParse(pair.Substring(colon + 1), out int cnt) && cnt >= 1)
                         cont[id] = cnt;
                 }
                 if (cont.Count > 0)
@@ -231,12 +250,13 @@ namespace ItemChecklist.Possession
                     int colon = pair.IndexOf(':');
                     if (colon <= 0)
                         continue;
-                    if (long.TryParse(pair.Substring(0, colon), out long pk) && int.TryParse(pair.Substring(colon + 1), out int cnt))
+                    if (long.TryParse(pair.Substring(0, colon), out long pk) && int.TryParse(pair.Substring(colon + 1), out int cnt) && cnt >= 1)
                         aux[pk] = cnt;
                 }
                 if (aux.Count > 0)
                     _auxContainers[key] = aux;
             }
+            return _containers.Count;
         }
     }
 }
