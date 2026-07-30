@@ -42,34 +42,12 @@ namespace ItemChecklist.Possession
 
         public void SetLiveContainer(long key, Dictionary<int, int> contents) => _containers[key] = contents;
 
-        // Iter-28: set once a ledger has had its pre-existing world-nature entries evicted
-        // (a one-time cleanup of the old bloated ledger; the scan gate keeps it clean after).
-        public bool WorldNaturePruned;
-
-        /// <summary>One-time cleanup: drop every item whose id matches <paramref name="removeId"/>
-        /// from all containers, and drop containers that become empty. Used to evict world
-        /// nature the pre-Iter-28 scan persisted into the ledger; legitimately-stored items
-        /// re-add themselves via the live scan. Collect-then-remove to avoid mutating during
-        /// iteration.</summary>
-        public void PruneByPredicate(Func<int, bool> removeId)
-        {
-            List<long> dropKeys = null;
-            foreach (var pair in _containers)
-            {
-                List<int> dropItems = null;
-                foreach (var kv in pair.Value)
-                    if (removeId(kv.Key))
-                        (dropItems ??= new List<int>()).Add(kv.Key);
-                if (dropItems != null)
-                    foreach (var k in dropItems)
-                        pair.Value.Remove(k);
-                if (pair.Value.Count == 0)
-                    (dropKeys ??= new List<long>()).Add(pair.Key);
-            }
-            if (dropKeys != null)
-                foreach (var k in dropKeys)
-                    _containers.Remove(k);
-        }
+        // Iter-42: the Iter-28 `WorldNaturePruned` flag + `PruneByPredicate(Func<int,bool>)`
+        // one-time world-nature eviction lived here and were REMOVED — an id-predicate sweep over
+        // the ledger cannot distinguish a placed wild object from the same id legitimately STORED
+        // in a chest (both are plain entries in the same per-tile dict), so it deleted real
+        // possession on every load (the flag was never serialized, so "one-time" never held).
+        // Rationale + the measured damage: see the note at the top of `PossessionScanner.Scan`.
 
         /// <summary>Self-heal: drop a remembered container/aux tile that WOULD be counted this scan
         /// if a container were still there — i.e. it is DEFINITELY loaded (within `radius` of the

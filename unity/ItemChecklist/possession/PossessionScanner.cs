@@ -51,17 +51,21 @@ namespace ItemChecklist.Possession
             var em = world.EntityManager;
             float dTWorld = diag ? Time.realtimeSinceStartup : 0f;
 
-            // Iter-28: one-time eviction of pre-existing world nature from the loaded ledger.
-            // The old scan persisted nature into the per-(x,z) ledger (it grew to ~5500
-            // entries); PruneStaleNear's 180-tile window is far too slow to clear that backlog,
-            // leaving the autosave-serialize spike. Do a full one-time sweep here, where
-            // PugDatabase is ready. The scan gate below keeps the ledger nature-free from now
-            // on; legitimately-stored nature re-adds itself via container contents.
-            if (!ledger.WorldNaturePruned)
-            {
-                ledger.PruneByPredicate(itemId => PossessionClassifier.IsWorldNature(itemId, PugDatabase.GetObjectInfo((ObjectID)itemId, 0)));
-                ledger.WorldNaturePruned = true;
-            }
+            // Iter-42: the Iter-28 one-time world-nature eviction used to run here, gated on a
+            // `WorldNaturePruned` ledger flag. It was REMOVED because it destroyed real possession:
+            // the flag lived only in memory (Serialize never wrote it), so a ledger freshly read
+            // from disk always started `false` and the "one-time" sweep ran on EVERY world load —
+            // and `PruneByPredicate` cannot tell path #1 (the placed object, which SHOULD be
+            // evicted) from path #2 (the same id STORED in a chest, legitimate possession), since
+            // both land in the same per-tile dict. So every load wiped stored nature (measured on a
+            // real save: 21 ids / 2677 units, incl. 1129 stored Stalagmite + 598 Mushroom). At base
+            // the live scan wrote it straight back — invisible; loading FAR from base left it gone
+            // until the player returned, and the next autosave persisted the loss.
+            // Removing it is safe, not merely a lesser evil: the Iter-28 scan gate keeps path-#1
+            // nature out of the ledger at the source, and the Iter-31/41 v2→v3 discard migrations
+            // dropped every pre-gate ledger, so no v3 ledger can hold a path-#1 nature backlog.
+            // A newly blacklisted id's leftovers are self-healed by PruneStaleNear on the next
+            // base visit (unobserved + player-near + anchor-covered ⇒ dropped).
 
             // Anchors = WORKBENCHES + the crafting stations standing within a workbench's
             // radius. Iter-31: a base is SEEDED by a workbench — the first thing a player
