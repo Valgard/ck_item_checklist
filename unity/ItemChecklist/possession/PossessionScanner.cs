@@ -276,8 +276,20 @@ namespace ItemChecklist.Possession
                 ledger.SetLiveContainer(kv.Key, kv.Value);
                 liveKeys.Add(kv.Key);
             }
+            // Iter-43: publish ONLY tiles that actually produced aux. `TileAux(auxScan, key)` is
+            // evaluated as an ARGUMENT at the AddBuffer call above, so auxScan gains a key for
+            // EVERY container tile whether or not any aux was added — and `SetLiveAux` REPLACES,
+            // so writing an empty dict is a deletion in all but name, performed here UNGATED while
+            // the acknowledged deletion paths below are allowPrune-gated. That bypassed the gate
+            // in exactly the case its comment describes: a tile with a co-located chest IS in
+            // auxScan (empty), so ClearAux never fired for it and the empty write had already
+            // wiped the remembered aux — during the post-load grace, when the cattle's archetype
+            // chunk may simply not have streamed in yet. Skipping empties routes every aux removal
+            // through the one gated path below.
             foreach (var kv in auxScan)
             {
+                if (kv.Value.Count == 0)
+                    continue;
                 ledger.SetLiveAux(kv.Key, kv.Value);
                 liveKeys.Add(kv.Key);
             }
@@ -290,9 +302,11 @@ namespace ItemChecklist.Possession
             // reason as PruneStaleNear below: during the post-load streaming grace a co-located
             // creature may not have streamed in yet, and this is a DELETION path — deleting its
             // remembered aux then would be the unsafe direction (a transient over-count is safer).
+            // Iter-43: "present but empty" counts as absent — see the skip above; without this the
+            // predicate would read "aux was observed here" for a tile that produced none.
             if (allowPrune)
                 foreach (var key in liveKeys)
-                    if (!auxScan.ContainsKey(key))
+                    if (!auxScan.TryGetValue(key, out var observedAux) || observedAux.Count == 0)
                         ledger.ClearAux(key);
 
             // Self-heal: drop a remembered container/aux tile the player is close enough to that
