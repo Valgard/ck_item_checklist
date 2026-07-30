@@ -586,6 +586,117 @@ remaining backlog.
     in one interval, retiring the suspicion behind the 504→681 tile growth); and
     `possession-incidents.txt` absent, i.e. no false alarm. Reported + done 2026-07-30.
 
+- **Iter-44 -- possession subsystem: review backlog + an architectural decision. OPEN
+  (opened 2026-07-30, nothing implemented).** A **stock-take**, deliberately taken instead of a
+  fifth round of point fixes. Context: Iter-42 fixed a data-loss bug; its `review-pr` gate found
+  four more; Iter-43 fixed those and **introduced three new Criticals of the same class**; the
+  Iter-43 gate (four reviewers: code / comments / type-design / silent-failure) found them, three
+  of the four independently converging on the same root cause. 1.3.3 is published and carries
+  them. Nothing below is fixed — this entry exists so the analysis is not lost.
+
+  **Why a point fix is the wrong next move.** The type-design reviewer named the cause twice: a
+  `bool` parameter (`allowShrink`) that carries a condition across a semantic boundary, plus two
+  parallel per-tile dicts (`_containers`/`_auxContainers`) kept in step by hand at **ten** sites.
+  Iter-43 skipped the recommended `TileEntry` refactor and *increased* that coupling by giving both
+  dicts the same correctness predicate — C-1 below is the bill for exactly that.
+
+  **Open Criticals (all code-verified by the reviewers, none in-game):**
+  - **C-1 — `containerTiles` cannot serve as a universal confirmation predicate; permanent,
+    persisted phantom ownership.** `PossessionScanner.cs:320` (contents) and `:342` (aux) share
+    `allowPrune && containerTiles.Contains(key)`, but `containerTiles` is filled only in the
+    `isContainer` branch (`:296`), and `isContainer` excludes `CraftingCD` entities (`:278`).
+    - *aux:* cattle colour aux is keyed by `NearestAnchorTile` (a station/workbench tile — those
+      carry `CraftingCD`, so **never** in `containerTiles`) and paint aux by the placeable's own
+      tile. So `allowShrink` is structurally always false there: a pen losing its **last** animal
+      of one colour, or a placeable repainted A→B, keeps the stale key **forever** (`ClearAux` only
+      fires when the observed aux is *empty*). It is serialized, so it survives restarts. Inflates
+      `K` (Iter-36 counter) permanently, violating Iter-41's "own >=1 right now" contract.
+    - *contents:* any multi-entity tile. Replace a torch with a lantern, pick a chest up off a
+      decorated tile, mine a wall next to an observed torch → the removed id is merged back every
+      scan, and the tile stays in `liveKeys` so `PruneStaleNear` (`PossessionLedger.cs:129-130`)
+      never reaches it. Locked chests / boss statues (`PossessionScanner.cs:254-258`) `AddOne` +
+      `continue`, so their tiles are **never** in `containerTiles` — structurally unshrinkable.
+    - *knock-on:* `TilesHolding` reads `_containers`, so the Iter-40 tracker draws an arrow to a
+      chest that no longer exists and its auto-untrack never fires.
+    - **Both reviewers proposed the identical fix, and it needs no schema change:** authorize the
+      shrink with `PruneStaleNear`'s own premise — `allowPrune && (containerObservedHere ||
+      (dist(player,tile) <= PruneRadius && coveredByLoadedAnchor(tile)))`. Inside 48 tiles and
+      anchor-covered, the codebase *already* infers "unobserved ⇒ destroyed". Cost in the I4 case
+      it protects: **none** — that case is measured at ~91-115 tiles, i.e. 2x outside the envelope.
+      A bare "tile observed at all" test would NOT be sound (it re-opens I4). `PruneStaleNear`
+      itself already accepts this exact risk, and this is strictly smaller (drops unconfirmed ids,
+      not the whole tile). Applying it to `SetLiveAux` fixes the aux half and also resolves I-8's
+      direction inconsistency.
+  - **C-2 — `PossessionIncidentStore` destroys its own history on the very fault it reports.**
+    `ReadAll()` (`PossessionIncidentStore.cs:145-156`) returns `null` both when the file is absent
+    **and** when `Read` fails on a present file — the exact conflation `StoreLoadStatus` was added
+    to end, one file deeper. `Record` then writes `Header + line`, **replacing** every accumulated
+    incident with a single line, and the trigger is *correlated* with the fault being reported. Fix:
+    a `TryReadAll(out text)` that distinguishes absent from unreadable, and refuse to write (keeping
+    the already-emitted warning, and not marking the dedup key) when a present file could not be
+    read. Inherited in shape from `PhantomViolationStore.cs:58-59` — but that one guards a
+    reachability curiosity, this one guards data-loss evidence.
+  - **C-3 — the C1 status flag cannot see a damaged-but-parseable file.** Neither parser throws on
+    damaged input: `PetCollection.LoadFrom` skips bad lines, `PossessionLedger.LoadFrom` `continue`s
+    on four conditions (plus the two new `cnt >= 1` rejections). A file truncated after line 1 →
+    parses a **subset** → `status = Loaded` → writable → the next autosave persists the subset and
+    the following one takes the `.pugbackup`. Worst on the **unrecoverable** store: 3 of 40 pet
+    skins parsed, `MarkCollected` sets `Dirty`, `Save` writes 4 entries over the file — 37
+    ever-owned skins gone, nothing logged. Fix candidates: return a skipped/malformed-line count
+    and treat `> 0` as `Failed` + an incident (truncation almost always leaves one malformed line,
+    so this is nearly free), or write a declared entry count / FNV trailer into the header and treat
+    `parsed != declared` as `Failed`.
+
+  **Open Importants:** two load-bearing comments were made FALSE by Iter-43 itself and should be
+  corrected first, before anyone reasons from them — `PossessionScanner.cs:98-105` (claims
+  `SetLiveContainer`'s dict replacement is "the dominant" self-heal for a newly blacklisted id; I4
+  killed exactly that, so a blacklist addition now leaves a **permanent** over-count on any mixed
+  tile) and `:236-241` (the Iter-41 note still says "SetLiveAux replaces, no accumulation" — the
+  property C-1 removed). Same class: `PossessionClassifier.cs:48-51`, `docs/iteration-history.md`
+  Iter-42's "self-heal on the next visit", and `docs/architecture.md:1268`'s unconditional
+  "re-observation is itself a removal path". Further: **the anomaly detector is calibrated to the
+  wrong failure** — it watches `SetLiveContainer` shrinks, but the *measured* historical
+  catastrophe was Iter-41's `ledgerC` 402→0 via `PruneStaleNear`, where only a DIAG line behind the
+  default-off flag exists; a `prunedTiles >= max(5, lcBefore/4)` trigger would have caught it. Its
+  "cannot false-positive" claim is also wrong three ways (the scan interval is user-settable to
+  **30 s**, the 8 s grace batches withdrawals into the first post-grace scan, and playing with
+  `ModConfig.Enabled` off desynchronises the ledger while saves continue). **Two of the three new
+  signals are one-shots consumed by the benign case:** `_worldNullWarned` is per-process and, per
+  Iter-43's own in-game notes, fires on every load — so a genuine mid-play world loss is silent
+  forever (fix: reset it on a successful resolve and gate it on `WorldState.IsInPlayableWorld`);
+  and the `Shrink` dedup key is `":session"` (`PossessionScanner.cs:399`), so a benign 5-tile
+  reorganisation consumes the slot and a later 400-tile collapse is neither written nor logged
+  (fix: bucket the key by magnitude). Also: the **200-line cap** degrades the durable channel back
+  to the rotating log with no marker, and `Record` returns `true` while writing nothing
+  (`PossessionIncidentStore.cs:76-77`); a **read-only session is invisible** (no UI surface reads
+  the flags, and the DIAG save lines live inside the `Save` that is skipped) and for pets the
+  symptom *looks like* the loss it prevents — every ever-owned skin renders uncollected and `N`
+  drops while the disk is fine (the modal window footer, not the HUD, is the right place for an
+  `! not saving` marker); `LoadFrom`'s silent drops (I-6) violate Iter-43's own "count and report
+  every deletion" rule, which is currently true of neither aux path; and `SetLiveAux`/
+  `SetLiveContainer` merge **asymmetrically** (aux restores only absent keys, so a colour going
+  3→0 restores the stale 3 while 3→1 correctly records 1) with no dropped-count return.
+
+  **Refuted — do NOT re-investigate:** `_lines` is not double-counted (`LoadKnown` runs once under
+  the `_loaded` guard); the `catch` un-marking the dedup key is correct, not a defect (the warning
+  is emitted before the write, so a retry can still land); the ≥5-tile detector is **not** dead code
+  (confirmed shrinks happen on every normal withdrawal — the verified `1001` −50 / `1610` −100
+  deltas); `bestCount` −1→0 is a net improvement, its only cost being a display-only window inside
+  the load screen (which is what burns the one-shot warning); `s_ledgerReadOnly`/`s_petsReadOnly` are
+  correct and have no bypass (both branches write both flags, the char-switch backstop runs before
+  the reset, and `SavePossessionLedger` is the only `Save` call site); all new return values are
+  handled and `PruneStaleNear` is behaviour-identical after its restructure; and the `cnt >= 1`
+  parse rejection cannot change what an existing file loads to (no writer emits a non-positive
+  count), so "no migration needed" holds.
+
+  **The decision to take:** point-fix C-1/C-2/C-3 now (a hotfix that touches exactly the code an
+  eventual refactor replaces), or do the structural change first — `TileEntry { Contents, Aux }` +
+  a `TileObservation` describing what was actually seen, so the ledger owns the shrink rules and the
+  contents/aux dimensions become **separately expressible** (which is what C-1 needs). The reviewer
+  also re-confirmed that persisted provenance, if ever wanted, can migrate **losslessly**: make the
+  version marker a *set* (v3 ⇒ 3 segments, v4 ⇒ 4), load v3 lines as `provenance = Unknown` with the
+  rule "never auto-evict" — no discard, no player re-scan. Reported + open 2026-07-30.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See

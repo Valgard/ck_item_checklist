@@ -1388,6 +1388,54 @@ because the next save persists that emptiness over the intact file:
   `PossessionIncidentStore` → `mods/ItemChecklist/possession-incidents.txt`) and keep it **ungated**
   by the default-off diagnostics flag — a report that requires prior suspicion reports nothing.
 
+### When four rounds of point fixes each introduce the next bug, the shape is the bug (Iter-42/43 review backlog)
+
+Iter-42 fixed a data-loss bug; its review found four more; Iter-43 fixed those and introduced three
+new Criticals **of the same class**; the Iter-43 review found those, with three of four independent
+reviewers converging on one root cause. That sequence is itself the finding. The transferable parts,
+all paid for:
+
+- **A `bool` that carries a condition across a semantic boundary will be pasted to the wrong side.**
+  `allowShrink: allowPrune && containerTiles.Contains(key)` is correct for container contents and
+  structurally wrong for aux (cattle colour aux is keyed by an *anchor* tile, and anchors carry
+  `CraftingCD`, so they can never be in `containerTiles`). **The two call sites are visually
+  identical.** A flag says *what you may do*; it cannot say *which evidence justified it*, so it
+  cannot be checked at the place that owns the data. Pass the observation, not the permission.
+- **Two collections that must be kept in step by hand will drift the moment they stop being
+  symmetric.** `_containers`/`_auxContainers` were hand-paired at ~8 trivially symmetric sites and
+  that was survivable; Iter-43 added a **semantic** pairing (one shared correctness predicate whose
+  validity depends on which producer wrote the dict) and it was wrong immediately. The line between
+  "conventional pairing" and "actively error-prone" is exactly there.
+- **Calibrate a detector to the failure you MEASURED, not the one you just fixed.** The Iter-43
+  anomaly trigger watches the wholesale-replace path (Iter-42's shape). The catastrophe this ledger
+  actually suffered was Iter-41's `ledgerC` 402 → 0 through the *prune* — for which there is still
+  only a diagnostic line behind a default-off flag. A regression of the measured failure would be
+  reported by nothing.
+- **A threshold that depends on a user-settable parameter is not the threshold you documented.**
+  "≥5 tiles in one 3 s scan cannot false-positive" was asserted absolutely; the scan interval is a
+  player Choice up to **30 s**, the post-load grace batches withdrawals into the first scan after it,
+  and playing with the mod disabled desynchronises the ledger while saves continue. Three false-alarm
+  paths in a claim of impossibility.
+- **A reporting channel must not fail on the fault it reports.** The new durable incident store read
+  its own file with a helper that returns `null` both for "absent" and for "present but unreadable" —
+  the exact conflation it was built to end, one file deeper — and then rewrote the file from scratch,
+  destroying the history. The trigger is *correlated* with the fault being reported, so this is the
+  common case for a misbehaving filesystem, not bad luck.
+- **A one-shot signal is spent by the benign occurrence.** The "no ECS world" warning is
+  once-per-process and fires during every world load, so a genuine mid-play world loss is silent
+  forever. Same for a `":session"` dedup key: the first harmless anomaly consumes the slot. Scope a
+  one-shot to an *episode*, or bucket the key by severity.
+- **Distinguishing "empty because new" from "empty because broken" is not enough — a parser that
+  never throws produces a third state.** The status flag added for exactly this catches a throw and
+  a null read, but a file truncated after its header parses to a *subset*, reports success, and gets
+  written back. Validate the body (a declared count, a checksum, or a skipped-line counter), not just
+  the header.
+- **Convergent independent reviewers are strong evidence; a single one is a hypothesis.** Three
+  reviewers arrived at the same root cause and two proposed the identical fix, having been given the
+  suspicion in different words. Conversely each also refuted suspicions of mine — the refutations
+  (listed in the roadmap's Iter-44 entry) are as valuable as the findings, because they stop the next
+  round from re-investigating settled ground.
+
 ## Possession Base Scope & Persistence (Iter-31)
 
 ### Workbench = the semantic "is this the player's base?" discriminator
