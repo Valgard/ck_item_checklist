@@ -34,13 +34,68 @@ namespace ItemChecklist.Possession
 
         public void SetCarriedAux(Dictionary<long, int> aux) => _auxCarried = aux ?? new Dictionary<long, int>();
 
-        public void SetLiveAux(long key, Dictionary<long, int> aux) => _auxContainers[key] = aux;
+        /// <summary>Publish a tile's freshly observed aux. <paramref name="allowShrink"/> false
+        /// keeps remembered keys the caller did not re-observe (Iter-43; see
+        /// <see cref="SetLiveContainer"/> for the full reasoning — same hazard, same rule).</summary>
+        public void SetLiveAux(long key, Dictionary<long, int> aux, bool allowShrink)
+        {
+            if (!allowShrink && _auxContainers.TryGetValue(key, out var prevAux))
+                foreach (var kv in prevAux)
+                    if (!aux.ContainsKey(kv.Key))
+                        aux[kv.Key] = kv.Value;
+            _auxContainers[key] = aux;
+        }
 
         // Iter-41: drop a live tile's remembered aux when it was re-observed this scan WITHOUT
         // aux (a mobile cattle moved off a tile still kept live by a co-located chest/placeable).
         public void ClearAux(long key) => _auxContainers.Remove(key);
 
-        public void SetLiveContainer(long key, Dictionary<int, int> contents) => _containers[key] = contents;
+        /// <summary>Publish a tile's freshly observed contents.
+        /// <para><strong>Iter-43 — this used to be a bare `_containers[key] = contents`, i.e. an
+        /// unconditional, ungated DELETE of whatever the previous scan knew.</strong> Two producers
+        /// write a tile's dict for DIFFERENT entities: `AddOne` (the placed object) and `AddBuffer`
+        /// (a container's contents). A container (has `ContainedObjectsBuffer`) and a torch (does
+        /// not) necessarily sit in different DOTS archetype chunks, so per Iter-41 they leave the
+        /// observed set INDEPENDENTLY (~91-115 tiles). Iter-20 documents this exact co-location — a
+        /// wall torch on a mannequin's tile. So at ~95 tiles the scan could see only the torch,
+        /// build `{torch:1}`, and silently discard the mannequin's four armour pieces; the tile is
+        /// in `liveKeys`, so `PruneStaleNear` skips it (and would refuse past 48 anyway). Same loss
+        /// shape as Iter-42, no predicate involved, and — unlike `PruneStaleNear`'s three
+        /// conditions + `allowPrune` — with zero conditions and no gate.</para>
+        /// <para><paramref name="allowShrink"/> is the fix, and it is deliberately NOT just
+        /// "past the streaming grace": grace-only merging would fix loading far from base but not
+        /// the walk-away case above, which happens in normal play. The caller passes true only when
+        /// this tile's contents were actually CONFIRMED this scan — i.e. a container entity was
+        /// observed here AND the world is past the grace. Otherwise remembered ids the caller did
+        /// not re-observe are kept (a transient over-count — the direction this codebase has
+        /// repeatedly chosen, cf. Iter-41's ClearAux gate and Iter-42).</para>
+        /// <para>Known residue: two containers sharing one tile, only one observed, shrinks the
+        /// unobserved one. Retiring that needs real provenance in the stored record (a per-tile
+        /// split of placed-object vs container-sourced counts), which is a schema change.</para>
+        /// </summary>
+        /// <returns>Units that vanished from this tile's remembered contents — 0 whenever nothing
+        /// was dropped. The caller surfaces the total; that number is the Iter-42 detector.</returns>
+        public int SetLiveContainer(long key, Dictionary<int, int> contents, bool allowShrink)
+        {
+            if (!_containers.TryGetValue(key, out var prev))
+            {
+                _containers[key] = contents;
+                return 0;
+            }
+            int dropped = 0;
+            foreach (var kv in prev)
+            {
+                contents.TryGetValue(kv.Key, out var now);
+                if (now >= kv.Value)
+                    continue;
+                if (allowShrink)
+                    dropped += kv.Value - now;
+                else
+                    contents[kv.Key] = kv.Value; // unconfirmed → keep what we remembered
+            }
+            _containers[key] = contents;
+            return dropped;
+        }
 
         // Iter-42: the Iter-28 `WorldNaturePruned` flag + `PruneByPredicate(Func<int,bool>)`
         // one-time world-nature eviction lived here and were REMOVED — an id-predicate sweep over
@@ -61,7 +116,9 @@ namespace ItemChecklist.Possession
         /// observation dropout (mode 1). A real destruction is always both (you stand next to the
         /// container; its workbench is co-located), so nothing legitimate is missed. Collect-then-
         /// remove to avoid mutating during iteration.</summary>
-        public void PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys, Func<long, bool> coveredByLoadedAnchor)
+        /// <returns>Iter-43: how many tiles were dropped, so the caller can surface it — this
+        /// deletion used to be entirely unreported, even under diagnostics.</returns>
+        public int PruneStaleNear(float px, float pz, float radius, HashSet<long> liveKeys, Func<long, bool> coveredByLoadedAnchor)
         {
             float r2 = radius * radius;
             List<long> drop = null;
@@ -79,12 +136,14 @@ namespace ItemChecklist.Possession
                     continue; // loaded but no loaded anchor would observe it → not destroyed → keep
                 (drop ??= new List<long>()).Add(key);
             }
-            if (drop != null)
-                foreach (var k in drop)
-                {
-                    _containers.Remove(k);
-                    _auxContainers.Remove(k);
-                }
+            if (drop == null)
+                return 0;
+            foreach (var k in drop)
+            {
+                _containers.Remove(k);
+                _auxContainers.Remove(k);
+            }
+            return drop.Count;
         }
 
         public PossessionView BuildView(HashSet<long> liveKeys)

@@ -19,7 +19,12 @@ namespace ItemChecklist.Possession
         private static World ResolveWorld()
         {
             World best = null;
-            int bestCount = -1;
+            // Iter-43: start at 0, not -1. At -1 a world with ZERO ContainedObjectsBuffer entities
+            // still won the max-count pick, so a wrong-world selection was possible and equally
+            // silent. There is no legitimate case for picking an empty one: the player entity
+            // itself carries a ContainedObjectsBuffer, so the real world always has >= 1 once a
+            // character exists. No candidate now means "no world yet" — reported by the caller.
+            int bestCount = 0;
             foreach (var w in World.All)
             {
                 if (w == null || !w.IsCreated)
@@ -47,7 +52,22 @@ namespace ItemChecklist.Possession
             float dT0 = diag ? Time.realtimeSinceStartup : 0f;
             var world = ResolveWorld();
             if (world == null)
+            {
+                // Iter-43: was a bare early-return that logged NOTHING, ever, even under
+                // diagnostics — every row then shows an em-dash and the Possession counter reads
+                // 0 / M with no explanation anywhere. Display-only (with no world there is no
+                // scan, and the prune is skipped via havePlayer), so one warning per session is
+                // the right weight — not a durable incident.
+                if (!_worldNullWarned)
+                {
+                    _worldNullWarned = true;
+                    Debug.LogWarning(
+                        "[ItemChecklist] possession scan skipped: no ECS world resolved. Owned counts will "
+                            + "read 0 until a world is available. (Harmless on the main menu / during a load.)"
+                    );
+                }
                 return PossessionView.Empty;
+            }
             var em = world.EntityManager;
             float dTWorld = diag ? Time.realtimeSinceStartup : 0f;
 
@@ -146,6 +166,10 @@ namespace ItemChecklist.Possession
             var carriedAux = new Dictionary<long, int>(); // Iter-41: live carried + active-pet skins/colours
             var auxScan = new Dictionary<long, Dictionary<long, int>>(); // per-tile remembered aux (pets/cattle/paint)
             var liveKeys = new HashSet<long>();
+            // Iter-43: tiles where a CONTAINER entity was actually observed this scan. Only those
+            // can confirm a tile's stored contents, so only they may shrink the remembered dict —
+            // see PossessionLedger.SetLiveContainer.
+            var containerTiles = new HashSet<long>();
             float r2 = radius * radius;
             Vector2 playerPos = default;
             bool havePlayer = false;
@@ -268,12 +292,37 @@ namespace ItemChecklist.Possession
                     a[cck] = (a.TryGetValue(cck, out var pcc) ? pcc : 0) + 1;
                 }
                 if (isContainer)
+                {
+                    containerTiles.Add(key);
                     AddBuffer(em, e, tile, TileAux(auxScan, key));
+                }
             }
 
+            // Iter-43: a tile's remembered contents may only SHRINK when this scan actually
+            // confirmed them — a container entity observed here AND past the streaming grace.
+            // Otherwise (e.g. only the co-located torch was observed, its chunk still loaded while
+            // the chest's is not) the remembered ids are kept. `droppedUnits` counts what a
+            // confirmed shrink removed; it is reported below, because an unseen deletion is what
+            // made Iter-42 invisible for a month.
+            // Iter-43: capture the pre-mutation ledger size so the DIAG line can report the
+            // TRANSITION rather than just the endpoint. `Containers.Count` is O(1) so the tile
+            // count is always available; the pair sum costs an iteration and is diag-only.
+            int lcBefore = ledger.Containers.Count;
+            int lpBefore = 0;
+            if (diag)
+                foreach (var c in ledger.Containers)
+                    lpBefore += c.Value.Count;
+
+            int droppedUnits = 0,
+                shrunkTiles = 0;
             foreach (var kv in scan)
             {
-                ledger.SetLiveContainer(kv.Key, kv.Value);
+                int dropped = ledger.SetLiveContainer(kv.Key, kv.Value, allowShrink: allowPrune && containerTiles.Contains(kv.Key));
+                if (dropped > 0)
+                {
+                    droppedUnits += dropped;
+                    shrunkTiles++;
+                }
                 liveKeys.Add(kv.Key);
             }
             // Iter-43: publish ONLY tiles that actually produced aux. `TileAux(auxScan, key)` is
@@ -290,7 +339,7 @@ namespace ItemChecklist.Possession
             {
                 if (kv.Value.Count == 0)
                     continue;
-                ledger.SetLiveAux(kv.Key, kv.Value);
+                ledger.SetLiveAux(kv.Key, kv.Value, allowShrink: allowPrune && containerTiles.Contains(kv.Key));
                 liveKeys.Add(kv.Key);
             }
 
@@ -329,13 +378,29 @@ namespace ItemChecklist.Possession
             // INDEPENDENT of AnchorRadius (which only shares the 48 *default* and is user-settable
             // to 96): the prune must stay under the observed-dropout regardless of AnchorRadius.
             const float PruneRadius = 48f; // the "loaded" half (player-near); the closure is the "anchor-covered" half
+            int prunedTiles = 0;
             if (allowPrune && havePlayer)
-                ledger.PruneStaleNear(
+                prunedTiles = ledger.PruneStaleNear(
                     playerPos.x,
                     playerPos.y,
                     PruneRadius,
                     liveKeys,
                     key => WithinAnchor(anchors, PossessionLedger.KeyX(key), PossessionLedger.KeyZ(key), r2)
+                );
+
+            // Iter-43: one anomaly report, chosen to be false-positive-free. A confirmed shrink is
+            // NORMAL — emptying a chest legitimately drops its whole content — so neither a unit
+            // threshold nor "any shrink" can be the trigger. But losing units on MANY tiles inside
+            // a single 3 s scan is not normal play: nobody empties five chests at once, while the
+            // Iter-42 sweep hit exactly 5 tiles in one pass. That shape is the signal.
+            if (shrunkTiles >= 5)
+                PossessionIncidentStore.Record(
+                    PossessionIncidentStore.Shrink,
+                    PossessionIncidentStore.Shrink + ":session",
+                    "tiles=" + shrunkTiles + " units=" + droppedUnits + " ledgerC=" + lcBefore + "->" + ledger.Containers.Count,
+                    $"{droppedUnits} owned unit(s) dropped from {shrunkTiles} container tiles in a single scan. "
+                        + "That is expected if you just emptied several containers at once — otherwise it may be a "
+                        + "tracking bug; please report this file."
                 );
 
             // Iter-16.1: any skin currently owned (carried/active/container) is collected
@@ -379,7 +444,15 @@ namespace ItemChecklist.Possession
                         + $"(world={(dTWorld - dT0) * 1000f:F1} setup={(dTAnchors - dTWorld) * 1000f:F1} "
                         + $"loop={(dTLoop - dTAnchors) * 1000f:F1} build={(dTEnd - dTLoop) * 1000f:F1}) "
                         + $"interval={ModConfig.ScanIntervalSeconds:F0}s dt={(_lastScanRt > 0f ? dT0 - _lastScanRt : 0f):F2}s "
-                        + $"ledgerC={lc} pairs={lp} ents={ents.Length} near={dNear} anchors={anchors.Count}"
+                        // Iter-43: report the TRANSITION, not just the endpoint. The old line
+                        // printed ledgerC/pairs only after every mutation, so a collapse was
+                        // visible solely by hand-diffing two consecutive lines and the pre-scan
+                        // value was never shown at all. A single line reading
+                        // "ledgerC=505->505 lostUnits=2677" would have made Iter-42 self-evident
+                        // on the first far-from-base load instead of costing a month.
+                        + $"ledgerC={lcBefore}->{lc} pairs={lpBefore}->{lp} pruned={prunedTiles} "
+                        + $"shrunk={shrunkTiles} lostUnits={droppedUnits} "
+                        + $"ents={ents.Length} near={dNear} anchors={anchors.Count}"
                 );
                 _lastScanRt = dT0; // Iter-38.1: anchor the next scan's dt=
                 DiagDumpObjectsOnce();
@@ -394,6 +467,7 @@ namespace ItemChecklist.Possession
         // placeable that is obviously wild nature (leaking past the blacklist in a new biome)
         // is visible and its tag/ID can be added to PossessionClassifier.
         private static bool _diagObjectsDumped;
+        private static bool _worldNullWarned; // Iter-43: one warning per session, not per scan
         private static float _lastScanRt; // Iter-38.1: realtime of the previous diag-logged scan, for the dt= cadence field
         private static readonly Dictionary<int, (int count, string sig)> _diagObjects = new();
 
