@@ -5,6 +5,37 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.3] - 2026-07-30
+
+Hardens the owned-item tracking against several rare ways it could lose entries,
+found while reviewing the 1.3.2 fix.
+
+### Fixed
+
+- **Stored items are no longer forgotten when only part of a tile is in view.** If a
+  container shared a tile with something else — a wall torch standing on a mannequin,
+  for instance — and the game had unloaded the container but not the torch, the
+  remembered contents of that container were dropped. Owned counts now only go down
+  when the container itself was actually seen, so the numbers stay put until you
+  really take something out.
+- **A failed read of your tracking data can no longer overwrite it.** If the file
+  could not be read — a rare filesystem hiccup — the mod treated that as "nothing
+  owned yet", and the next autosave wrote the emptiness over the good file. It now
+  refuses to save over data it could not read. This mattered most for the
+  **collected pet skins**, which have no other source and could not be rebuilt.
+- **Penned animal colours no longer drop out right after loading a world** when a pen
+  shares a tile with a chest.
+- **A discarded tracking file is now reported** rather than vanishing quietly, so a
+  genuinely damaged file can be told apart from the normal one-time upgrade.
+
+### Added
+
+- **A problem report you can actually send.** If the mod ever cannot read your tracking
+  data, or loses an unusual number of entries at once, it writes that to
+  `possession-incidents.txt` beside its other files instead of only to the game log,
+  which is wiped every time the game restarts. The file stays absent when nothing goes
+  wrong.
+
 ## [1.3.2] - 2026-07-30
 
 Fixes owned-item counts being lost when a save is loaded away from your base.
