@@ -1942,3 +1942,65 @@ objectId only, so for a colour/skin variant the "in N chests" count can include 
 sibling variation. **Process:** brainstorm → spec → plan → hybrid execution (subagent-friendly
 code edits + inline in-game calibration, which the camera / highlight / "None" loops all needed);
 one whole-branch review (1 Important finding, fixed). Pure behavioural C# + one sheet/loc touch.
+
+**Iter-42 (stored world nature evicted on every world load) — DONE (2026-07-30, branch
+`iter-42`).** A user-reported bug: *"loading a save where the player is far from base removes
+items that were already tracked as owned; they are only re-counted after walking back to base."*
+Root-caused **from the on-disk data with no build at all**, and the fix is a deletion — a
+mechanism that had become pure damage.
+
+**Diagnosis (the ledger's own `.pugbackup` is a free before/after).** `API.ConfigFilesystem`
+keeps a `<file>.pugbackup` beside each write, so the character's `possession-<guid>.txt` (16:37)
+and its backup (16:02) form a diff of the last save. Result: **0 tiles removed** (505 → 505) —
+which immediately killed the whole "the ledger is not loaded / is cleared" hypothesis family —
+but **5 tiles lost items from their contents**: 21 ids / **2677 units**, incl. `5610` Stalagmite
+**×1129**, `5500` Mushroom ×598, `5700` CavelingFloorTile ×222, `5702` CavelingPot ×126,
+MeadowBush/TallGrass/GraveTree/HiveDestructible… Counts in the thousands are chest contents, not
+placed objects. And **every** lost id is an `IsWorldNature` match while **no** non-nature id was
+touched — the predicate left its fingerprint in the data, so no further hypothesis was needed.
+
+**Two independent defects, both in the Iter-28 one-time eviction.** (1) Its gate
+`PossessionLedger.WorldNaturePruned` was an in-memory field only — `Serialize()` never wrote it,
+`LoadFrom()` never set it — so a ledger read from disk always started `false` and the "one-time"
+sweep ran at the first scan of **every world load**. (2) `PruneByPredicate` cannot distinguish
+what it deletes: the ledger holds one flat `Dictionary<int,int>` per tile, written by **both**
+scan path #3 (`AddOne`, the placed wild object — the intended target) and path #2 (`AddBuffer`,
+container contents — legitimate possession). Evicting "wild Stalagmite" therefore also evicted
+1129 Stalagmite stored in a chest. Iter-28's comment ("legitimately-stored items re-add
+themselves via the live scan") holds **only where the container is observed** — i.e. at base.
+
+**Why it hid for a month, and the general test for this bug class.** At base the next 3 s scan
+re-observed the containers and `SetLiveContainer` wrote the true contents straight back, repairing
+the deletion within one scan interval — invisible. Loading **far from base** leaves the containers
+unobserved, so the entries stay gone until the player returns, and the next autosave persists the
+loss. For anything touching remembered/persisted spatial state, **the load-far-from-base case is
+the test**; the load-at-base case is self-repairing and proves nothing.
+
+**Fix (option A, chosen by the user over persisting the flag): remove the eviction entirely.**
+The `PruneByPredicate` call, the `WorldNaturePruned` flag and the now-unused
+`PruneByPredicate` method are gone (+21/−39 across `PossessionScanner.cs`/`PossessionLedger.cs`).
+This is not the lesser evil but the correct end state: the Iter-28 **write gate** keeps path-#3
+nature out of the ledger at the source, and the Iter-31/41 `v2`/`v3` **discard migrations** threw
+away every pre-gate ledger outright — so no v3 ledger can carry a path-#1 nature backlog for the
+sweep to clear. Should a future blacklist addition leave stragglers, `PruneStaleNear` (the Iter-41
+two-condition self-heal) removes them on the next base visit. Persisting the flag was rejected: it
+would keep a mechanism that deletes unattributable entries, so the same data loss would recur
+(once) on every future blacklist edit, and it would cost another schema bump + discard migration.
+The ledger now has exactly **two** removers: `PruneStaleNear` and the `LoadFrom` marker discard.
+The replaced code is documented in place (a comment block at the top of `Scan` + one on the
+ledger) so a later reader does not "fix" it by persisting the flag and reintroducing the loss.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997) — against the ledger file, not the UI.** The
+`possession-<guid>.txt` ledger is the cause; the checklist column is only a (spoiler-gated,
+filtered, aggregated) projection of it, so a `—` on screen has several possible causes while a
+missing `5610:1129` in the file has exactly one. `safetyCheck=True` + 0 `CompileFailed` in both
+launches, 0 NRE, 0 `possession save/load failed`. Test protocol (base visit to refill → walk far
+→ Save & Quit → reload far from base), then the same `.pugbackup` diff that diagnosed it:
+**REMOVED=0 ADDED=0 CHANGED=0** across the far-from-base load — the ledger came through
+**byte-identical** (504 tiles, 13783 → 13783 bytes), where the pre-fix pair had lost 21 ids /
+2677 units over 5 tiles (13793 → 13613). All 21 previously-deleted ids are present again at their
+original counts (`5610` Stalagmite 1129, `5500` Mushroom 598, `5700` CavelingFloorTile 222, …).
+
+**Recovery for existing players:** none needed — the deleted entries are rewritten by the live
+scan on the next base visit (that same self-repair is what masked the bug). Pure behavioural C#;
+no prefab/art/loc touch, no schema change.

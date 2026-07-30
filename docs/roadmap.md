@@ -506,6 +506,30 @@ remaining backlog.
   ~385, `ledgerC` 402-403 with the base fully unloaded, self-heal intact. The CK load-vs-observe
   distinction lives in the `reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
   Reported 2026-07-15, done 2026-07-17.
+- **Iter-42 -- stored world nature evicted on every world load. DONE** (see
+  `docs/iteration-history.md`). Loading a save **far from base** dropped already-tracked owned
+  items; they only came back after walking to base. **Root-caused from the on-disk data with no
+  build** — diffing the ledger against its own `.pugbackup` showed 0 tiles removed but 21 ids /
+  **2677 units** gone from 5 tiles' *contents* (1129 stored Stalagmite, 598 Mushroom, …), every
+  one an `IsWorldNature` match and no other id touched. **Two defects in the Iter-28 one-time
+  eviction:** (1) its `WorldNaturePruned` gate was never serialized, so the "one-time" sweep ran
+  on **every** load; (2) `PruneByPredicate` cannot tell scan path #3 (the placed wild object,
+  the target) from path #2 (the same id STORED in a chest, legitimate possession) — one flat
+  per-tile dict serves both. At base the live scan rewrote the contents within one scan interval
+  (invisible); far from base the loss stood and the next autosave persisted it. **Fix: remove the
+  eviction, the flag and the method** (user's choice over persisting the flag) — the Iter-28
+  *write* gate keeps path-#3 nature out at the source and the Iter-31/41 v2/v3 discard migrations
+  dropped every pre-gate ledger, so nothing is left for the sweep to clear; stragglers from a
+  future blacklist edit self-heal via `PruneStaleNear`. Persisting the flag was rejected: it keeps
+  a mechanism that deletes unattributable entries (same loss, once per future blacklist edit) and
+  costs another schema bump. The ledger now has exactly two removers (`PruneStaleNear` + the
+  `LoadFrom` marker discard). **General lesson (`docs/gotchas.md`):** a "one-time" cleanup must
+  keep its done-mark IN the store, never run a predicate delete over a store without provenance,
+  and test remembered-state changes by loading **far from base** — the at-base case self-repairs
+  and proves nothing. Verified in-game (1.2.1.5) against the ledger file: across a far-from-base
+  load the `.pugbackup` diff is **REMOVED=0 ADDED=0 CHANGED=0** (byte-identical, 13783 → 13783;
+  the pre-fix pair lost 2677 units) and all 21 ids are back at their original counts;
+  `safetyCheck=True`, 0 `CompileFailed`/NRE. Reported + done 2026-07-30.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered

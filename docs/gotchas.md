@@ -1275,9 +1275,14 @@ main thread it also pushed CK's **host simulation** over its **55 ms** frame bud
 the scan:** the Iter-27 PERF data already showed `BuildView` was ~0.8 ms even at 5503 entries,
 so the read was never the peak. Budget the autosave serialize like any < 16.7 ms frame op, and
 **keep the persisted store small at the source** (the world-nature gate below). A
-radius-bounded self-heal (`PruneStaleNear`, 180 tiles) does **not** retroactively clear a
-backlog an old bug accumulated — pair the source fix with a one-time full eviction
+radius-bounded self-heal (`PruneStaleNear`, then 180 tiles) does **not** retroactively clear a
+backlog an old bug accumulated, so Iter-28 paired the source fix with a one-time full eviction
 (`PossessionLedger.PruneByPredicate` at the first scan, gated by a `WorldNaturePruned` flag).
+**Iter-42 removed that eviction: it was a data-loss bug on two counts** — see the third section
+below, which is the durable lesson. The backlog-clearing need was real *then*; it no longer
+exists (the Iter-31/41 `v2→v3` discard migrations dropped every pre-gate ledger outright, which
+is the safe way to retire a polluted store: throw the whole file away and re-scan, never
+selectively delete entries you cannot attribute).
 
 ### CK encodes no "world-spawned vs player-placed" signal — don't try to derive it
 
@@ -1299,6 +1304,38 @@ plus a short ObjectID list for the tag-less stragglers. (Iter-20 had removed the
 gate so menu-removable furniture counts — which is what let mineable wild nature in;
 `MineableCD` is not a usable discriminator either.) Gate **only the placed-object path** —
 container contents + carried are untouched, so nature actually stored in a chest still counts.
+
+### A "one-time" cleanup gated on an unpersisted flag runs on EVERY load (Iter-42)
+
+Two independent defects, both in the Iter-28 eviction above, each sufficient to lose data:
+
+1. **The gate was in-memory only.** `WorldNaturePruned` was a plain `public bool` field on
+   `PossessionLedger`; `Serialize()` never wrote it and `LoadFrom()` never set it, so a ledger
+   read from disk always started `false` and the "one-time" sweep ran at the first scan of
+   **every world load**. **If a cleanup must happen once per store, the "already done" mark has
+   to live IN the store** — for this ledger that means the version marker (`#icl-ledger-vN`),
+   which is the mechanism the migrations already use.
+2. **The predicate could not distinguish what it deleted.** The ledger holds one flat
+   `Dictionary<int,int>` per tile, filled by *both* scan path #1 (`AddOne`, the placed object —
+   the intended eviction target) and path #2 (`AddBuffer`, container contents — legitimate
+   possession). An id-predicate sweep sees only `(tile, id, count)`, so evicting "wild
+   Stalagmite" necessarily also evicted **1129 Stalagmite stored in a chest**. The Iter-28
+   comment's promise that "legitimately-stored items re-add themselves via the live scan" holds
+   **only where the container is observed**, i.e. at base. **Never run a predicate delete over a
+   store that does not record provenance** — gate at the write site (as the `IsWorldNature`
+   path-#1 gate correctly does) or discard the whole file.
+
+**Why it stayed invisible for ~4 weeks, and the test that exposes this bug class.** At base the
+next 3 s scan re-observed the containers and `SetLiveContainer` wrote the true contents straight
+back, so the deletion was repaired within one scan interval. It only becomes visible when the
+world is **loaded far from base**: the containers are unobserved, the deleted entries stay gone
+until the player walks back — and the next autosave persists the loss to disk. So for anything
+touching remembered/persisted spatial state, **the load-far-from-base case is the test**, not the
+load-at-base case; the latter is self-repairing and proves nothing. (Diagnosed with no build at
+all, by diffing the ledger against its own `.pugbackup`: 21 ids / 2677 units gone, every one of
+them an `IsWorldNature` match and no other — the predicate left its fingerprint in the data.
+Cf. `docs/gotchas.md § Possession Base Scope` and the [[feedback_validate_against_savegame]]
+habit of parsing the real save instead of reasoning about it.)
 
 ## Possession Base Scope & Persistence (Iter-31)
 
