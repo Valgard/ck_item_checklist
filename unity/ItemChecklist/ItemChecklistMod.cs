@@ -186,6 +186,15 @@ namespace ItemChecklist
 
         private static PossessionLedger s_ledger;
         private static string s_ledgerGuid;
+
+        // Iter-43: set when the store on disk could NOT be read (not merely absent). The
+        // in-memory store is then empty or partial, so writing it back would destroy the intact
+        // file — and the FNV save-skip cannot save us: its cache is per-session, so the first
+        // save of a launch always lands. Read-only until the next character switch, which
+        // re-attempts the load. Separate flags because the two stores fail independently and
+        // the pet-skin one is unrecoverable (no second source), while the ledger self-rebuilds.
+        private static bool s_ledgerReadOnly;
+        private static bool s_petsReadOnly;
         private float _possessionTimer;
 
         // Prune grace: chunks stream in asynchronously after a world load/teleport, so
@@ -404,12 +413,16 @@ namespace ItemChecklist
         /// <summary>Persist the active character's possession ledger. Driven primarily
         /// by <see cref="SaveManagerWriteCharacterHook"/> (fires in lockstep with CK's
         /// own character save — autosave + "Save &amp; Quit"); also called on char-switch
-        /// and Shutdown as backstops. No-op when no character is active.</summary>
+        /// and Shutdown as backstops. No-op when no character is active.
+        /// <para>Iter-43: each store is skipped when its load FAILED (<see cref="s_ledgerReadOnly"/>
+        /// / <see cref="s_petsReadOnly"/>) — an empty-or-partial in-memory store must never
+        /// overwrite a file we could not read. Not saving costs this session's changes; saving
+        /// would cost everything on disk (and for pet skins that is unrecoverable).</para></summary>
         internal static void SavePossessionLedger()
         {
-            if (s_ledger != null && !string.IsNullOrEmpty(s_ledgerGuid))
+            if (s_ledger != null && !s_ledgerReadOnly && !string.IsNullOrEmpty(s_ledgerGuid))
                 PossessionStore.Save(s_ledgerGuid, s_ledger);
-            if (Pets != null && Pets.Dirty && !string.IsNullOrEmpty(s_ledgerGuid))
+            if (Pets != null && Pets.Dirty && !s_petsReadOnly && !string.IsNullOrEmpty(s_ledgerGuid))
                 PetCollectionStore.Save(s_ledgerGuid, Pets);
         }
 
@@ -513,12 +526,20 @@ namespace ItemChecklist
                 {
                     s_ledger = null;
                     Pets = null;
+                    s_ledgerReadOnly = false;
+                    s_petsReadOnly = false;
                     Possession = PossessionView.Empty;
                 }
                 else
                 {
-                    s_ledger = PossessionStore.Load(activeGuid);
-                    Pets = PetCollectionStore.Load(activeGuid);
+                    // Iter-43: a FAILED load (file present but unreadable/unparseable) must not be
+                    // mistaken for "new character" — the resulting empty store would otherwise be
+                    // written over the intact file by the very next autosave. Both stores report
+                    // their own status; each is independently put read-only for this character.
+                    s_ledger = PossessionStore.Load(activeGuid, out var ledgerStatus);
+                    Pets = PetCollectionStore.Load(activeGuid, out var petsStatus);
+                    s_ledgerReadOnly = ledgerStatus == StoreLoadStatus.Failed;
+                    s_petsReadOnly = petsStatus == StoreLoadStatus.Failed;
                     _possessionPlayableTime = 0f; // fresh load → withhold prune until grace
                     Possession = PossessionScanner.Scan(s_ledger, Pets, ModConfig.AnchorRadius, false);
                 }
