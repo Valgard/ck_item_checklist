@@ -218,6 +218,10 @@ namespace ItemChecklist.Possession
             // be overwritten by the next entity on the same tile (Iter-20: publishing per entity
             // lost the mannequin's displayed armor → counted 0).
             var scan = new Dictionary<long, Dictionary<int, int>>();
+            // Iter-45: path #3 (the placed object itself) accumulates separately from path #2 (a
+            // container's contents). Same per-tile merge discipline, different provenance — see
+            // PossessionLedger.TileEntry.
+            var placedScan = new Dictionary<long, Dictionary<int, int>>();
             int dNear = 0;
 
             for (int i = 0; i < ents.Length; i++)
@@ -303,7 +307,7 @@ namespace ItemChecklist.Possession
                 // NonUsable + not Mineable so it would fail the generic filter below.
                 if (PossessionClassifier.IsLockedChest(id) || PossessionClassifier.IsBossStatue(id))
                 {
-                    AddOne(Tile(scan, key), id);
+                    AddOne(Tile(placedScan, key), id);
                     continue;
                 }
 
@@ -328,9 +332,11 @@ namespace ItemChecklist.Possession
                 bool isContainer = !em.HasComponent<CraftingCD>(e) && em.HasComponent<ContainedObjectsBuffer>(e);
                 if (!owned && !isContainer)
                     continue; // wild nature with no storage → skip
-                var tile = Tile(scan, key);
+                // Iter-45: path #3 goes into its OWN accumulator. The two paths wrote one dict from
+                // Iter-20 to Iter-44 — the missing provenance behind Iter-42 — so the reverse index
+                // could not tell a chest holding a torch from a torch standing there.
                 if (owned)
-                    AddOne(tile, id);
+                    AddOne(Tile(placedScan, key), id);
                 // Iter-17: a painted/coloured placeable carries its paint colour in variation →
                 // also credit per (id, colour) for the per-colour slot (live-only). variation 0
                 // = base item, already counted by AddOne. Tile floors/walls aren't individual
@@ -344,7 +350,7 @@ namespace ItemChecklist.Possession
                 if (isContainer)
                 {
                     containerTiles.Add(key);
-                    AddBuffer(em, e, tile, TileAux(auxScan, key));
+                    AddBuffer(em, e, Tile(scan, key), TileAux(auxScan, key));
                 }
             }
 
@@ -401,6 +407,7 @@ namespace ItemChecklist.Possession
             //     buffer is authoritative: absence there is confirmed, not merely inferred.
             var applied = ledger.ApplyScan(
                 scan,
+                placedScan,
                 auxScan,
                 containerTiles,
                 havePlayer,

@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <!--
     Iter-44: a standalone harness for the possession LEDGER. Not a Unity project and not part of
     the mod build — `utils/link.sh` symlinks only `unity/ItemChecklist` into the SDK's Assets/, so
@@ -35,5 +34,4 @@
     <Compile Include="../../unity/ItemChecklist/possession/PossessionLedger.cs" />
     <Compile Include="../../unity/ItemChecklist/possession/PetCollection.cs" />
   </ItemGroup>
-
 </Project>

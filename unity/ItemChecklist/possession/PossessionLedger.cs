@@ -15,10 +15,22 @@ namespace ItemChecklist.Possession
     /// correctness predicate although they have DIFFERENT producers, so the cattle/paint aux
     /// could never shrink at all. One record makes the two dimensions separately expressible
     /// while removing the union bookkeeping entirely.</para>
-    /// <para><c>Contents</c> is objectID → count, written by scan paths #2 (<c>AddBuffer</c>, a
-    /// container's contents) and #3 (<c>AddOne</c>, the placed object itself). <c>Aux</c> is
-    /// <c>PackKey(id, secondDim)</c> → count for the sub-variant axes (pet skins, cattle
-    /// colours, paint colours).</para>
+    /// <para><strong>Three dimensions since Iter-45.</strong> <c>Stored</c> is objectID → count for
+    /// scan path #2 (<c>AddBuffer</c>, a container's contents); <c>Placed</c> the same for path #3
+    /// (<c>AddOne</c>, the placed object standing there); <c>Aux</c> is
+    /// <c>PackKey(id, secondDim)</c> → count for the sub-variant axes (pet skins, cattle colours,
+    /// paint colours). Paths #2 and #3 shared one dict from Iter-20 to Iter-44 — the missing
+    /// provenance that Iter-42 was about and Iter-44's notes kept deferring. Splitting them buys
+    /// two things a flag on the tile could not: the Iter-40 reverse index can count CONTAINERS
+    /// rather than "anything remembered here", so the tooltip's "in N chests" stops claiming a chest
+    /// for a placed object; and a future blacklist addition can evict path-#3 entries specifically,
+    /// which is the self-heal Iter-42 had to remove because a per-id sweep could not tell the two
+    /// apart.</para>
+    /// <para>Their SHRINK RULES differ, which is the other half of why one dict was wrong:
+    /// <c>Placed</c> is the object's own entity, observed exactly when the tile is in scope, so it
+    /// behaves like <c>Aux</c> (scope-only, absence never "confirmed"). <c>Stored</c> can also be
+    /// confirmed from beyond scope by an observed container's buffer. See
+    /// <see cref="PossessionLedger.ApplyScan"/>.</para>
     /// <para><strong>Both dictionaries are private and there is no read accessor for them.</strong>
     /// The reads every consumer actually needs are methods here instead. Two reasons, and the
     /// second is the one that bites: it makes the WRITERS enumerable — four methods, each
@@ -30,7 +42,8 @@ namespace ItemChecklist.Possession
     /// </summary>
     internal sealed class TileEntry
     {
-        private readonly Dictionary<int, int> _contents = new Dictionary<int, int>();
+        private readonly Dictionary<int, int> _stored = new Dictionary<int, int>();
+        private readonly Dictionary<int, int> _placed = new Dictionary<int, int>();
         private readonly Dictionary<long, int> _aux = new Dictionary<long, int>();
 
         // The keys that were unconfirmed-absent on the PREVIOUS scan, per dimension — the state
@@ -39,9 +52,11 @@ namespace ItemChecklist.Possession
         // neighbour on the same tile had missed before it, which is the common shape on the aux axis
         // (a pen keys every colour to one anchor tile, and a drifting herd misses them in turn).
         // Null while nothing is pending, which is the steady state.
-        private HashSet<int> _contentsMissed;
+        private HashSet<int> _storedMissed;
+        private HashSet<int> _placedMissed;
         private HashSet<long> _auxMissed;
-        private int _contentsMissedSeq = -1;
+        private int _storedMissedSeq = -1;
+        private int _placedMissedSeq = -1;
         private int _auxMissedSeq = -1;
 
         // The scan on which the prune last found this WHOLE tile stale. The prune needs its own
@@ -67,18 +82,26 @@ namespace ItemChecklist.Possession
         /// <summary>Nothing remembered here any more — the ledger drops such a tile, so an emptied
         /// tile does not linger as a remembered one that the prune skips for as long as something
         /// on it keeps being observed.</summary>
-        public bool IsEmpty => _contents.Count == 0 && _aux.Count == 0;
+        public bool IsEmpty => _stored.Count == 0 && _placed.Count == 0 && _aux.Count == 0;
 
-        /// <summary>Remembered (tile, objectID) content pairs on this tile — the <c>cPairs=</c>
-        /// DIAG figure.</summary>
-        public int ContentPairCount => _contents.Count;
+        /// <summary>Remembered (tile, objectID) content pairs on this tile, both provenances — the
+        /// <c>cPairs=</c> DIAG figure.</summary>
+        public int ContentPairCount => _stored.Count + _placed.Count;
 
         // --- reads (loops live here so they run against the concrete Dictionary) ---
 
-        /// <summary>Add this tile's contents to a view under construction.</summary>
+        /// <summary>Add this tile's contents to a view under construction — BOTH provenances, since
+        /// a placed object and a stored one are equally owned. The distinction exists for the
+        /// reverse index and for eviction, not for the totals.</summary>
         public void AccumulateInto(Dictionary<int, int> totals, HashSet<int> anyItem, HashSet<int> liveItems, bool live)
         {
-            foreach (var kv in _contents)
+            Accumulate(_stored, totals, anyItem, liveItems, live);
+            Accumulate(_placed, totals, anyItem, liveItems, live);
+        }
+
+        private static void Accumulate(Dictionary<int, int> src, Dictionary<int, int> totals, HashSet<int> anyItem, HashSet<int> liveItems, bool live)
+        {
+            foreach (var kv in src)
             {
                 totals[kv.Key] = (totals.TryGetValue(kv.Key, out var c) ? c : 0) + kv.Value;
                 anyItem.Add(kv.Key);
@@ -94,21 +117,39 @@ namespace ItemChecklist.Possession
                 aux[kv.Key] = (aux.TryGetValue(kv.Key, out var a) ? a : 0) + kv.Value;
         }
 
-        /// <summary>Does this tile hold at least one <paramref name="objectId"/>? (Iter-40's
-        /// reverse index.)</summary>
-        public bool Holds(int objectId) => _contents.TryGetValue(objectId, out var c) && c >= 1;
+        /// <summary>Does a CONTAINER on this tile hold at least one <paramref name="objectId"/>?
+        /// (Iter-40's reverse index.)
+        /// <para>Iter-45: <c>_stored</c> only, deliberately. Until then this read the one shared
+        /// contents dict, so a PLACED object counted as a hit — and the tooltip renders the result
+        /// as "in N chests" while the arrow points at the object. Tracking a torch with a torch
+        /// standing at your base claimed a chest that does not exist. A tile can legitimately be
+        /// both (a chest standing next to a placed copy), and that still counts once, correctly.</para></summary>
+        public bool Holds(int objectId) => _stored.TryGetValue(objectId, out var c) && c >= 1;
 
-        /// <summary>Append this tile's v3 line: <c>x,z|&lt;id:count,…&gt;|&lt;packedKey:count,…&gt;</c>,
-        /// either segment possibly empty, exactly two '|'.</summary>
+        /// <summary>Append this tile's line.
+        /// <para>v4: <c>x,z|&lt;stored&gt;|&lt;aux&gt;|&lt;placed&gt;</c>. The placed segment is
+        /// LAST on purpose — the first three fields keep exactly their v3 meaning, so a v3 file
+        /// parses through the same code path with no second parser and no migration branch; only
+        /// the optional fourth segment is new.</para></summary>
         public void AppendTo(List<string> lines, int x, int z)
         {
-            var cPart = new List<string>(_contents.Count);
-            foreach (var kv in _contents)
-                cPart.Add(kv.Key + ":" + kv.Value);
-            var aPart = new List<string>(_aux.Count);
-            foreach (var kv in _aux)
-                aPart.Add(kv.Key + ":" + kv.Value);
-            lines.Add(x + "," + z + "|" + string.Join(",", cPart) + "|" + string.Join(",", aPart));
+            lines.Add(x + "," + z + "|" + Pairs(_stored) + "|" + Pairs(_aux) + "|" + Pairs(_placed));
+        }
+
+        private static string Pairs(Dictionary<int, int> d)
+        {
+            var parts = new List<string>(d.Count);
+            foreach (var kv in d)
+                parts.Add(kv.Key + ":" + kv.Value);
+            return string.Join(",", parts);
+        }
+
+        private static string Pairs(Dictionary<long, int> d)
+        {
+            var parts = new List<string>(d.Count);
+            foreach (var kv in d)
+                parts.Add(kv.Key + ":" + kv.Value);
+            return string.Join(",", parts);
         }
 
         // --- writes (the only four) ---
@@ -119,16 +160,21 @@ namespace ItemChecklist.Possession
         /// rejects a DUPLICATE id within one file — silently keeping the last of two values would
         /// be an unreported accept in the very method whose job is detecting damage.</summary>
         /// <returns><c>false</c> when the pair was rejected — the caller counts that as damage.</returns>
-        public bool TryRestoreContent(int id, int count)
+        public bool TryRestoreStored(int id, int count) => Restore(_stored, id, count);
+
+        /// <summary>Restore one persisted PLACED pair (v4's fourth segment).</summary>
+        public bool TryRestorePlaced(int id, int count) => Restore(_placed, id, count);
+
+        private static bool Restore(Dictionary<int, int> d, int id, int count)
         {
-            if (count < 1 || _contents.ContainsKey(id))
+            if (count < 1 || d.ContainsKey(id))
                 return false;
-            _contents[id] = count;
+            d[id] = count;
             return true;
         }
 
         /// <summary>Restore one persisted aux pair. Same rejection rules as
-        /// <see cref="TryRestoreContent"/>.</summary>
+        /// <see cref="TryRestoreStored"/>.</summary>
         public bool TryRestoreAux(long packedKey, int count)
         {
             if (count < 1 || _aux.ContainsKey(packedKey))
@@ -146,9 +192,35 @@ namespace ItemChecklist.Possession
         /// <para>Both permissions are the LEDGER's decision, never the caller's — see
         /// <see cref="PossessionLedger.ApplyScan"/> for what they mean and why there are two.</para></summary>
         /// <returns>The UNITS lost — the Iter-42 detector's input.</returns>
-        public int MergeContents(Dictionary<int, int> observed, bool mayShrink, bool absenceIsConfirmed, int scanSeq)
+        public int MergeStored(Dictionary<int, int> observed, bool mayShrink, bool absenceIsConfirmed, int scanSeq) =>
+            MergeInts(_stored, observed, mayShrink, absenceIsConfirmed, scanSeq, ref _storedMissed, ref _storedMissedSeq);
+
+        /// <summary>Merge the PLACED dimension. Same code, one rule short: an absence here is never
+        /// "confirmed", because the only thing that could confirm it is seeing the tile — which is
+        /// what <c>mayShrink</c> already means. A container's buffer says nothing about the object
+        /// standing next to it, and treating it as if it did was the mirror of C-1.</summary>
+        public int MergePlaced(Dictionary<int, int> observed, bool mayShrink, int scanSeq) =>
+            MergeInts(_placed, observed, mayShrink, false, scanSeq, ref _placedMissed, ref _placedMissedSeq);
+
+        /// <summary>Observed at all this scan → the prune's stale streak is broken. Called once per
+        /// publish rather than from each merge, so the three dimensions cannot disagree about it.</summary>
+        public void NoteObserved() => _staleSeq = -1;
+
+        // The two int-keyed dimensions share this body — passed their own dict and their own miss
+        // state by ref. (The aux merge below is a near-copy because its key is `long`; a generic
+        // helper would unify all three, but this mod has never shipped a self-defined generic method
+        // and a Roslyn-sandbox rejection fails the WHOLE mod at load. Measure that separately before
+        // trading a duplicated 40 lines for it.)
+        private static int MergeInts(
+            Dictionary<int, int> remembered,
+            Dictionary<int, int> observed,
+            bool mayShrink,
+            bool absenceIsConfirmed,
+            int scanSeq,
+            ref HashSet<int> missedState,
+            ref int missedSeqState
+        )
         {
-            _staleSeq = -1; // observed this scan → the prune's stale streak, if any, is broken
             int droppedUnits = 0;
             HashSet<int> restore = null;
             List<int> drop = null;
@@ -158,8 +230,8 @@ namespace ItemChecklist.Possession
             // teleport earlier — and a tile whose chunk streams in late (the very case the grace
             // exists for) could carry a stale miss into the first post-grace scan and lose an id on
             // its first real miss.
-            bool streakLive = _contentsMissed != null && _contentsMissedSeq == scanSeq - 1;
-            foreach (var kv in _contents)
+            bool streakLive = missedState != null && missedSeqState == scanSeq - 1;
+            foreach (var kv in remembered)
             {
                 int now = Observed(observed, kv.Key);
                 if (now >= kv.Value)
@@ -175,7 +247,7 @@ namespace ItemChecklist.Possession
                     droppedUnits += kv.Value - now;
                     continue;
                 }
-                if (absenceIsConfirmed || (streakLive && _contentsMissed.Contains(kv.Key)))
+                if (absenceIsConfirmed || (streakLive && missedState.Contains(kv.Key)))
                 {
                     droppedUnits += kv.Value;
                     (drop ??= new List<int>()).Add(kv.Key);
@@ -186,15 +258,15 @@ namespace ItemChecklist.Possession
                     (restore ??= new HashSet<int>()).Add(kv.Key);
                 }
             }
-            _contentsMissed = mayShrink ? missedNow : null;
-            _contentsMissedSeq = scanSeq;
+            missedState = mayShrink ? missedNow : null;
+            missedSeqState = scanSeq;
             if (observed != null)
                 foreach (var kv in observed)
                     if (kv.Value >= 1 && (restore == null || !restore.Contains(kv.Key)))
-                        _contents[kv.Key] = kv.Value;
+                        remembered[kv.Key] = kv.Value;
             if (drop != null)
                 for (int i = 0; i < drop.Count; i++)
-                    _contents.Remove(drop[i]);
+                    remembered.Remove(drop[i]);
             return droppedUnits;
         }
 
@@ -210,7 +282,6 @@ namespace ItemChecklist.Possession
         /// "dropped".</returns>
         public int MergeAux(Dictionary<long, int> observed, bool mayShrink, int scanSeq)
         {
-            _staleSeq = -1;
             int reducedKeys = 0;
             HashSet<long> restore = null;
             List<long> drop = null;
@@ -441,7 +512,11 @@ namespace ItemChecklist.Possession
         /// <para><strong>Precondition.</strong> Observed counts are ≥ 1; a non-positive one is read
         /// as absence rather than stored (<see cref="TileEntry"/>).</para>
         /// </summary>
-        /// <param name="contents">Per-tile observed contents (the scanner's <c>scan</c>).</param>
+        /// <param name="contents">Per-tile observed CONTAINER contents, scan path #2 (the scanner's
+        /// <c>scan</c>).</param>
+        /// <param name="placed">Per-tile observed PLACED objects, scan path #3 (the scanner's
+        /// <c>placedScan</c>). Iter-45 split this out of <paramref name="contents"/> — see
+        /// <see cref="TileEntry"/> for what the provenance buys and why the two shrink differently.</param>
         /// <param name="aux">Per-tile observed sub-variant counts (the scanner's <c>auxScan</c>).</param>
         /// <param name="containerTiles">Tiles where a container entity was observed, so its stored
         /// contents were confirmed. The one fact the scanner uniquely knows.</param>
@@ -462,6 +537,7 @@ namespace ItemChecklist.Possession
         /// deletion is what made Iter-42 invisible for a month.</returns>
         public TilePublishResult ApplyScan(
             Dictionary<long, Dictionary<int, int>> contents,
+            Dictionary<long, Dictionary<int, int>> placed,
             Dictionary<long, Dictionary<long, int>> aux,
             HashSet<long> containerTiles,
             bool havePlayer,
@@ -473,7 +549,7 @@ namespace ItemChecklist.Possession
         )
         {
             var result = new TilePublishResult();
-            if (contents == null || aux == null || liveKeys == null)
+            if (contents == null || placed == null || aux == null || liveKeys == null)
             {
                 Debug.LogWarning("[ItemChecklist] ApplyScan called with a null accumulator — the ledger is left untouched.");
                 return result;
@@ -503,35 +579,44 @@ namespace ItemChecklist.Possession
             liveKeys.Clear();
             foreach (var pair in contents)
                 liveKeys.Add(pair.Key);
+            foreach (var pair in placed)
+                liveKeys.Add(pair.Key);
             foreach (var pair in aux)
                 liveKeys.Add(pair.Key);
 
             foreach (var key in liveKeys)
             {
-                contents.TryGetValue(key, out var tileContents);
+                contents.TryGetValue(key, out var tileStored);
+                placed.TryGetValue(key, out var tilePlaced);
                 aux.TryGetValue(key, out var tileAux);
                 bool containerObserved = containerTiles != null && containerTiles.Contains(key);
 
                 bool existed = _tiles.TryGetValue(key, out var entry);
                 if (!existed)
                     entry = new TileEntry();
+                entry.NoteObserved();
 
                 // Nothing remembered here yet ⇒ nothing can shrink ⇒ the expensive "would the
                 // scan have seen this tile" test is not evaluated at all. Same during the grace.
                 // That matters: it scans every anchor (~44 at a built-up base), per tile.
-                bool mayShrinkContents = false,
-                    mayShrinkAux = false,
+                bool mayShrinkStored = false,
+                    mayShrinkPlacedOrAux = false,
                     absenceIsConfirmed = false;
                 if (existed && pastGrace)
                 {
+                    // Iter-45: `wouldSee` is the whole rule for PLACED and AUX — both are the
+                    // entities themselves, observed exactly when the tile is in scope. Only STORED
+                    // gets the extra disjunct, because a container's buffer is evidence about its
+                    // own contents even from beyond scope.
                     bool wouldSee = ScanWouldSeeTile(key);
-                    mayShrinkContents = containerObserved || wouldSee;
-                    mayShrinkAux = wouldSee;
+                    mayShrinkStored = containerObserved || wouldSee;
+                    mayShrinkPlacedOrAux = wouldSee;
                     absenceIsConfirmed = containerObserved;
                 }
 
-                int units = entry.MergeContents(tileContents, mayShrinkContents, absenceIsConfirmed, _scanSeq);
-                int auxKeys = entry.MergeAux(tileAux, mayShrinkAux, _scanSeq);
+                int units = entry.MergeStored(tileStored, mayShrinkStored, absenceIsConfirmed, _scanSeq);
+                units += entry.MergePlaced(tilePlaced, mayShrinkPlacedOrAux, _scanSeq);
+                int auxKeys = entry.MergeAux(tileAux, mayShrinkPlacedOrAux, _scanSeq);
                 result.DroppedUnits += units;
                 result.AuxKeysReduced += auxKeys;
                 if (units > 0)
@@ -691,8 +776,11 @@ namespace ItemChecklist.Possession
         // frozen in SP, so a remembered tile is the true last state (Iter-41). Carried
         // is tile-less and intentionally absent.
 
-        /// <summary>Every container tile currently holding <paramref name="objectId"/>
-        /// (count >= 1), as packed (x,z) keys. Empty when nothing is stored.</summary>
+        /// <summary>Every CONTAINER tile currently holding <paramref name="objectId"/>
+        /// (count >= 1), as packed (x,z) keys. Empty when nothing is stored.
+        /// <para>Iter-45: a tile whose only copy is the PLACED object no longer qualifies. The
+        /// tooltip renders this count as "in N chests" and the HUD draws an arrow per tile, so a
+        /// placed torch used to produce a claim about a chest that does not exist.</para></summary>
         public List<long> TilesHolding(int objectId)
         {
             var keys = new List<long>();
@@ -714,13 +802,13 @@ namespace ItemChecklist.Possession
         }
 
         // --- Persistence (remembered tiles only; carried / live-aux never persisted) ---
-        // v3 line format: "x,z|<id:count,...>|<packedKey:count,...>" — segment 1 = the tile's
-        // contents (id->count), segment 2 = its aux breakdown (PackKey(id, secondDim)->count:
-        // pet skins, cattle/paint colours). Either segment may be empty. Exactly two '|' per
-        // data line.
-        // Iter-44: NO schema bump. A v3 line already IS a TileEntry (two segments, one per
-        // dimension), so folding the two in-memory dicts into one record is a pure in-memory
-        // refactor — same bytes out, same bytes in, no migration, no player re-scan.
+        // v4 line format: "x,z|<stored>|<aux>|<placed>", every segment `id:count` (aux:
+        // `packedKey:count`) comma-separated and any of them possibly empty.
+        //   v3 was "x,z|<contents>|<aux>" — the SAME first three fields, because Iter-45 appended
+        //   `placed` rather than inserting it. One parser reads both: three segments means a v3
+        //   line (its contents load as stored), four means v4.
+        // Iter-44: NO schema bump — a v3 line already WAS a TileEntry (two segments, one per
+        // dimension), so folding two in-memory dicts into one record changed no bytes.
 
         // Iter-31: ledgers written before the workbench-anchor fix are polluted with remote
         // world-structure loot (camps/ruins anchored by their campfires/seed-extractors were
@@ -729,13 +817,34 @@ namespace ItemChecklist.Possession
         // so the per-line parser skips it like any non-data line.
         // internal (Iter-43): PossessionStore names it when reporting a discard, so the expected
         // marker in the incident record cannot drift from the one actually enforced here.
-        internal const string VersionMarker = "#icl-ledger-v3";
+        /// <summary>What <see cref="Serialize"/> writes. Iter-45 bumped v3 → v4 for the fourth
+        /// (placed) segment.</summary>
+        internal const string VersionMarker = "#icl-ledger-v4";
+
+        /// <summary>The PREVIOUS marker, still accepted — Iter-45 is the first schema change here
+        /// that MIGRATES instead of discarding, which is the whole point of putting `placed` last:
+        /// a v3 line's three fields keep their meaning, so the same parser reads both and only the
+        /// optional fourth segment is new. A v3 file's contents load as STORED, i.e. provenance is
+        /// assumed for one visit; the first observation of a tile replaces it with the real split.
+        /// Documented rather than hidden, because it means a not-yet-revisited tile can still
+        /// over-report "in N chests" until then — strictly better than v3, where every tile did.
+        /// <para>Downgrading (an older mod version reading a v4 file) discards it and re-scans, as
+        /// it must: v3 cannot represent the split.</para></summary>
+        internal const string PreviousVersionMarker = "#icl-ledger-v3";
+
+        // Line 2, and only ever a comment: `#n=<tiles>`. The parser skips '#' lines, so this is
+        // invisible to every reader that does not look for it — including older mod versions.
+        // It exists because a file cut exactly at a line boundary is otherwise a perfectly valid
+        // SHORTER file (Iter-44 gave the pet store the same guard for the same reason; the ledger
+        // was left out then because it self-heals at base, which is true but is not a reason to
+        // stay silent about damage).
+        private const string CountPrefix = "#n=";
 
         private static bool _emptyEntryWarned;
 
         public string Serialize()
         {
-            var lines = new List<string>(_tiles.Count + 1) { VersionMarker };
+            var lines = new List<string>(_tiles.Count + 2) { VersionMarker, CountPrefix + _tiles.Count };
             foreach (var pair in _tiles)
             {
                 var entry = pair.Value;
@@ -795,21 +904,31 @@ namespace ItemChecklist.Possession
                 skipped = 1;
                 return 0;
             }
-            // Compare the FIRST LINE exactly, not a prefix: `StartsWith("#icl-ledger-v3")` would
-            // also accept a future "#icl-ledger-v30" and then parse it under the wrong schema.
+            // Compare the FIRST LINE exactly against each ACCEPTED marker, never as a prefix:
+            // `StartsWith("#icl-ledger-v4")` would also accept a future "#icl-ledger-v40" and then
+            // parse it under the wrong schema. Iter-45 makes this a SET rather than a single value —
+            // the migration the Iter-44 review confirmed as lossless.
             int nl = text.IndexOf('\n');
             string firstLine = (nl < 0 ? text : text.Substring(0, nl)).Trim();
-            if (firstLine != VersionMarker)
-                return -1; // discard (pre-v3 migration, or a corrupt file — the caller reports it)
+            if (firstLine != VersionMarker && firstLine != PreviousVersionMarker)
+                return -1; // discard (pre-v3 file, or corrupt — the caller reports it)
+            int declared = -1;
             foreach (var raw in text.Split('\n'))
             {
                 var line = raw.Trim();
-                if (line.Length == 0 || line[0] == '#')
+                if (line.Length == 0)
                     continue;
-                var seg = line.Split('|');
-                if (seg.Length != 3)
+                if (line[0] == '#')
                 {
-                    skipped++; // a v3 line has exactly two '|'
+                    if (line.StartsWith(CountPrefix) && int.TryParse(line.Substring(CountPrefix.Length), out int d))
+                        declared = d;
+                    continue;
+                }
+                var seg = line.Split('|');
+                // 3 = a v3 line (contents+aux), 4 = v4 (stored+aux+placed). Anything else is damage.
+                if (seg.Length != 3 && seg.Length != 4)
+                {
+                    skipped++;
                     continue;
                 }
                 var xz = seg[0].Split(',');
@@ -828,35 +947,16 @@ namespace ItemChecklist.Possession
                 if (!_tiles.TryGetValue(key, out var entry))
                     entry = new TileEntry();
 
-                bool lineOk = true;
-                foreach (var pair in seg[1].Split(','))
-                {
-                    if (pair.Length == 0)
-                        continue; // an empty segment is legal ("x,z||…")
-                    int colon = pair.IndexOf(':');
-                    if (
-                        colon <= 0
-                        || !int.TryParse(pair.Substring(0, colon), out int id)
-                        || !int.TryParse(pair.Substring(colon + 1), out int cnt)
-                        || !entry.TryRestoreContent(id, cnt)
-                    )
-                        lineOk = false;
-                }
-                foreach (var pair in seg[2].Split(','))
-                {
-                    if (pair.Length == 0)
-                        continue;
-                    int colon = pair.IndexOf(':');
-                    if (
-                        colon <= 0
-                        || !long.TryParse(pair.Substring(0, colon), out long pk)
-                        || !int.TryParse(pair.Substring(colon + 1), out int cnt)
-                        || !entry.TryRestoreAux(pk, cnt)
-                    )
-                        lineOk = false;
-                }
-                // A line with valid coordinates but nothing in either segment carries no
-                // information; Serialize never emits one, so it is damage like any other.
+                // Segment 1 = stored. For a v3 line this is the undifferentiated old `contents`, so
+                // it lands in stored: provenance is assumed for one visit and replaced by the real
+                // split the first time the tile is observed (see PreviousVersionMarker).
+                bool lineOk = RestoreInts(seg[1], entry, placed: false);
+                lineOk &= RestoreAuxSegment(seg[2], entry);
+                // Segment 4 = placed, v4 only. Absent on a v3 line, which is not damage.
+                if (seg.Length == 4)
+                    lineOk &= RestoreInts(seg[3], entry, placed: true);
+                // A line with valid coordinates but nothing in any segment carries no information;
+                // Serialize never emits one, so it is damage like any other.
                 if (!lineOk || entry.IsEmpty)
                     skipped++;
                 if (entry.IsEmpty)
@@ -864,7 +964,50 @@ namespace ItemChecklist.Possession
                 else
                     _tiles[key] = entry;
             }
+            // The boundary-truncation detector: a file cut cleanly between two lines is otherwise a
+            // valid shorter file. `declared < 0` means a pre-Iter-45 file with no count line, which
+            // is accepted unchecked and gains one on the next save.
+            if (declared >= 0 && declared != _tiles.Count)
+                skipped++;
             return _tiles.Count;
+        }
+
+        private static bool RestoreInts(string segment, TileEntry entry, bool placed)
+        {
+            bool ok = true;
+            foreach (var pair in segment.Split(','))
+            {
+                if (pair.Length == 0)
+                    continue; // an empty segment is legal ("x,z||…")
+                int colon = pair.IndexOf(':');
+                if (
+                    colon <= 0
+                    || !int.TryParse(pair.Substring(0, colon), out int id)
+                    || !int.TryParse(pair.Substring(colon + 1), out int cnt)
+                    || !(placed ? entry.TryRestorePlaced(id, cnt) : entry.TryRestoreStored(id, cnt))
+                )
+                    ok = false;
+            }
+            return ok;
+        }
+
+        private static bool RestoreAuxSegment(string segment, TileEntry entry)
+        {
+            bool ok = true;
+            foreach (var pair in segment.Split(','))
+            {
+                if (pair.Length == 0)
+                    continue;
+                int colon = pair.IndexOf(':');
+                if (
+                    colon <= 0
+                    || !long.TryParse(pair.Substring(0, colon), out long pk)
+                    || !int.TryParse(pair.Substring(colon + 1), out int cnt)
+                    || !entry.TryRestoreAux(pk, cnt)
+                )
+                    ok = false;
+            }
+            return ok;
         }
     }
 }

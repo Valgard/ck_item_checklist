@@ -73,10 +73,12 @@ internal static class Harness
         Dictionary<long, Dictionary<int, int>> contents = null,
         Dictionary<long, Dictionary<long, int>> aux = null,
         HashSet<long> containers = null,
-        bool havePlayer = true
+        bool havePlayer = true,
+        Dictionary<long, Dictionary<int, int>> placed = null
     ) =>
         led.ApplyScan(
             contents ?? new Dictionary<long, Dictionary<int, int>>(),
+            placed ?? new Dictionary<long, Dictionary<int, int>>(),
             aux ?? new Dictionary<long, Dictionary<long, int>>(),
             containers ?? new HashSet<long>(),
             havePlayer,
@@ -93,7 +95,8 @@ internal static class Harness
 
     private static void Main()
     {
-        const string M = "#icl-ledger-v3";
+        const string M = "#icl-ledger-v4";
+        const string V3 = "#icl-ledger-v3";
         long t00 = PossessionLedger.Key(0, 0);
         var at = new Vector2(0f, 0f); // player standing on the tile
         var far = new Vector2(95f, 0f); // the measured I4 distance
@@ -113,19 +116,30 @@ internal static class Harness
         foreach (var f in Directory.Exists(dir) ? Directory.GetFiles(dir, "possession-*.txt") : new string[0])
         {
             string text = File.ReadAllText(f);
-            bool isV3 = text.StartsWith(M);
+            bool supported = text.StartsWith(M) || text.StartsWith(V3);
             var led = new PossessionLedger();
             int tiles = led.LoadFrom(text, out int skipped);
-            if (isV3)
+            if (supported)
             {
-                Check("load v3 " + Path.GetFileName(f), tiles > 0 && skipped == 0, "tiles=" + tiles + " skipped=" + skipped + " bytes=" + text.Length);
-                Check("byte-identical re-serialize", led.Serialize() == text, "in=" + text.Length + " out=" + led.Serialize().Length);
+                Check("load " + Path.GetFileName(f), tiles > 0 && skipped == 0, "tiles=" + tiles + " skipped=" + skipped + " bytes=" + text.Length);
+                // A v3 file MIGRATES, so its bytes legitimately change (v4 marker, count line,
+                // fourth segment). What must hold is STABILITY: writing, re-reading and writing
+                // again reproduces the same text, and no tile is lost on the way.
+                string once = led.Serialize();
+                var again = new PossessionLedger();
+                int tiles2 = again.LoadFrom(once, out int skipped2);
+                Check(
+                    "write/read/write is stable and lossless",
+                    again.Serialize() == once && tiles2 == tiles && skipped2 == 0,
+                    "tiles=" + tiles + "->" + tiles2 + " skipped2=" + skipped2
+                );
+                Check("output is v4 with a declared count", once.StartsWith(M + "\n#n=" + tiles + "\n"), once.Split('\n')[1]);
             }
             else
             {
                 Check("pre-v3 " + Path.GetFileName(f) + " is discarded, not damage", tiles == -1 && skipped == 0, "tiles=" + tiles);
             }
-            if (isV3 && text.Length > biggestLen)
+            if (supported && text.Length > biggestLen)
             {
                 biggestLen = text.Length;
                 biggest = f;
@@ -179,12 +193,12 @@ internal static class Harness
             var led = new PossessionLedger();
             int tiles = led.LoadFrom(M + "\n1,2|5610:10|\n3,4||123:1\n5,6|7:1|8:2", out int skipped);
             Check("contents-only / aux-only / both parse clean", tiles == 3 && skipped == 0, "tiles=" + tiles + " skipped=" + skipped);
-            Check("re-serialize keeps all three", led.Serialize().Split('\n').Length == 4);
+            Check("re-serialize keeps all three", led.Serialize().Split('\n').Length == 5, "marker + #n= + 3 tiles");
         }
         {
             var led = new PossessionLedger();
             led.LoadFrom(M + "\n-7,-9|5610:3|", out int sk);
-            Check("negative coords round-trip", sk == 0 && led.Serialize() == M + "\n-7,-9|5610:3|");
+            Check("negative coords round-trip", sk == 0 && led.Serialize() == M + "\n#n=1\n-7,-9|5610:3||", led.Serialize().Replace("\n", " / "));
         }
         {
             var led = new PossessionLedger();
@@ -369,6 +383,7 @@ internal static class Harness
             var live = new HashSet<long>();
             var r = led.ApplyScan(
                 Tile(t00, C(100, 1)),
+                new Dictionary<long, Dictionary<int, int>>(),
                 new Dictionary<long, Dictionary<long, int>>(),
                 new HashSet<long> { t00 },
                 true,
@@ -393,6 +408,7 @@ internal static class Harness
             var live = new HashSet<long>();
             led.ApplyScan(
                 Tile(t00, C(100, 5)),
+                new Dictionary<long, Dictionary<int, int>>(),
                 new Dictionary<long, Dictionary<long, int>>(),
                 new HashSet<long> { t00 },
                 true,
@@ -479,6 +495,75 @@ internal static class Harness
             var led = new PossessionLedger();
             int tiles = led.LoadFrom("", out int sk);
             Check("empty ledger file is damage", tiles == 0 && sk == 1, "tiles=" + tiles + " skipped=" + sk);
+        }
+
+        Console.WriteLine("== Iter-45: provenance (stored vs placed) ==");
+        {
+            // The bug this exists for: a PLACED object must not read as "in a chest".
+            var led = new PossessionLedger();
+            led.LoadFrom(M + "\n0,0|||110:1", out int sk);
+            Check("a placed-only tile parses", sk == 0 && led.TileCount == 1);
+            Check("placed does NOT count as a container tile", led.CountTilesHolding(110) == 0 && led.TilesHolding(110).Count == 0);
+            var view = led.BuildView(new HashSet<long>());
+            Check("placed still counts as OWNED", view.Totals.TryGetValue(110, out var t) && t == 1, "total=" + t);
+        }
+        {
+            var led = new PossessionLedger();
+            led.LoadFrom(M + "\n0,0|110:2||110:1", out int sk);
+            Check("both provenances on one tile round-trip", sk == 0 && led.Serialize() == M + "\n#n=1\n0,0|110:2||110:1");
+            Check("the reverse index counts the tile once", led.CountTilesHolding(110) == 1);
+            var view = led.BuildView(new HashSet<long>());
+            Check("totals sum both", view.Totals[110] == 3, "total=" + view.Totals[110]);
+        }
+        {
+            // v3 MIGRATION: contents become stored (provenance assumed for one visit), and the
+            // first observation of the tile replaces it with the real split.
+            var led = new PossessionLedger();
+            int tiles = led.LoadFrom(V3 + "\n0,0|110:1|", out int sk);
+            Check("a v3 file migrates instead of being discarded", tiles == 1 && sk == 0, "tiles=" + tiles + " skipped=" + sk);
+            Check("v3 contents load as STORED", led.CountTilesHolding(110) == 1);
+            Scan(led, at, true, placed: Tile(t00, C(110, 1)), containers: new HashSet<long> { t00 });
+            Check(
+                "...and the first observation re-files it as PLACED",
+                led.CountTilesHolding(110) == 0 && led.Serialize().Contains("||110:1"),
+                led.Serialize().Replace("\n", " / ")
+            );
+        }
+        {
+            var led = new PossessionLedger();
+            Check("a pre-v3 marker is still discarded", led.LoadFrom("#icl-ledger-v2\n1,2|5610:10|", out int _) == -1);
+            var led2 = new PossessionLedger();
+            Check("v40 is not accepted as v4", led2.LoadFrom("#icl-ledger-v40\n1,2|5610:10|", out int _) == -1);
+        }
+        {
+            // The declared count: a clean cut between two lines is otherwise undetectable.
+            var led = new PossessionLedger();
+            led.LoadFrom(M + "\n0,0|100:1|\n1,1|101:1|\n2,2|102:1|", out int _);
+            string full = led.Serialize();
+            var lines2 = full.Split('\n');
+            var cut = new PossessionLedger();
+            int sk2;
+            cut.LoadFrom(string.Join("\n", lines2[0], lines2[1], lines2[2]), out sk2);
+            Check("ledger boundary truncation IS detected via #n=", sk2 > 0, "skipped=" + sk2);
+            var noCount = new PossessionLedger();
+            noCount.LoadFrom(M + "\n0,0|100:1|", out int sk3);
+            Check("a file without #n= is accepted unchecked", sk3 == 0);
+        }
+        {
+            // Placed shrinks on the tile-scope premise only — a container's buffer says nothing
+            // about the object standing beside it.
+            var led = new PossessionLedger();
+            led.LoadFrom(M + "\n0,0|100:1||110:1", out int _);
+            var r = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
+            Check("placed is NOT dropped on the first miss even with a container observed", r.DroppedUnits == 0 && led.Serialize().Contains("110:1"));
+            var r2 = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
+            Check("...and drops on the second", r2.DroppedUnits == 1 && !led.Serialize().Contains("110:1"), "dropped=" + r2.DroppedUnits);
+        }
+        {
+            var led = new PossessionLedger();
+            led.LoadFrom(M + "\n0,0|||110:1", out int _);
+            var r = Scan(led, far, true, placed: Tile(t00, C(999, 1)));
+            Check("placed is kept when the tile is out of scope", r.DroppedUnits == 0 && led.Serialize().Contains("110:1"));
         }
 
         Console.WriteLine("== pet collection (boundary truncation) ==");
