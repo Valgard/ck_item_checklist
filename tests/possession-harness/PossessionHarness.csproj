@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Iter-44: a standalone harness for the possession LEDGER. Not a Unity project and not part of
+    the mod build — `utils/link.sh` symlinks only `unity/ItemChecklist` into the SDK's Assets/, so
+    nothing under `tests/` is ever imported by the Editor or packed into the AssetBundle.
+
+    Why this exists at all, when the mod otherwise has no test framework: PossessionLedger and
+    PetCollection are PURE LOGIC. No ECS, no Harmony, no Unity API beyond Debug.LogWarning and
+    Vector2 — both stubbed in Stubs.cs. So this one subsystem, the one whose bugs have cost four
+    iterations of silent data loss, can be exercised outside the game in a second, where the same
+    checks in-game need a base, a walk, a pen and a save cycle. It has already caught two defects
+    that four review agents reading the same code did not.
+
+    The sources are COMPILED IN, not copied — a copy would drift, and a drifting test is worse
+    than none.
+
+    Note the repo's .gitignore has `*.csproj` (Unity generates those at the root); this file is
+    exempted explicitly. If it ever goes missing from a commit again, that is why.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>ItemChecklist.Tests</RootNamespace>
+    <AssemblyName>PossessionHarness</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs.cs" />
+    <Compile Include="Harness.cs" />
+    <Compile Include="../../unity/ItemChecklist/possession/PossessionLedger.cs" />
+    <Compile Include="../../unity/ItemChecklist/possession/PetCollection.cs" />
+  </ItemGroup>
+
+</Project>

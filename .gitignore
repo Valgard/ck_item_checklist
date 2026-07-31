@@ -23,6 +23,10 @@ Logs/
 UserSettings/
 *.csproj
 *.sln
+# ...except the possession harness, which is hand-written and not Unity-generated
+# (Iter-44 — see docs/conventions.md § Testing). Without this the project file is
+# silently dropped from the commit and only the two .cs files land.
+!tests/possession-harness/*.csproj
 
 # Env / secrets
 .env
