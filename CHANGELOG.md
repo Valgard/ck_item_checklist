@@ -5,6 +5,47 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.4] - 2026-07-31
+
+Rebuilds the owned-item bookkeeping around one record per location instead of two
+kept in step by hand. That was the common cause behind the last three rounds of
+fixes, and it is what the remaining problems below all came out of.
+
+### Fixed
+
+- **Penned animals no longer inflate their colour counts.** A pen's colours were filed
+  under whichever workbench happened to be nearest the animal, so a wandering animal
+  kept moving its own entry around and the same colour could be counted twice for a
+  while. Colours are now filed in one fixed place, so the numbers hold still.
+- **Cattle colours and paint colours can go down again.** For those two, a count could
+  only ever grow: sell the last animal of a colour, or repaint an object, and the old
+  colour stayed on your owned list permanently — across restarts. It now clears once
+  you are standing at the pen or the object.
+- **A container the game briefly does not report no longer costs its contents.** Owned
+  counts now wait for a second look before removing anything they cannot see, so a
+  one-off hiccup no longer takes a chest's contents with it.
+- **Saving is verified.** The game's file layer can fail to write a file without
+  reporting an error. When that happened, the mod believed the save had landed and
+  then skipped every later save that would have written the same data — so a whole
+  session's changes could quietly fail to reach disk. Saves are now checked by reading
+  the file back, and a failure is reported instead of assumed away.
+- **A damaged tracking file is detected instead of being trusted.** A file cut short
+  by a crash used to load as a smaller but valid one, and the next save made that
+  permanent. Both files now notice missing content and refuse to overwrite themselves,
+  and the **collected pet skins** file — the one that cannot be rebuilt from anything
+  else — carries a count so even a clean cut is spotted.
+- **A file saved with a text editor no longer looks damaged.** Copying your tracking
+  file out and back could make the mod treat it as corrupt and stop saving.
+
+### Changed
+
+- **The checklist footer says when nothing is being saved**, and which of the two files
+  is affected, instead of leaving you to wonder why the numbers look wrong. The
+  problem report in `possession-incidents.txt` now also covers failed saves, and no
+  longer overwrites its own history when the very fault it is reporting occurs.
+- **Fewer needless saves at farm bases**, because the tracking data stops changing on
+  its own between saves.
+
 ## [1.3.3] - 2026-07-30
 
 Hardens the owned-item tracking against several rare ways it could lose entries,

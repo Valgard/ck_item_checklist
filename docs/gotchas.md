@@ -1374,7 +1374,10 @@ because the next save persists that emptiness over the intact file:
   DOTS archetype chunks), only the *confirmed* part may shrink it — here: a container entity was
   actually observed on that tile, and the world is past the post-load streaming grace. Gating on
   the grace alone is not enough; that covers loading far from base but not walking away, which is
-  the same loss in normal play.
+  the same loss in normal play. **Iter-44 replaced the concrete predicate** (`containerTiles` could
+  never be true for cattle/paint aux, so that half could never shrink at all — see the C-1 entry
+  below): a removal now needs the grace AND either a container observed on that tile, or the tile to
+  be one the scan WOULD have seen anything on (within `PruneRadius` of the player and anchor-covered).
 - **Count and report every deletion, even the legitimate ones.** Not one destructive path here
   logged anything, and the diagnostic printed only the *endpoint* after all mutations. Report the
   **transition** (`ledgerC=505->505 lostUnits=2677`) — that one line would have made Iter-42
@@ -1382,7 +1385,16 @@ because the next save persists that emptiness over the intact file:
 - **Pick an anomaly trigger that cannot false-positive, or don't ship one.** A shrink is normal
   (emptying a chest drops its content), so neither a magnitude threshold nor "any shrink" is usable.
   Trigger on a *shape* that normal play cannot produce — units lost on ≥5 tiles within one 3 s scan.
-  A false alarm about data loss is worse than no alarm.
+  A false alarm about data loss is worse than no alarm. **This one was asserted and then refuted
+  four ways** — the interval is player-settable to 30 s, the streaming grace batches everything into
+  the first scan after it, playing with the mod disabled desynchronises the ledger while saves
+  continue, and **CK automation moves items out of chests continuously**, which is precisely the
+  benign bulk event on the contents axis that the justification claimed did not exist. Iter-44's
+  version scales with the configured interval, suppresses the batched scans (with a much higher
+  override bound, because the first post-grace scan is the ONLY one a load-time bug can strike on),
+  buckets its dedup key by magnitude and by character, and names automation in the player-facing
+  text. The lesson survives, but state such a claim as "no benign event we have MEASURED produces
+  this shape" — not as an absolute.
 - **Durable beats logged for anything a user must report.** `Player.log` rotates every launch, so a
   warning is gone by the time someone writes the bug report. Persist it (here
   `PossessionIncidentStore` → `mods/ItemChecklist/possession-incidents.txt`) and keep it **ungated**
@@ -1402,15 +1414,25 @@ all paid for:
   identical.** A flag says *what you may do*; it cannot say *which evidence justified it*, so it
   cannot be checked at the place that owns the data. Pass the observation, not the permission.
 - **Two collections that must be kept in step by hand will drift the moment they stop being
-  symmetric.** `_containers`/`_auxContainers` were hand-paired at ~8 trivially symmetric sites and
+  symmetric.** `_containers`/`_auxContainers` were hand-paired at ~10 trivially symmetric sites and
   that was survivable; Iter-43 added a **semantic** pairing (one shared correctness predicate whose
   validity depends on which producer wrote the dict) and it was wrong immediately. The line between
-  "conventional pairing" and "actively error-prone" is exactly there.
+  "conventional pairing" and "actively error-prone" is exactly there. **Iter-44 folded both into one
+  `TileEntry` per tile.** The site count barely moved — what changed is *which* sites: the ones
+  spread across files and interleaved with gating logic (three ledger writers, two flush loops, a
+  reconcile pass, two key unions) are gone, and the remainder are adjacent, symmetric, and decide
+  nothing. Localisation, not elimination — but the pairs that could disagree about *correctness* no
+  longer exist.
 - **Calibrate a detector to the failure you MEASURED, not the one you just fixed.** The Iter-43
   anomaly trigger watches the wholesale-replace path (Iter-42's shape). The catastrophe this ledger
   actually suffered was Iter-41's `ledgerC` 402 → 0 through the *prune* — for which there is still
   only a diagnostic line behind a default-off flag. A regression of the measured failure would be
-  reported by nothing.
+  reported by nothing. **Iter-44 built that channel**, per-scan and cumulative, and the cumulative
+  one requires a **net** decline: gross removals are healthy churn (Iter-43's own verification
+  measured "8 removed / 7 added in one interval" in a session whose ledger GREW), while the
+  historical failure was a net collapse. That distinction paid for itself on the first in-game run —
+  60 legitimate prunes in one session, and the net condition correctly stayed silent where a gross
+  count would have filed a durable data-loss report.
 - **A threshold that depends on a user-settable parameter is not the threshold you documented.**
   "≥5 tiles in one 3 s scan cannot false-positive" was asserted absolutely; the scan interval is a
   player Choice up to **30 s**, the post-load grace batches withdrawals into the first scan after it,
@@ -1435,6 +1457,60 @@ all paid for:
   suspicion in different words. Conversely each also refuted suspicions of mine — the refutations
   (listed in the roadmap's Iter-44 entry) are as valuable as the findings, because they stop the next
   round from re-investigating settled ground.
+
+### Iter-44: what the structural rebuild taught, on top of the above
+
+- **"The write call did not throw" is not "the write landed."** CK's `StandaloneFilesystem.Write`
+  ends in `catch (IOException) { Debug.LogError(...) }` with **no rethrow**, and its inner
+  `File.Replace`/`File.Move` retry loop gives up after ten attempts with only a `LogError`. So the
+  entire `IOException` class — disk full, a locked file, the Wine faults this project ships six IL
+  patches for — is invisible to a mod. Worse, our FNV save-write-skip then cached "the disk holds
+  this" for content that was never written, so every later save with unchanged content was **skipped**:
+  one poisoned cache entry could suppress saving for a whole session, and for the pet store
+  `ClearDirty()` additionally cancelled the retry its own placement after the write was meant to
+  guarantee. **Verify by reading back before you record a write as done** — and note this was
+  invisible from the mod's own source. It took reading the decompile.
+- **One missed observation is not evidence of removal.** A container's chunk can be absent from a
+  single ECS query while it still exists; a penned animal can wander out of `AnchorRadius` for one
+  scan or vanish briefly during growth churn. Acting on the first miss produced a flickering count
+  that froze at the wrong value if the player then left. Requiring the **immediately preceding** scan
+  to have missed the same key too costs one interval and removes the whole class. Two details matter:
+  the marks must be **per key** (one per tile lets a neighbour's miss spend another key's grace, which
+  is routine where several keys share a tile) and **adjacent** (otherwise "the previous scan" means
+  "the previous scan that looked at this tile", which can be an hour and a teleport earlier).
+- **Apply such a delay to EVERY removal path or it is cosmetic.** The delay first went only into the
+  merge. But on most tiles the container is the *only* producer, so when its chunk flickers the tile
+  is not in the observed set at all, the merge never runs, and the *prune* takes the whole tile in one
+  scan. The rule was protecting the rarer shape and leaving the common one exposed.
+- **A multi-call protocol cannot be enforced at compile time in this language subset — so remove the
+  protocol.** Three shapes were tried: a permission bool per write (the caller owned a rule it could
+  not see), four evidence bools per tile (three derivable, one a duplicated predicate), then
+  `BeginScan`/`Publish`/`Prune` over ledger-held state — where a harness found that a publish *after*
+  the prune still shrank, because the "is a scan open" flag was a warning trigger and not part of the
+  authorization. Patching the condition was not the lesson. With a **single entry point** taking the
+  whole snapshot, "no scan is open" and "the prune was skipped" stop being representable.
+- **A stable bookkeeping key must not be derived from something that moves.** Cattle colour aux was
+  keyed to "the anchor nearest the animal", called stable because anchors do not move. The animal
+  does. Measured: ~12 tiles added and ~12 removed per save interval against 11 such tiles in
+  existence. That silently broke the Iter-31 save-write-skip for farm bases, and once the miss delay
+  existed it also double-counted colours. The fix is a key that does not depend on the moving thing at
+  all (the lowest packed anchor key of the scan) — and the "location" was safe to give up because
+  nothing reads it.
+- **A running game is not a stable measurement subject.** Twice during verification an intermediate
+  read produced a wrong conclusion — "no DIAG lines, so diagnostics was off" (the log was still being
+  written) and "the in-memory tile count exceeds the file's, so a save was wrongly skipped" (the file
+  was four minutes younger than the process). Both would have been written up as bugs. **Quit the
+  game before reading the log and the ledger**, or you are comparing two different points in time.
+- **Extract the pure-logic core and test it offline; it finds what reading does not.** The ledger and
+  the pet collection need no ECS, no Harmony, and no Unity API beyond `Debug.LogWarning` and
+  `Vector2`, so ~40 lines of stubs make them runnable outside the game
+  (`tests/possession-harness`). It caught two defects that four review agents reading the same code
+  did not. Compile the real sources into the harness rather than copying them — a copy drifts, and a
+  drifting test is worse than none.
+- **A test protocol finds what it asks about; a data diff finds what happened.** The in-game protocol
+  asked whether a colour count still flickered *downward* (the regression just fixed). The ledger diff
+  showed a drift *upward* plus the hopping tiles — a different defect, in the opposite direction,
+  that no protocol step named.
 
 ## Possession Base Scope & Persistence (Iter-31)
 

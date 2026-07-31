@@ -2132,3 +2132,161 @@ Four behavioural checks, all read from the ledger FILE rather than the UI:
 
 Pure behavioural C# + one new file; no prefab/art/loc touch, no schema change (the v3 marker is
 unchanged, so no migration and no player re-scan).
+
+**Iter-44 (possession subsystem — the shape, not the next point fix) — DONE (2026-07-31, branch
+`iter-44`).** Not a user report either: this is the **stock-take** the Iter-43 gate forced, then
+acted on. The chain to that point was Iter-42 fixing a data-loss bug → its review finding four more
+→ Iter-43 fixing those and **introducing three new Criticals of the same class** → the Iter-43 gate
+finding those, with three of four independent reviewers converging on one root cause. The user's call
+was to stop point-fixing and change the shape. Three further review rounds ran on the rebuild itself
+(ten agent reviews in total across the iteration), each finding real defects; the entry below is
+organised by what changed, with the measurement that forced each change.
+
+**The core: one record, one entry point.** `_containers` + `_auxContainers` — two parallel per-tile
+dicts kept in step by hand — became one `TileEntry { Contents, Aux }`, and the three writers
+(`SetLiveContainer` / `SetLiveAux` / `ClearAux`) became a single `PossessionLedger.ApplyScan(...)`
+that takes the whole snapshot and does the merge and the prune inside one method body. Two
+intermediate shapes were built and rejected on the way, and *why* they failed is the transferable
+part:
+- **Four evidence booleans per tile** (`TileObservation`) replaced Iter-43's single permission bool.
+  Better — evidence instead of permission, and the two dimensions became separately expressible,
+  which is what C-1 needed — but three of the four were derivable from data the ledger already had,
+  and one of them was the *player-near AND anchor-covered* predicate that AUTHORIZES a destructive
+  decision, written out twice: an `&&` chain in the caller and two early-`continue`s in the prune.
+  Two copies of that, in a codebase with no automated tests.
+- **`BeginScan` / `Publish` / `PruneStaleNear` over ledger-held scan state.** This is where the
+  harness (below) found that a `Publish` **after** the prune could still shrink: `_scan.Active` was a
+  warning trigger and not part of the authorization. Patching the condition was not the lesson —
+  a multi-call protocol cannot be enforced at compile time in this language subset. With one entry
+  point, "no scan is open" and "the prune was skipped" stop being representable, and `Vector2` +
+  `pruneRadius` also retired three adjacent interchangeable `float` parameters where a transposition
+  would have been silent and destructive.
+
+**C-1 (the defect that opened the iteration): `containerTiles` cannot be a universal confirmation
+predicate.** It is filled only in the `isContainer` branch, and cattle colour aux is keyed to a
+*station* tile (which carries `CraftingCD`), so for cattle the flag was **structurally always
+false** — a pen losing its last animal of a colour, or a placeable repainted A→B, kept the stale key
+forever, serialized, surviving restarts, permanently inflating the Iter-36 owned counter `K` against
+Iter-41's "own ≥1 right now" contract. (Paint is only *usually* false: a **paintable container**
+writes its paint aux and adds its own tile in the same two branches, so that one subset was never
+frozen — an absolute that survived two review rounds before being scoped.) The shipped rule: a
+dimension may shrink only past the streaming grace AND on evidence for *itself* — contents when a
+container was observed on the tile OR the tile is one the scan would have seen anything on; aux only
+on the second test, because "some aux was observed here" would authorize dropping one producer's keys
+because a different one was seen, which is C-1's own shape one level down.
+
+**"One miss is not evidence" — the rule that came out of the second review round.** A count that is
+merely LOWER applies at once (the producer was seen, that is direct evidence). An entry that is
+ABSENT is removed only when the absence is CONFIRMED (a container was observed on the tile, so its
+buffer is authoritative) or when the same key was unconfirmed-absent on the **immediately preceding**
+scan too. This covers the two cases where one scan legitimately misses a producer that still exists:
+a co-located container absent from a single query — the residual the first draft had documented as
+acceptable, now **retired** — and a penned animal briefly outside `AnchorRadius` or mid growth-churn,
+which flickered a colour count to 0 and froze it there if the player then left. Three details are
+load-bearing and each was a review finding: the marks are **per key** (one counter per tile let a
+neighbour's miss spend another key's grace — routine on the aux axis, where a pen keys every colour to
+one tile), **adjacent** via a scan sequence number (otherwise "the previous scan" meant "the previous
+scan that merged this tile", an hour and a teleport earlier), and applied to the **prune as well** —
+without that the rule was cosmetic, because on most tiles the container is the only producer, so a
+flicker leaves the tile unobserved entirely, the merge never runs, and the prune took the whole tile
+in one scan.
+
+**The critical finding of the third round came from the decompile, not from the mod's own source.**
+CK's `StandaloneFilesystem.Write` ends in `catch (IOException) { Debug.LogError(...) }` with **no
+rethrow**, and its inner `File.Replace`/`File.Move` retry loop gives up after ten attempts with only
+a `LogError`. So disk-full, a locked file, and the Wine faults this project ships six IL patches for
+never reach the mod — the "a failed write is now reported" fix of the previous commit covered only
+the throwing minority. Worse, and **pre-existing since Iter-31**: the FNV cache then recorded "the
+disk holds this" for content never written, so every later save with unchanged content hash-matched
+and was **skipped** — one poisoned entry could suppress saving for the rest of a session, and for pet
+skins `ClearDirty()` cancelled the retry its own placement after the write was meant to guarantee.
+Both stores now read the file back and compare before caching the hash or clearing `Dirty`; the
+incident store verifies its appends for the same reason, being the fallback channel whose only
+justification is durability.
+
+**C-2 / C-3, the two paths the stock-take left open.** C-2: `PossessionIncidentStore` read its own
+file with a helper returning `null` for both "absent" and "unreadable" — the exact conflation
+`StoreLoadStatus` was introduced to end, one file deeper — and then rewrote the file from scratch,
+destroying the incident history, *triggered by the very fault it was reporting*. C-3: neither parser
+can throw, so a file truncated mid-write parsed into a **subset**, was reported as a successful load,
+left the store writable, and the next autosave persisted the subset while the one after took the
+`.pugbackup`. Both parsers now count unaccepted data lines and any such line makes the load FAILED;
+the pet file additionally gained a `#icl-petskins-v1 n=<count>` header, because its lines are ~8
+bytes and delimiter-free, so a cut exactly at a line boundary parsed as a valid *shorter* file —
+roughly 1-in-8, on the one store with no second source. Headerless files stay valid and are marked
+dirty on load so they gain the header, otherwise the detector would have stayed inert precisely for
+the characters with a stable complete collection.
+
+**Detector work, all three of the "the channel exists but cannot see the case it was built for"
+kind.** A **prune channel** now exists, per-scan and cumulative — Iter-43 watched only the shrink
+path while the largest ledger collapse this subsystem has ever MEASURED (Iter-41's `ledgerC` 402→0)
+came through the prune, where nothing but a default-off DIAG line existed. The cumulative one requires
+a **net** decline, because gross removals are healthy churn (Iter-43's own verification measured
+"8 removed / 7 added in one interval" in a session whose ledger GREW 504→681). The batched-scan
+override was 25× less sensitive than the only event of this class ever measured (Iter-42: 5 tiles of
+505; a `tilesBefore/4` bound needs 126), so `firstPostGrace` and "after a gap" were separated and the
+former keeps a low floor. Dedup keys carry the character GUID and bucket by magnitude — the flat
+`":session"` key let one benign five-tile reorganisation silence a later four-hundred-tile collapse,
+and a deduped `Record` reaches no channel at all, not even the log. Iter-43's "cannot false-positive"
+claim was refuted **four** ways, the fourth being CK **automation**, which moves items out of chests
+continuously and is exactly the benign bulk contents event the justification claimed did not exist.
+
+**Also fixed, each a review finding:** the read-only mode is visible at last (a footer marker naming
+*which* store, plus one durable incident per character — Iter-43 built the mechanism and surfaced it
+nowhere, and for pet skins its symptom is indistinguishable from the loss it prevents); `LoadFrom`
+trims data lines, without which a file re-saved with CRLF marked a **healthy** character permanently
+read-only (a lone `\r` lands in the empty aux segment of nearly every line); a zero-byte store file
+counted as a clean, writable, EMPTY store; `_worldNullWarned` is re-armed on every successful resolve;
+the scan runs at most **once per frame** (`Update` has two call sites with no return between them, so
+pressing the toggle on the frame the timer fires ran two scans against an identical ECS world — and
+since the miss rule counts scans, the same read twice voided the delay); and `IReadOnlyDictionary`
+accessors on `TileEntry` were tried and **reverted** in favour of read methods, because the interface
+boxes a heap enumerator per `foreach` — ~1,400 allocations per scan at the measured ledger sizes, in
+the subsystem with three prior perf iterations.
+
+**A test harness, for the first time in this repo.** `PossessionLedger` and `PetCollection` are pure
+logic — no ECS, no Harmony, no Unity API beyond `Debug.LogWarning` and `Vector2` — so ~40 lines of
+stubs make them runnable outside the game: `dotnet run --project tests/possession-harness`, 61
+assertions, with the real sources **compiled in** rather than copied. It found two defects that four
+review agents reading the same code did not (the post-prune publish, and the prune lacking the miss
+delay), and it round-trips the real shipped 681-tile ledger byte-identically — the assertion that
+matters most, since a false damage report would put a healthy character's store read-only. Everything
+else about the mod remains in-game-only; `docs/conventions.md § Testing` now carries both.
+
+**The last defect was found by the in-game verification, not by any review.** The ledger diff over one
+save interval showed ~12 aux-only tiles removed and ~12 added against only 11 such tiles in
+existence — essentially all of them hopping, continuously — and the per-colour sums drifting **up**
+(cow/colour-2 2→4, goat/colour-1 5→6). Iter-41 had keyed penned-cattle aux to the anchor *nearest the
+animal*, calling it "a stable per-pen location (anchors don't move)": the anchors do not, the animal
+does. That had silently broken the Iter-31 save-write-skip for farm bases ever since, and once the
+miss delay existed it also double-counted colours. All cattle aux now goes to the **lowest packed
+anchor key of the scan** — deterministic and independent of where the animals stand; the locality was
+safe to give up because no reader looks at an aux tile's coordinates.
+
+**Verified in-game (1.2.1.5, fake-ID 9999997), reading the ledger FILE and the DIAG sequence rather
+than the UI.** `safetyCheck=True`, 0 `CompileFailed`, 0 NRE. The Iter-42 regression holds (no unit
+loss across the observed intervals). Contents shrink still works (`shrunkC=1 lostUnits=1` ×3,
+`lostUnits=3` once). **The prune delay is provable from the sequence rather than a constructed test:**
+the first scan with base contact pruned **0** with 551 tiles in range, and the one-off cleanup of the
+old scattered cattle tiles then spread across five consecutive scans (1, 18, 4, 1, 35) — exactly what
+"two adjacent stale scans per tile" produces, where no delay would have dropped everything at once.
+Those 60 removals were legitimate: `pruned=0` for the following 37 scans and the tile count stayed at
+495, and a wrongly pruned tile whose object still exists reappears on the very next scan. The cattle
+fix is confirmed to the byte: between the last two saves **0 tiles added, 0 removed, 0 units changed**,
+the colour sums **identical** (cow/2=2, goat/0=3, goat/1=4, roly/0=1, roly/1=3, roly/2=1), all base
+cattle aux on ONE tile, and the three remaining aux-only tiles ~300 tiles away at a second pen,
+correctly untouched. `possession-incidents.txt` stayed **absent** — no false alarm despite those 60
+prunes, which the gross version of the cumulative detector would have reported. The pet-skin header
+upgrade landed for real: the file now starts `#icl-petskins-v1 n=20` over 20 data lines while its
+`.pugbackup` still holds the headerless legacy format. Scan cost 1–8.7 ms at base with ~940 entities
+in anchor range, and `DIAG save SKIPPED unchanged` reappeared, i.e. the read-back verification did not
+break the save-skip and the cattle fix restored it. **Not exercised:** the same-frame double scan (the
+observed hotkey scan came 1 s after the timer scan, a different frame, so the dedup correctly did not
+suppress it; hitting the same frame needs ~1/180 luck at a 3 s interval).
+
+**Process.** Ten agent reviews across three rounds, plus the harness, plus two in-game rounds. The
+refutations were as valuable as the findings — several of my own suspicions did not survive checking,
+and two of my *own* intermediate conclusions during verification were wrong because I read a log and
+a ledger while the game was still writing them (documented in `docs/gotchas.md § Iter-44`). No schema
+change for the ledger (the v3 marker is untouched, so no migration and no player re-scan); the pet
+file gains a header backward-compatibly.

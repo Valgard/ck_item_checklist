@@ -586,7 +586,13 @@ remaining backlog.
     in one interval, retiring the suspicion behind the 504→681 tile growth); and
     `possession-incidents.txt` absent, i.e. no false alarm. Reported + done 2026-07-30.
 
-- **Iter-44 -- possession subsystem: review backlog + an architectural decision. OPEN
+- **Iter-44 -- possession subsystem: the shape, not the next point fix. DONE** (2026-07-31, see
+  `docs/iteration-history.md`). The stock-take below was taken on 2026-07-30 and **acted on**; it is
+  kept in full because it is the record of what four independent reviewers found and, just as
+  usefully, of what they refuted. Everything in it is resolved — see **How it was resolved** at the
+  end of the entry. Original framing, unchanged:
+
+- **Iter-44 -- possession subsystem: review backlog + an architectural decision. (the stock-take,
   (opened 2026-07-30, nothing implemented).** A **stock-take**, deliberately taken instead of a
   fifth round of point fixes. Context: Iter-42 fixed a data-loss bug; its `review-pr` gate found
   four more; Iter-43 fixed those and **introduced three new Criticals of the same class**; the
@@ -696,6 +702,40 @@ remaining backlog.
   also re-confirmed that persisted provenance, if ever wanted, can migrate **losslessly**: make the
   version marker a *set* (v3 ⇒ 3 segments, v4 ⇒ 4), load v3 lines as `provenance = Unknown` with the
   rule "never auto-evict" — no discard, no player re-scan. Reported + open 2026-07-30.
+
+  **How it was resolved** (the user chose the structural change; full narrative in
+  `docs/iteration-history.md § Iter-44`):
+  - **C-1** — fixed by the rebuild, not by the point fix. One `TileEntry { Contents, Aux }` per tile
+    and a single `ApplyScan` entry point; a dimension may shrink only past the grace and on evidence
+    for *itself*. `containerTiles` survives only as "this tile's container was observed, so its buffer
+    is authoritative", never as a universal predicate. One correction to the analysis above: paint was
+    only *usually* structurally frozen — a **paintable container** writes its paint aux and adds its
+    own tile in the same two branches.
+  - **C-2** — `TryReadAll` separates absent from unreadable and a failed read aborts the write; the
+    cap marker is written from the write's own result and recognised on load; an unreadable history no
+    longer counts as zero lines. The store also refuses to rewrite a file that vanished mid-session
+    (a lying `FileExists` was the last from-scratch path) and verifies its appends.
+  - **C-3** — both parsers report unaccepted data lines and any such line makes the load FAILED. The
+    pet file gained a declared entry count, which is the only way to see a cut exactly at a line
+    boundary; headerless files stay valid and upgrade on the next save. A zero-byte file is damage.
+  - **The Importants** — all done: the false comments corrected (and re-checked by a further review
+    round, which found three more), the detector recalibrated (a prune channel per-scan and
+    cumulative, thresholds scaled to the configured interval, batched scans suppressed but with an
+    override, dedup keyed by GUID and magnitude), `_worldNullWarned` re-armed, the 200-line cap
+    writing a `#full` marker and returning `false`, the read-only session visible in the window
+    footer, and `LoadFrom`'s silent drops counted.
+  - **Found only after the rebuild** and worth recording because none of it was in the analysis above:
+    CK's file layer swallows the whole `IOException` class (so writes are now verified by reading
+    back, and the FNV cache no longer records unverified writes — a poisoning bug latent since
+    Iter-31); "one miss is not evidence" for both the merge and the prune; one scan per frame; and
+    cattle colour aux keyed to a deterministic anchor tile instead of the anchor nearest the animal,
+    which had been hopping ~12 tiles per save interval since Iter-41 and quietly disabling the
+    save-write-skip.
+  - **Still open, deliberately:** persisted per-container provenance (the version-marker-*set*
+    migration above remains the vehicle) — the residual it would retire is now bounded by the two-miss
+    rule, so it buys much less than it did; the ledger's own boundary-truncation blind spot, which
+    self-heals at base, unlike the pet store's, which is why only that one got a declared count; and
+    aux having no trigger channel of its own, only a reported number.
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
