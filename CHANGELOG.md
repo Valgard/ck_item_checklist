@@ -36,7 +36,6 @@ fixes, and it is what the remaining problems below all came out of.
   else — carries a count so even a clean cut is spotted.
 - **A file saved with a text editor no longer looks damaged.** Copying your tracking
   file out and back could make the mod treat it as corrupt and stop saving.
-
 - **"Locate" no longer talks about chests that do not exist.** The tracking data could
   not tell an item lying in a chest from the same item standing in the world, so
   tracking something you had placed — a workbench, a torch, a waypoint — offered to
