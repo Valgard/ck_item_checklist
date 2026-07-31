@@ -1512,6 +1512,49 @@ all paid for:
   showed a drift *upward* plus the hopping tiles — a different defect, in the opposite direction,
   that no protocol step named.
 
+### Iter-45: adding provenance to a persisted record
+
+- **A green test that picked the convenient configuration is worse than no test.** The migration test
+  passed a `containers` set, which forces `absenceIsConfirmed` — the ONE case where the provenance
+  correction lands atomically. So it asserted a behaviour the shipped code did not have, and both
+  reviewers spotted it independently. When writing a test for a new rule, use the shape that occurs
+  MOST, not the one that makes the assertion easy: here a placed-only tile, which is ~99 % of the
+  ledger per Iter-28's measurement.
+- **A migration that ADDS where it should MOVE double-counts, and the correction looks like a loss.**
+  Loading a v3 line's contents into `stored` and letting the first observation add to `placed` left
+  both populated until the shrink rule expired the stale one — a doubled count meanwhile, and
+  permanent for any tile observed from beyond the shrink envelope (ordinary play at a base, since
+  anchors reach ~91-115 tiles). Worse, the eventual removal was booked as `DroppedUnits`, so the
+  anomaly detector would have written "N owned unit(s) vanished — please report this file" on the
+  first post-update scan of every real base. **Re-filing is bookkeeping, not a removal: do it before
+  the merges and do not count it.**
+- **When one field is the SUM of two, the exact correction is subtraction, not a guess.** A v3 count
+  was `stored + placed`, so an id observed as placed accounts for exactly that much of it. 1 + 1 was
+  written as 2; observing 1 placed leaves 1, and the chest's copy survives. No heuristic, no
+  tolerance — but it must be gated on "this record is still the migrated assumption", because on a
+  verified record the same subtraction deletes real data whenever the container happens to be
+  unobserved.
+- **Carry migration uncertainty in the SHAPE, not in a new field.** An unverified tile is written as
+  a v3-shaped three-segment line, so the uncertainty survives a save with no extra format surface
+  and no extra parser branch. Without that, a tile the player has not revisited since the update
+  hardens into a split nobody verified.
+- **Put the new segment LAST and the migration is nearly free.** v4 is `x,z|stored|aux|placed`, so
+  v3's three fields keep their meaning and ONE parser reads both. Inserting it in the middle would
+  have forced either two parsers or a discard — and a discard costs every player a full re-scan.
+- **A mandatory field must be mandatory under the marker that promises it.** The `#n=` count was
+  first treated as "absent ⇒ accepted unchecked" for every file. But only a v4 writer emits it, so
+  under the v4 marker its absence IS damage — and that absence is exactly what a truncation after
+  line 1 produces, which otherwise loaded as a clean, WRITABLE, EMPTY ledger.
+- **A damage detector must not double-report.** A malformed line fails the parse AND makes the tile
+  count fall short of the declared one; reporting both doubles the number the incident quotes to the
+  player as "lines that could not be read". Subtract every line that yielded no tile — including one
+  that merged into an existing tile, where the naive check read a concatenated file as damaged
+  although the merge path exists to SALVAGE such a file.
+- **If a fix removes a capability, the diagnosis was too coarse.** "The tooltip must count containers,
+  not everything" reads like the fix for a wrong claim — and silently removed the locate arrow for
+  every placed object. The arrow was always correct; only the WORDING was wrong. Split the READ
+  (both provenances, for the arrow) from the WORDING (containers only), rather than narrowing both.
+
 ## Possession Base Scope & Persistence (Iter-31)
 
 ### Workbench = the semantic "is this the player's base?" discriminator

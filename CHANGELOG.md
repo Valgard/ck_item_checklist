@@ -37,6 +37,13 @@ fixes, and it is what the remaining problems below all came out of.
 - **A file saved with a text editor no longer looks damaged.** Copying your tracking
   file out and back could make the mod treat it as corrupt and stop saving.
 
+- **"Locate" no longer talks about chests that do not exist.** The tracking data could
+  not tell an item lying in a chest from the same item standing in the world, so
+  tracking something you had placed — a workbench, a torch, a waypoint — offered to
+  find it "in 1 chests" and pointed an arrow at the object itself. The tooltip now says
+  which it is: in chests, placed in the world, or both. The arrow works for all of
+  them, as before.
+
 ### Changed
 
 - **The checklist footer says when nothing is being saved**, and which of the two files
@@ -45,6 +52,12 @@ fixes, and it is what the remaining problems below all came out of.
   longer overwrites its own history when the very fault it is reporting occurs.
 - **Fewer needless saves at farm bases**, because the tracking data stops changing on
   its own between saves.
+- **Your tracking file is upgraded in place, not thrown away.** Earlier format changes
+  discarded the old file and rebuilt it from scratch on your next base visit; this one
+  keeps everything and fills in the new detail as you walk past your things. Owned
+  counts stay exactly as they were throughout. Rolling back to an older version of the
+  mod does still discard it (the older version cannot read the new detail), and it
+  rebuilds at base as it always did.
 
 ## [1.3.3] - 2026-07-30
 

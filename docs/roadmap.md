@@ -731,11 +731,45 @@ remaining backlog.
     cattle colour aux keyed to a deterministic anchor tile instead of the anchor nearest the animal,
     which had been hopping ~12 tiles per save interval since Iter-41 and quietly disabling the
     save-write-skip.
-  - **Still open, deliberately:** persisted per-container provenance (the version-marker-*set*
-    migration above remains the vehicle) — the residual it would retire is now bounded by the two-miss
-    rule, so it buys much less than it did; the ledger's own boundary-truncation blind spot, which
-    self-heals at base, unlike the pet store's, which is why only that one got a declared count; and
-    aux having no trigger channel of its own, only a reported number.
+  - **Left open at the time, then assessed and acted on:** the three residuals below. Two were done
+    in **Iter-45**; the third is deliberately waiting for a measurement.
+
+- **Iter-45 -- possession provenance: stored vs placed, plus a declared tile count (ledger v4). DONE**
+  (2026-07-31, see `docs/iteration-history.md`). The two Iter-44 residuals worth doing, taken together
+  because both are format changes to the same file and one schema bump covers both. Assessed first,
+  and **two of my own initial estimates were wrong** — I had rated the damage and only guessed the
+  cost:
+  - **Provenance was worth more than "the residual it would retire".** Splitting scan paths #2 and #3
+    fixes a *live wrong statement*: `CountTilesHolding` counted any remembered tile, and the Iter-40
+    tooltip renders that as "in N chests" with an arrow per tile — so a placed torch claimed a chest
+    that does not exist. That sat in a different feature, which is why the first assessment missed it.
+    The same bit also restores the ability to evict path-#3 entries specifically, i.e. the blacklist
+    self-heal Iter-42 had to remove. Full container IDENTITY still buys almost nothing and was NOT
+    built.
+  - **The declared count was far cheaper than estimated.** `#n=<tiles>` is a `#` comment line the
+    parser already skips — additive, invisible to older readers, no migration. "Expensive because it
+    is a format change" was simply wrong about an additive line.
+  - The migration is lossless because `placed` is the LAST segment: v3's three fields keep their
+    meaning, one parser reads both shapes, and the marker becomes an accepted SET — the scheme the
+    Iter-44 review had already confirmed.
+  - **The review gate then found the defect that mattered**, both reviewers independently and by
+    running the code: the migration ADDED a copy instead of MOVING provenance, so every placed object
+    counted double (permanently, for a tile observed from beyond the shrink envelope) and the eventual
+    correction was booked as lost owned units — which would have written a durable "please report
+    this file" incident on every updating player's first base scan and burned that magnitude's dedup
+    slot. Fixed subtractively (a v3 count was `stored + placed`, so subtracting the observed placed
+    part is exact), uncounted, gated on a per-tile "provenance unknown" flag that survives a save by
+    being serialized as a v3-shaped line. Second finding: the naive form of the tooltip fix removed
+    the locate arrow for ~99 % of ledger tiles and told players they were carrying things they had
+    put down — the arrow was always right, only the wording was wrong.
+  - **Still open, deliberately:** an **aux trigger channel**. Aux reductions are reported (session
+    total in every incident detail, plus the DIAG line) but never trigger, so an aux-only regression
+    — the class that opened Iter-44 — would still be invisible. The cattle fix removed the dominant
+    benign source (hopping keys), which makes a cumulative channel viable for the first time, but
+    there is no measured baseline for aux reductions in normal play after that fix. Iter-44's four
+    refuted "cannot false-positive" claims are the reason this waits for a number instead of a guess:
+    read `auxReduced=`/`shrunkAux=` from a normal diagnostics session, then set the threshold.
+    Also still open and unchanged: full per-container identity (buys the near-vacuous residual only).
 
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered

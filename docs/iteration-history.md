@@ -2290,3 +2290,104 @@ and two of my *own* intermediate conclusions during verification were wrong beca
 a ledger while the game was still writing them (documented in `docs/gotchas.md § Iter-44`). No schema
 change for the ledger (the v3 marker is untouched, so no migration and no player re-scan); the pet
 file gains a header backward-compatibly.
+
+**Iter-45 (possession provenance — stored vs placed, ledger v4) — DONE (2026-07-31, branch
+`iter-45`).** Two of the three residuals Iter-44 left open, done together because both are format
+changes to the same file, so one schema bump covers them. The user's call after an explicit
+assessment of all three; the third (an aux trigger channel) stays deliberately open until a
+measured baseline exists.
+
+**The user-visible half.** Scan paths #2 (a container's contents) and #3 (the placed object standing
+on the tile) had shared one per-tile dictionary since Iter-20 — the missing provenance that Iter-42
+was actually about and that Iter-43/44 kept deferring. `TileEntry` now keeps `Stored` and `Placed`
+apart, which buys two things a flag on the tile could not:
+- `CountContainerTilesHolding` can back the Iter-40 tooltip's **"in N chests"**. Until now that
+  string was asserted about placed objects too, so tracking a torch while a torch stood at the base
+  claimed a chest that did not exist and pointed an arrow at it. A live wrong statement, not a
+  rounding error — and the reason this was worth a schema change at all.
+- A future blacklist addition can evict path-#3 entries **specifically**, which is the self-heal
+  Iter-42 had to delete because a per-id sweep could not tell a placed wild object from the same id
+  stored in a chest.
+
+**Their shrink rules genuinely differ**, which is the other half of why one dict was wrong.
+`Placed` IS the object's entity, observed exactly when the tile is in scope, so it behaves like
+`Aux` — scope-only, absence never "confirmed". Only `Stored` keeps the extra disjunct, because a
+container's buffer is evidence about its own contents from any distance. Passing that confirmation
+to the placed dimension would have been C-1 mirrored: a buffer says nothing about the object
+standing beside the chest. (One improvement fell out silently: before the split, an observed
+container could drop a co-located PLACED id from the shared dict on a single miss. That hole is now
+closed by construction.)
+
+**The second residual: a declared tile count.** `#n=<tiles>` as line 2 — a comment line the parser
+already skips, so it is invisible to any reader that does not look for it, including older mod
+versions. A file cut exactly at a line boundary is otherwise a perfectly valid SHORTER file;
+Iter-44 gave the pet store this guard and left the ledger out because it self-heals at base, which
+is true but is not a reason to stay silent about damage. My own first assessment called this
+expensive and was wrong: an ADDITIVE comment line is not a format change in the risky sense.
+
+**The migration is why `placed` is the LAST segment.** v4 is `x,z|stored|aux|placed`, so v3's three
+fields keep their exact meaning and ONE parser reads both — three segments means a v3-shaped line,
+four means v4. The marker becomes an accepted SET (v4 and v3), which makes this the first schema
+change in this file that migrates rather than discards: no discard, no player re-scan, and a file
+upgrades on its next save. Every pre-v3 marker is still discarded. Downgrading (an older mod
+reading v4) discards and re-scans, as it must — and is reported, since Iter-43 made the discard
+audible.
+
+**Then the review gate found the defect that mattered, and both reviewers found it independently by
+RUNNING the code.** The migration ADDED a second copy instead of MOVING provenance: a v3 line's
+contents loaded into `_stored`, the first observation put the same id into `_placed`, and
+`AccumulateInto` sums both — so every placed object counted DOUBLE until the shrink rule expired
+the stale copy. Permanently for any tile observed while the player is farther than `PruneRadius`
+from it, because `mayShrinkStored` is then false and the stale copy is restored and serialized on
+every scan; at a large base that is ordinary play, since anchors reach ~91-115 tiles and
+`AnchorRadius` goes to 96. Worse, the eventual removal was booked as `DroppedUnits`, which feeds the
+anomaly detector: on the first post-update scan of any real base (675 tiles in the shipped ledger,
+617 of them a single id) the mod would have written a durable *"N owned unit(s) vanished … please
+report this file"*. Nothing was lost. And because `Record` dedups **before** it logs, that false
+alarm would have consumed its magnitude bucket, so a genuine collapse of the same size in the same
+session would have reached no channel at all — precisely the property Iter-44 spent a review round
+establishing.
+
+The fix is **subtractive, and exact rather than heuristic**: a v3 count was `stored + placed`, so an
+id observed as placed accounts for exactly that much of it. 1 stored + 1 placed was written as `2`,
+so observing 1 placed leaves 1 and the chest's copy survives. It runs BEFORE the merges (so an
+observed container's buffer is re-added right after), it is uncounted (re-filing is bookkeeping, not
+a removal), and it is gated on a per-tile "provenance unknown" flag — without that gate the same
+subtraction would delete real chest contents whenever the container happened to be unobserved while
+the co-located placed object was seen. The flag survives a save by **shape**: an unverified tile is
+written as a v3-shaped three-segment line, so the uncertainty is carried with no extra format
+surface. Without that, a tile not revisited before the first save would harden into a split nobody
+verified.
+
+**The second review finding was the mirror-image mistake in my own fix.** `IsTrackable` went through
+the now-container-only reverse index while `OwnedCount` still counted placed objects, so a workbench
+or waypoint standing at base was owned, not trackable, and fell through to the hint line's last
+branch — telling the player **"You are carrying it"** about something they had put down, with an
+inert click. And the naive reading of the provenance fix silently removed the locate arrow for every
+placed object, which per Iter-28 is ~99 % of ledger tiles. Both wrong for the same reason: the arrow
+was always correct, only the WORDING was. So the reverse index counts both provenances again (every
+provenance is a real location), a container-only count feeds the wording, and the hint line has
+three cases — "in N chests" / "placed at N spots" / "N locations".
+
+**Also from the reviews:** under the v4 marker the count line is now MANDATORY, because treating its
+absence as "accepted unchecked" let a file cut to its first line load as a clean, WRITABLE, EMPTY
+ledger — the Iter-42 symptom with a green light on it; `Serialize` builds its data lines before
+declaring the count, so the "unreachable" empty-entry guard can no longer make a file self-report as
+damaged and stop the character saving; and every data line that yields no tile is subtracted from the
+count check, so a malformed line is reported once rather than twice — including a line that merges
+into an existing tile, where the naive check read a concatenated file as damaged although the merge
+path exists to salvage exactly that.
+
+**Harness: 89 assertions.** The migration test no longer passes `containers` — both reviewers caught
+that it forced the one case where the correction looks atomic, i.e. it asserted a behaviour the
+shipped code did not have. That is the sharpest process lesson of this iteration: **a green test
+that picked the convenient configuration is worse than no test**, because it manufactures
+confidence. Added: no doubling on a placed-only tile; no doubling when observed from beyond the
+shrink envelope; the correction not counted as a loss; a mixed tile splitting exactly (v3 `110:3` +
+1 observed placed → `110:2||110:1`); the uncertainty surviving a save; the v4 count line being
+mandatory; and the real shipped 675-tile v3 file migrating with zero reported damage and stable
+write/read/write.
+
+**Deliberately still open** (carried over in `docs/roadmap.md`): an aux trigger channel, which
+needs a measured baseline of aux reductions in normal play before its threshold can be anything but
+a guess — the lesson from Iter-44's four refuted false-positive claims.
