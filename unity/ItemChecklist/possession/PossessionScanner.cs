@@ -179,6 +179,10 @@ namespace ItemChecklist.Possession
                 foreach (var s in stations)
                     if (WithinAnchor(workbenches, s.x, s.y, wr2))
                         anchors.Add(s);
+            // One tile for every cattle colour this scan — computed once, not per animal. See
+            // CattleAuxTile for why it is deliberately independent of where the animals stand.
+            long cattleAuxTile = CattleAuxTile(anchors, 0L);
+            bool haveCattleAuxTile = anchors.Count > 0;
             float dTAnchors = diag ? Time.realtimeSinceStartup : 0f;
 
             // ALL placed entities (not just containers) so the placed object itself
@@ -268,10 +272,12 @@ namespace ItemChecklist.Possession
                 // WithinAnchor above. Spoiler-gated on per-colour discovery (OwnedCount).
                 // Iter-41: a penned cow WANDERS, so keying its colour aux by its transient tile
                 // accumulated a stale entry per visited tile (a per-colour over-count in the
-                // 48..~91 ring, where old tiles are neither pruned nor reconciled). Key it by its
-                // NEAREST loaded ANCHOR tile instead — a stable per-pen location (anchors don't
-                // move) — so a moving cow maps to the SAME tile every scan.
-                // Iter-44: that stability is what makes the aux shrink rule work, and the old
+                // 48..~91 ring, where old tiles are neither pruned nor reconciled). Its answer was
+                // the anchor NEAREST TO THE ANIMAL, believed stable because anchors do not move —
+                // but the animal does, so the nearest one changes and the key hopped anyway.
+                // Iter-44 keys it to ONE anchor tile per scan, independent of the animals; the
+                // measurement that forced that and the two costs it removes are in CattleAuxTile.
+                // Iter-44: a stable tile is what makes the aux shrink rule work, and the old
                 // "SetLiveAux replaces, no accumulation" wording no longer describes it. The
                 // publish MERGES, and this tile's aux may shrink only past the streaming grace AND
                 // when the scan would have seen anything here (player within PruneRadius AND
@@ -286,7 +292,7 @@ namespace ItemChecklist.Possession
                 if (em.HasComponent<CattleCD>(e))
                 {
                     long cckey = DiscoveredState.PackKey(CattleRegistry.AdultOf(id), od.variation);
-                    var a = TileAux(auxScan, NearestAnchorTile(anchors, pos.x, pos.z, key));
+                    var a = TileAux(auxScan, haveCattleAuxTile ? cattleAuxTile : key);
                     a[cckey] = (a.TryGetValue(cckey, out var cc) ? cc : 0) + 1;
                     continue;
                 }
@@ -770,23 +776,40 @@ namespace ItemChecklist.Possession
             return d;
         }
 
-        // Iter-41: tile of the anchor nearest to (x,z), used to give a WANDERING penned cow a
-        // STABLE per-pen aux tile (its own tile changes every scan → per-tile accumulation). The
-        // cattle branch only runs after WithinAnchor passed, so `anchors` is non-empty there;
-        // `fallback` (the cow's own tile) is a defensive default only.
-        private static long NearestAnchorTile(List<Vector2> anchors, float x, float z, long fallback)
+        // ONE tile for all cattle colour aux this scan: the lowest packed key among the loaded
+        // anchors. Deterministic, and — the point — independent of where the animals are.
+        //
+        // Iter-41 used the anchor NEAREST TO THE ANIMAL for this, described as "a stable per-pen
+        // location (anchors don't move)". The anchors don't, but the animal does, so the nearest one
+        // changes as it wanders and the key hops between tiles. Measured in-game at a farm base:
+        // ~12 tiles added and ~12 removed per save interval, against only 11 aux-only tiles in
+        // existence — i.e. essentially all of them, continuously. Two costs, one old and one new:
+        //   • the ledger's serialized text changed on every autosave, so the Iter-31 FNV
+        //     save-write-skip never fired for such a character — a silent perf regression since
+        //     Iter-41;
+        //   • with Iter-44's two-miss delay the vacated tile keeps its key for one more interval, so
+        //     the colour was DOUBLE-COUNTED while animals moved (measured: cow/colour-2 2→4,
+        //     goat/colour-1 5→6 between two saves). Over-counting is the safe direction, but it is
+        //     plainly visible on the per-colour row.
+        // A single tile removes both. The location carries no meaning to lose: nothing reads an aux
+        // tile's coordinates — the Iter-40 tracker's reverse index goes through Contents only — the
+        // tile exists purely so the aux can be remembered, persisted and pruned per tile like
+        // everything else. Being an anchor, it is trivially anchor-covered, so the shrink and prune
+        // premises still apply to it.
+        // No migration needed: the old scattered tiles simply go stale and are pruned on the first
+        // base visit after the update (two scans, per the delay), while this tile accumulates the
+        // true counts.
+        private static long CattleAuxTile(List<Vector2> anchors, long fallback)
         {
+            bool any = false;
             long best = fallback;
-            float bestD = float.MaxValue;
             for (int i = 0; i < anchors.Count; i++)
             {
-                float dx = anchors[i].x - x,
-                    dz = anchors[i].y - z;
-                float d = dx * dx + dz * dz;
-                if (d < bestD)
+                long k = PossessionLedger.Key(Mathf.RoundToInt(anchors[i].x), Mathf.RoundToInt(anchors[i].y));
+                if (!any || k < best)
                 {
-                    bestD = d;
-                    best = PossessionLedger.Key(Mathf.RoundToInt(anchors[i].x), Mathf.RoundToInt(anchors[i].y));
+                    best = k;
+                    any = true;
                 }
             }
             return best;
