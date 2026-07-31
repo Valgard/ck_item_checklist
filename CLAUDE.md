@@ -106,8 +106,13 @@ reference; keep these in mind when writing mod code):**
   The possession *ledger* still persists separately via `API.ConfigFilesystem`
   (unchanged). Labels/hint live in `localization/localization.yaml`
   (`ItemChecklist-Config` namespace).
-- **No unit-test framework** — testing = `utils/build.sh` + in-game Player.log grep
+- **Almost no offline testing** — testing = `utils/build.sh` + in-game Player.log grep
   + manual UI verification; canonical 7-phase list in `docs/conventions.md § Testing`.
+  The **one** exception (Iter-44) is `dotnet run --project tests/possession-harness`:
+  `PossessionLedger` + `PetCollection` are pure logic, so the harness compiles the real
+  sources against ~40 lines of Unity stubs and asserts the shrink/prune/parse rules
+  offline. Run it after touching either file. Nothing else — ECS, Harmony, UI, and
+  above all the Roslyn sandbox — can be checked outside the game.
 - **uGUI (Canvas/Image) structurally fails in CK** (no `Collider` → CK's
   `Physics.Raycast` `UIMouse` never sees it) — use `SpriteRenderer` + Layer 5 +
   `UIelement`. See `docs/gotchas.md § uGUI structurally fails in CK`.

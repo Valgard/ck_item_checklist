@@ -165,6 +165,40 @@ older than the source file is suspicious and warrants a re-run.
 
 ## Testing Conventions
 
+### The possession harness (Iter-44) — the one part that IS testable offline
+
+```bash
+dotnet run --project tests/possession-harness      # prints one line per assertion, exits non-zero on failure
+```
+
+Run it after touching `PossessionLedger.cs` or `PetCollection.cs`, **before** the
+build. It is not a gate and nothing runs it automatically.
+
+Why this one exists when nothing else does: those two classes are **pure logic**
+— no ECS, no Harmony, no Unity API beyond `Debug.LogWarning` and `Vector2`, both
+stubbed in `tests/possession-harness/Stubs.cs`. The `.csproj` **compiles the real
+sources in** rather than copying them (a copy drifts, and a drifting test is worse
+than none), and `tests/` is invisible to Unity because `utils/link.sh` symlinks
+only `unity/ItemChecklist` into the SDK's `Assets/`.
+
+What it pins down is exactly what costs a base, a walk, a pen and a save cycle to
+check in-game: which dimension may shrink and on what evidence, the two-miss delay
+and its resets, the prune's premise, and the parse boundary's damage detection.
+If a real save is present it also round-trips the actual ledger file — the check
+that matters most, since a false damage report puts a healthy character's store
+read-only. Point `ICL_POSSESSION_DIR` at a `mods/ItemChecklist` directory to use a
+different save; those three assertions are skipped (against a synthetic file of
+the same shape) when no save is found, so the harness stays green on a machine
+with no game install.
+
+It has already caught two defects that four review agents reading the same code
+did not — a publish after the prune that could still shrink, and the prune having
+no equivalent of the merge's miss delay. **Everything else** about the mod (ECS,
+Harmony, the UI, and above all the Roslyn sandbox) remains in-game-only, so the
+7-phase acceptance test below is unchanged and still mandatory.
+
+### The 7-phase in-game acceptance test
+
 Each iter ends with a structured acceptance test. The canonical 7-phase
 structure (established in Iter-3.6/3.7):
 
