@@ -257,10 +257,21 @@ namespace ItemChecklist.UI
             {
                 if (ItemTracker.Matches(_objectId, _entryVariation))
                     return new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateStop"), dontLocalize = true };
+                // Iter-45: say WHICH. "in N chests" was asserted about placed objects too, because
+                // the ledger could not tell a stored copy from one standing on the tile. Three
+                // cases now, and the arrow works for all of them.
                 int n = ItemChecklistMod.CountTilesHolding(_objectId);
-                return new TextAndFormatFields { text = ItemChecklist.Loc.F("ItemChecklist-General/LocateHint", n), dontLocalize = true };
+                int inContainers = ItemChecklistMod.CountContainerTilesHolding(_objectId);
+                string term =
+                    inContainers == 0 ? "ItemChecklist-General/LocateHintPlaced"
+                    : inContainers == n ? "ItemChecklist-General/LocateHint"
+                    : "ItemChecklist-General/LocateHintMixed";
+                return new TextAndFormatFields { text = ItemChecklist.Loc.F(term, n), dontLocalize = true };
             }
-            // owned but not in any stored container -> carried only
+            // Owned, but nothing the ledger can point at: carried only. (Iter-45 note — this is
+            // reached for a placed object only when locating is switched off entirely, since a
+            // placed object is now trackable again. Before that fix this branch claimed the player
+            // was carrying every workbench, torch and waypoint they had put down.)
             return new TextAndFormatFields { text = ItemChecklist.Loc.T("ItemChecklist-General/LocateCarried"), dontLocalize = true };
         }
 

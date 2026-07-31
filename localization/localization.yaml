@@ -48,6 +48,14 @@ ItemChecklist-General:
     hint: "Tooltip line on a trackable owned row. {0} = number of chests. ASCII only."
     en: "Click to locate (in {0} chests)"
     de: "Klicken zum Orten (in {0} Kisten)"
+  LocateHintPlaced:
+    hint: "Tooltip line on a trackable owned row whose copies all stand in the world rather than in a container. {0} = number of spots. ASCII only."
+    en: "Click to locate (placed at {0} spots)"
+    de: "Klicken zum Orten (an {0} Stellen aufgestellt)"
+  LocateHintMixed:
+    hint: "Tooltip line when the item is both in containers and placed in the world. {0} = total number of locations. ASCII only."
+    en: "Click to locate ({0} locations)"
+    de: "Klicken zum Orten ({0} Fundorte)"
   LocateStop:
     hint: "Tooltip line on the currently-tracked row. ASCII only."
     en: "Click to stop locating"

@@ -159,8 +159,16 @@ namespace ItemChecklist
         internal static bool IsTrackable(int objectId, int variation) =>
             ModConfig.LocateEnabled && OwnedCount(objectId, variation) >= 1 && s_ledger != null && s_ledger.CountTilesHolding(objectId) > 0;
 
-        // Iter-40: container-tile count for the tooltip hint ("in N chests"). 0 if no ledger.
+        // Iter-40: tile count for the tooltip hint. 0 if no ledger. Iter-45: this counts tiles that
+        // have it EITHER WAY (in a container or standing there) — both are places an arrow can point
+        // at. The container-only count below exists just for the wording.
         internal static int CountTilesHolding(int objectId) => s_ledger != null ? s_ledger.CountTilesHolding(objectId) : 0;
+
+        // Iter-45: how many of those are containers, so the tooltip can say "in N chests" only when
+        // that is true. Before the provenance split it said it about placed objects too, and once
+        // the split landed the naive fix (count containers only) silently removed the arrow for
+        // every placed object — ~99 % of ledger tiles per Iter-28's measurement.
+        internal static int CountContainerTilesHolding(int objectId) => s_ledger != null ? s_ledger.CountContainerTilesHolding(objectId) : 0;
 
         // Iter-40: the tracked item's holding tiles as packed (x,z) keys (empty if nothing
         // tracked / no ledger). Read fresh each frame by Update -> TrackerHud (the arrows

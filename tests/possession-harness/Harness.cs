@@ -89,6 +89,18 @@ internal static class Harness
             new HashSet<long>()
         );
 
+    // A well-formed v4 file from data lines. The count line is MANDATORY under the v4 marker
+    // (a file cut to its first line must not read as a clean empty ledger), so every hand-written
+    // v4 fixture has to carry one — which is why this helper exists rather than string concatenation.
+    private static string V4File(string body)
+    {
+        int n = 0;
+        foreach (var l in body.Split('\n'))
+            if (l.Trim().Length > 0)
+                n++;
+        return "#icl-ledger-v4\n#n=" + n + "\n" + body;
+    }
+
     private static Dictionary<long, Dictionary<int, int>> Tile(long key, Dictionary<int, int> c) => new() { [key] = c };
 
     private static Dictionary<long, Dictionary<long, int>> TileA(long key, Dictionary<long, int> a) => new() { [key] = a };
@@ -191,46 +203,50 @@ internal static class Harness
         Console.WriteLine("== parse shapes ==");
         {
             var led = new PossessionLedger();
-            int tiles = led.LoadFrom(M + "\n1,2|5610:10|\n3,4||123:1\n5,6|7:1|8:2", out int skipped);
+            int tiles = led.LoadFrom(V4File("1,2|5610:10|\n3,4||123:1\n5,6|7:1|8:2"), out int skipped);
             Check("contents-only / aux-only / both parse clean", tiles == 3 && skipped == 0, "tiles=" + tiles + " skipped=" + skipped);
             Check("re-serialize keeps all three", led.Serialize().Split('\n').Length == 5, "marker + #n= + 3 tiles");
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n-7,-9|5610:3|", out int sk);
-            Check("negative coords round-trip", sk == 0 && led.Serialize() == M + "\n#n=1\n-7,-9|5610:3||", led.Serialize().Replace("\n", " / "));
+            led.LoadFrom(V4File("-7,-9|5610:3|"), out int sk);
+            Check(
+                "negative coords round-trip (still v3-shaped: unverified)",
+                sk == 0 && led.Serialize() == M + "\n#n=1\n-7,-9|5610:3|",
+                led.Serialize().Replace("\n", " / ")
+            );
         }
         {
             var led = new PossessionLedger();
-            int tiles = led.LoadFrom(M + "\n1,2|5610:0|", out int sk);
+            int tiles = led.LoadFrom(V4File("1,2|5610:0|"), out int sk);
             Check("id:0 rejected AND counted", sk == 1 && tiles == 0);
             var led2 = new PossessionLedger();
-            led2.LoadFrom(M + "\n1,2|5610:-5|", out int sk2);
+            led2.LoadFrom(V4File("1,2|5610:-5|"), out int sk2);
             Check("id:-5 rejected AND counted", sk2 == 1);
             var led3 = new PossessionLedger();
-            led3.LoadFrom(M + "\n1,2|5610:1,5610:2|", out int sk3);
+            led3.LoadFrom(V4File("1,2|5610:1,5610:2|"), out int sk3);
             Check("duplicate id within one line is damage", sk3 == 1);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n1,2|5610:1", out int sk);
+            led.LoadFrom(V4File("1,2|5610:1"), out int sk);
             Check("one '|' is damage", sk == 1);
             var led2 = new PossessionLedger();
-            led2.LoadFrom(M + "\nx,y|5610:1|", out int sk2);
+            led2.LoadFrom(V4File("x,y|5610:1|"), out int sk2);
             Check("unparseable coords are damage", sk2 == 1);
             var led3 = new PossessionLedger();
-            led3.LoadFrom(M + "\n1,2||", out int sk3);
+            led3.LoadFrom(V4File("1,2||"), out int sk3);
             Check("an empty-but-well-formed line is damage", sk3 == 1);
         }
         {
             var led = new PossessionLedger();
-            int tiles = led.LoadFrom(M + "\n1,2|5610:10|\n1,2||99:1", out int sk);
+            int tiles = led.LoadFrom(V4File("1,2|5610:10|\n1,2||99:1"), out int sk);
             string s = led.Serialize();
             Check("duplicate tile line MERGES both dimensions", tiles == 1 && sk == 0 && s.Contains("5610:10") && s.Contains("99:1"), s.Replace("\n", " / "));
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n1,2|5610:1|\n", out int sk);
+            led.LoadFrom(V4File("1,2|5610:1|\n"), out int sk);
             Check("trailing newline is not damage", sk == 0);
         }
 
@@ -238,7 +254,7 @@ internal static class Harness
         {
             // Container observed => its buffer is authoritative => an absence lands at once.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r = Scan(led, at, true, Tile(t00, C(100, 2)), containers: new HashSet<long> { t00 });
             Check(
                 "observed container: a lower count is applied at once",
@@ -248,32 +264,32 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r = Scan(led, at, true, Tile(t00, C(999, 1)), containers: new HashSet<long> { t00 });
             Check("observed container: an ABSENT id is dropped at once", r.DroppedUnits == 5 && !led.Serialize().Contains("100:"), "dropped=" + r.DroppedUnits);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r = Scan(led, at, false, Tile(t00, C(100, 2)), containers: new HashSet<long> { t00 });
             Check("the streaming grace blocks every removal", r.DroppedUnits == 0 && led.Serialize().Contains("100:5"));
         }
         {
             // The I4 case: seen from ~95 tiles, no container observed.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r = Scan(led, far, true, Tile(t00, C(110, 1)));
             Check("I4: far tile, no container -> contents kept", r.DroppedUnits == 0 && led.Serialize().Contains("100:5"));
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r = Scan(led, far, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
             Check("far tile WITH container observed -> shrinks (Iter-43 rule kept)", r.DroppedUnits == 4);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             Scan(led, away, true, Tile(t00, C(100, 9)));
             Check("a HIGHER observation wins without any permission", led.Serialize().Contains("100:9"));
         }
@@ -283,7 +299,7 @@ internal static class Harness
             // Co-located torch observed, chest missing, player at the tile: ONE scan must not cost
             // the chest its contents.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|110:1", out int _);
+            led.LoadFrom(V4File("0,0|100:5|110:1"), out int _);
             var r1 = Scan(led, at, true, Tile(t00, C(110, 1)));
             Check("miss #1: contents kept", r1.DroppedUnits == 0 && led.Serialize().Contains("100:5"), "dropped=" + r1.DroppedUnits);
             var r2 = Scan(led, at, true, Tile(t00, C(110, 1)));
@@ -292,7 +308,7 @@ internal static class Harness
         {
             // A confirmed observation in between must RESET the streak.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|110:1", out int _);
+            led.LoadFrom(V4File("0,0|100:5|110:1"), out int _);
             Scan(led, at, true, Tile(t00, C(110, 1))); // miss 1
             Scan(led, at, true, Tile(t00, C(100, 5, 110, 1)), containers: new HashSet<long> { t00 }); // confirmed
             var r = Scan(led, at, true, Tile(t00, C(110, 1))); // miss 1 again, not 2
@@ -301,7 +317,7 @@ internal static class Harness
         {
             // Out of scope must also reset it: no information is not a miss.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|110:1", out int _);
+            led.LoadFrom(V4File("0,0|100:5|110:1"), out int _);
             Scan(led, at, true, Tile(t00, C(110, 1))); // miss 1
             Scan(led, away, true, Tile(t00, C(110, 1))); // out of scope
             var r = Scan(led, at, true, Tile(t00, C(110, 1)));
@@ -313,7 +329,7 @@ internal static class Harness
         {
             // C-1 A: the pen's LAST animal of a colour, player at the pen. Two scans, by design.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|8:1|" + red + ":1", out int _); // the station itself keeps the tile alive
+            led.LoadFrom(V4File("0,0|8:1|") + red + ":1", out int _); // the station itself keeps the tile alive
             var r1 = Scan(led, at, true, Tile(t00, C(8, 1)));
             Check("C-1 A: miss #1 keeps the colour", r1.AuxKeysReduced == 0 && led.Serialize().Contains(red + ":1"));
             var r2 = Scan(led, at, true, Tile(t00, C(8, 1)));
@@ -322,20 +338,20 @@ internal static class Harness
         {
             // C-1 B: 3 -> 1 of one colour is direct evidence and applies at once.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0||" + red + ":3", out int _);
+            led.LoadFrom(V4File("0,0||") + red + ":3", out int _);
             var r = Scan(led, at, true, aux: TileA(t00, A(red, 1)));
             Check("C-1 B: 3->1 applies immediately", r.AuxKeysReduced == 1 && led.Serialize().Contains(red + ":1"));
         }
         {
             // F15: a cow briefly outside AnchorRadius (or mid growth-churn) must not flicker.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|8:1|" + red + ":2", out int _);
+            led.LoadFrom(V4File("0,0|8:1|") + red + ":2", out int _);
             var r = Scan(led, at, true, Tile(t00, C(8, 1)));
             Check("F15: one unconfirmed scan does not touch the colour", r.AuxKeysReduced == 0 && led.Serialize().Contains(red + ":2"));
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0||" + red + ":3", out int _);
+            led.LoadFrom(V4File("0,0||") + red + ":3", out int _);
             var r = Scan(led, away, true);
             Check("away from base aux is KEPT (Iter-41)", r.AuxKeysReduced == 0 && led.Serialize().Contains(red + ":3"));
         }
@@ -352,7 +368,7 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1|\n1,1|101:1|\n300,300|102:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:1|\n1,1|101:1|\n300,300|102:1|"), out int _);
             var live = Tile(PossessionLedger.Key(1, 1), C(101, 1));
             Scan(led, at, true, live); // stale miss #1 for (0,0)
             var r = Scan(led, at, true, live); // #2 → dropped
@@ -365,13 +381,13 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:1|"), out int _);
             var r = Scan(led, at, false);
             Check("prune is a no-op during the grace", r.PrunedTiles == 0 && led.TileCount == 1);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:1|"), out int _);
             var r = Scan(led, at, true, havePlayer: false);
             Check("prune is a no-op with no player", r.PrunedTiles == 0 && led.TileCount == 1);
         }
@@ -379,7 +395,7 @@ internal static class Harness
             // No anchor predicate: report and remove nothing, rather than silently disabling both
             // removal paths.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var live = new HashSet<long>();
             var r = led.ApplyScan(
                 Tile(t00, C(100, 1)),
@@ -397,14 +413,14 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|200:2|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|200:2|"), out int _);
             var observed = C(100, 1);
             Scan(led, away, true, Tile(t00, observed));
             Check("the caller's dict is neither mutated nor adopted", observed.Count == 1 && observed[100] == 1, "count=" + observed.Count);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|\n9,9|100:2|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|\n9,9|100:2|"), out int _);
             var live = new HashSet<long>();
             led.ApplyScan(
                 Tile(t00, C(100, 5)),
@@ -425,7 +441,7 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|\n9,9|100:2|\n1,1|101:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|\n9,9|100:2|\n1,1|101:1|"), out int _);
             Check("reverse index", led.CountTilesHolding(100) == 2 && led.TilesHolding(100).Count == 2 && led.CountTilesHolding(999) == 0);
         }
 
@@ -434,7 +450,7 @@ internal static class Harness
             // The single-chest tile: the chest misses one scan, so the tile is not observed at all
             // and only the PRUNE can reach it. It must survive the first miss.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             var r1 = Scan(led, at, true);
             Check("prune: miss #1 keeps the tile", r1.PrunedTiles == 0 && led.TileCount == 1, "pruned=" + r1.PrunedTiles);
             var r2 = Scan(led, at, true);
@@ -443,7 +459,7 @@ internal static class Harness
         {
             // An observation between two stale scans must break the streak.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             Scan(led, at, true); // stale 1
             Scan(led, at, true, Tile(t00, C(100, 5)), containers: new HashSet<long> { t00 }); // observed
             var r = Scan(led, at, true); // stale 1 again
@@ -453,7 +469,7 @@ internal static class Harness
             // Going out of scope between two stale scans must also break it: no information is not
             // evidence either.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|", out int _);
+            led.LoadFrom(V4File("0,0|100:5|"), out int _);
             Scan(led, at, true); // stale 1
             Scan(led, away, true); // out of scope
             var r = Scan(led, at, true);
@@ -463,7 +479,7 @@ internal static class Harness
             // Per-KEY misses: A misses, then A is back and B misses. B must NOT drop on its first
             // miss just because a neighbour missed before it.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5,200:7,300:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:5,200:7,300:1|"), out int _);
             var r1 = Scan(led, at, true, Tile(t00, C(200, 7, 300, 1))); // 100 absent
             Check("per-key: A's miss keeps A", r1.DroppedUnits == 0 && led.Serialize().Contains("100:5"));
             var r2 = Scan(led, at, true, Tile(t00, C(100, 5, 300, 1))); // 100 back, 200 absent
@@ -474,7 +490,7 @@ internal static class Harness
         {
             // Adjacency: a miss, a long gap out of scope, then one miss must not be "the second".
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:5|110:1", out int _);
+            led.LoadFrom(V4File("0,0|100:5|110:1"), out int _);
             Scan(led, at, true, Tile(t00, C(110, 1))); // miss 1
             for (int i = 0; i < 5; i++)
                 Scan(led, away, true); // a trip away
@@ -484,7 +500,7 @@ internal static class Harness
         {
             // F3: an observed CONTAINER must not confirm the absence of a DIFFERENT aux producer.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1|" + red + ":1", out int _);
+            led.LoadFrom(V4File("0,0|100:1|") + red + ":1", out int _);
             var r = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
             Check("aux needs two misses even with a container observed", r.AuxKeysReduced == 0 && led.Serialize().Contains(red + ":1"));
             var r2 = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
@@ -501,15 +517,16 @@ internal static class Harness
         {
             // The bug this exists for: a PLACED object must not read as "in a chest".
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|||110:1", out int sk);
+            led.LoadFrom(V4File("0,0|||110:1"), out int sk);
             Check("a placed-only tile parses", sk == 0 && led.TileCount == 1);
-            Check("placed does NOT count as a container tile", led.CountTilesHolding(110) == 0 && led.TilesHolding(110).Count == 0);
+            Check("placed does NOT count as a CONTAINER tile", led.CountContainerTilesHolding(110) == 0);
+            Check("but it IS locatable, so the arrow survives", led.CountTilesHolding(110) == 1 && led.TilesHolding(110).Count == 1);
             var view = led.BuildView(new HashSet<long>());
             Check("placed still counts as OWNED", view.Totals.TryGetValue(110, out var t) && t == 1, "total=" + t);
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|110:2||110:1", out int sk);
+            led.LoadFrom(V4File("0,0|110:2||110:1"), out int sk);
             Check("both provenances on one tile round-trip", sk == 0 && led.Serialize() == M + "\n#n=1\n0,0|110:2||110:1");
             Check("the reverse index counts the tile once", led.CountTilesHolding(110) == 1);
             var view = led.BuildView(new HashSet<long>());
@@ -521,13 +538,72 @@ internal static class Harness
             var led = new PossessionLedger();
             int tiles = led.LoadFrom(V3 + "\n0,0|110:1|", out int sk);
             Check("a v3 file migrates instead of being discarded", tiles == 1 && sk == 0, "tiles=" + tiles + " skipped=" + sk);
-            Check("v3 contents load as STORED", led.CountTilesHolding(110) == 1);
-            Scan(led, at, true, placed: Tile(t00, C(110, 1)), containers: new HashSet<long> { t00 });
+            Check("v3 contents count as being in a container until observed", led.CountContainerTilesHolding(110) == 1);
+            // NO `containers` argument here. An earlier revision passed one, which forces
+            // `absenceIsConfirmed` — the single case where the correction looks atomic. Both
+            // reviewers caught that the test was asserting a behaviour the shipped code did not
+            // have. The migration must be exact on a PLACED-ONLY tile, which is the common shape.
+            var r = Scan(led, at, true, placed: Tile(t00, C(110, 1)));
+            var view = led.BuildView(new HashSet<long>());
+            Check("migration does not double the count", view.Totals[110] == 1, "total=" + view.Totals[110]);
+            Check("migration is not booked as a loss", r.DroppedUnits == 0 && r.ShrunkContentTiles == 0, "dropped=" + r.DroppedUnits);
             Check(
-                "...and the first observation re-files it as PLACED",
-                led.CountTilesHolding(110) == 0 && led.Serialize().Contains("||110:1"),
+                "...and the tile is re-filed as PLACED",
+                led.CountContainerTilesHolding(110) == 0 && led.Serialize().Contains("||110:1"),
                 led.Serialize().Replace("\n", " / ")
             );
+            Check("it stays trackable, so the arrow survives", led.CountTilesHolding(110) == 1);
+        }
+        {
+            // A migrated tile that legitimately holds the id BOTH ways: v3 wrote the sum, so
+            // subtracting the observed placed part must leave the chest's copy.
+            var led = new PossessionLedger();
+            led.LoadFrom(V3 + "\n0,0|110:3|", out int _);
+            Scan(led, at, true, Tile(t00, C(110, 2)), placed: Tile(t00, C(110, 1)), containers: new HashSet<long> { t00 });
+            var view = led.BuildView(new HashSet<long>());
+            Check(
+                "a mixed migrated tile splits exactly",
+                view.Totals[110] == 3 && led.Serialize().Contains("110:2||110:1"),
+                led.Serialize().Replace("\n", " / ")
+            );
+        }
+        {
+            // The permanent-doubling case the second reviewer found: observed from beyond
+            // PruneRadius, so nothing may shrink. The subtraction is evidence-based rather than a
+            // removal, so it must still apply.
+            var led = new PossessionLedger();
+            led.LoadFrom(V3 + "\n0,0|110:1|", out int _);
+            for (int i = 0; i < 3; i++)
+                Scan(led, new Vector2(60f, 0f), true, placed: Tile(t00, C(110, 1)));
+            Check("no doubling when observed from beyond the shrink envelope", led.BuildView(new HashSet<long>()).Totals[110] == 1);
+        }
+        {
+            // Provenance uncertainty must survive a save, or a tile not revisited before the first
+            // save hardens into a split nobody verified.
+            var led = new PossessionLedger();
+            led.LoadFrom(V3 + "\n0,0|110:1|", out int _);
+            string saved = led.Serialize();
+            Check("an unobserved migrated tile is written v3-SHAPED", saved.EndsWith("0,0|110:1|"), saved.Replace("\n", " / "));
+            var back = new PossessionLedger();
+            back.LoadFrom(saved, out int sk);
+            Scan(back, at, true, placed: Tile(t00, C(110, 1)));
+            Check(
+                "...so the correction still happens after a save",
+                sk == 0 && back.CountContainerTilesHolding(110) == 0 && back.BuildView(new HashSet<long>()).Totals[110] == 1
+            );
+        }
+        {
+            // F3: under the v4 marker the count line is mandatory — a file cut to line 1 must not
+            // load as a clean, writable, EMPTY ledger.
+            var led = new PossessionLedger();
+            int tiles = led.LoadFrom(M, out int sk);
+            Check("v4 truncated to line 1 is damage", tiles == 0 && sk > 0, "tiles=" + tiles + " skipped=" + sk);
+            var led2 = new PossessionLedger();
+            led2.LoadFrom(V4File("#n=abc\n0,0|100:1||"), out int sk2);
+            Check("a mangled count line is damage", sk2 > 0, "skipped=" + sk2);
+            var led3 = new PossessionLedger();
+            led3.LoadFrom(V3 + "\n0,0|100:1|", out int sk3);
+            Check("a v3 file needs no count line", sk3 == 0);
         }
         {
             var led = new PossessionLedger();
@@ -538,7 +614,7 @@ internal static class Harness
         {
             // The declared count: a clean cut between two lines is otherwise undetectable.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1|\n1,1|101:1|\n2,2|102:1|", out int _);
+            led.LoadFrom(V4File("0,0|100:1|\n1,1|101:1|\n2,2|102:1|"), out int _);
             string full = led.Serialize();
             var lines2 = full.Split('\n');
             var cut = new PossessionLedger();
@@ -546,14 +622,14 @@ internal static class Harness
             cut.LoadFrom(string.Join("\n", lines2[0], lines2[1], lines2[2]), out sk2);
             Check("ledger boundary truncation IS detected via #n=", sk2 > 0, "skipped=" + sk2);
             var noCount = new PossessionLedger();
-            noCount.LoadFrom(M + "\n0,0|100:1|", out int sk3);
+            noCount.LoadFrom(V4File("0,0|100:1|"), out int sk3);
             Check("a file without #n= is accepted unchecked", sk3 == 0);
         }
         {
             // Placed shrinks on the tile-scope premise only — a container's buffer says nothing
             // about the object standing beside it.
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|100:1||110:1", out int _);
+            led.LoadFrom(V4File("0,0|100:1||110:1"), out int _);
             var r = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
             Check("placed is NOT dropped on the first miss even with a container observed", r.DroppedUnits == 0 && led.Serialize().Contains("110:1"));
             var r2 = Scan(led, at, true, Tile(t00, C(100, 1)), containers: new HashSet<long> { t00 });
@@ -561,7 +637,7 @@ internal static class Harness
         }
         {
             var led = new PossessionLedger();
-            led.LoadFrom(M + "\n0,0|||110:1", out int _);
+            led.LoadFrom(V4File("0,0|||110:1"), out int _);
             var r = Scan(led, far, true, placed: Tile(t00, C(999, 1)));
             Check("placed is kept when the tile is out of scope", r.DroppedUnits == 0 && led.Serialize().Contains("110:1"));
         }

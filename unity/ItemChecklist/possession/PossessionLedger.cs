@@ -66,6 +66,59 @@ namespace ItemChecklist.Possession
         // rule cosmetic.
         private int _staleSeq = -1;
 
+        // This tile came from a v3 line, so its `_stored` dict is the SUM of both provenances and
+        // no id in it is known to be genuinely stored. Cleared once a scan has given full
+        // information about the tile. See ReclassifyMigrated — without it the migration doubled
+        // every placed object's count and booked the correction as lost owned units.
+        private bool _storedProvenanceUnknown;
+
+        public void MarkStoredProvenanceUnknown() => _storedProvenanceUnknown = true;
+
+        /// <summary>True while this tile's stored/placed split is still the v3 assumption. It is
+        /// then serialized as a v3-shaped line, so the uncertainty survives a save instead of
+        /// hardening into a wrong split.</summary>
+        public bool StoredProvenanceUnknown => _storedProvenanceUnknown && _placed.Count == 0;
+
+        /// <summary>
+        /// Re-file a migrated tile from what was actually observed, BEFORE the merges run.
+        /// <para>A v3 line carried one contents dict for both scan paths, so its count for an id is
+        /// <c>stored + placed</c>. An id observed as PLACED here therefore accounts for exactly that
+        /// much of the migrated number: <strong>subtract</strong> it, and what remains is the stored
+        /// part. Exact rather than heuristic — 1 stored + 1 placed was written as 2, so observing 1
+        /// placed leaves 1, and the chest's copy survives.</para>
+        /// <para>Uncounted on purpose: this is bookkeeping, not a removal. Counting it made the mod
+        /// write a durable "N owned unit(s) vanished — please report this file" incident on the
+        /// first post-update scan of every real base, and burn that magnitude's dedup slot so a
+        /// genuine loss in the same session would have reached no channel at all.</para>
+        /// <para>Gated on the flag, which is why the flag has to exist: on a VERIFIED tile the same
+        /// subtraction would delete a real chest's contents whenever its container happened to be
+        /// unobserved while the co-located placed object was seen.</para>
+        /// </summary>
+        public void ReclassifyMigrated(Dictionary<int, int> observedPlaced, bool haveFullInformation)
+        {
+            if (!_storedProvenanceUnknown)
+                return;
+            if (observedPlaced != null)
+            {
+                List<int> gone = null;
+                foreach (var kv in observedPlaced)
+                {
+                    if (kv.Value < 1 || !_stored.TryGetValue(kv.Key, out var wasBoth))
+                        continue;
+                    int storedPart = wasBoth - kv.Value;
+                    if (storedPart >= 1)
+                        _stored[kv.Key] = storedPart;
+                    else
+                        (gone ??= new List<int>()).Add(kv.Key);
+                }
+                if (gone != null)
+                    for (int i = 0; i < gone.Count; i++)
+                        _stored.Remove(gone[i]);
+            }
+            if (haveFullInformation)
+                _storedProvenanceUnknown = false;
+        }
+
         /// <summary>The prune found this tile stale on <paramref name="scanSeq"/>. Returns true when
         /// the immediately preceding scan found it stale too, i.e. when it may be dropped.</summary>
         public bool NoteStaleAndShouldDrop(int scanSeq)
@@ -126,6 +179,12 @@ namespace ItemChecklist.Possession
         /// both (a chest standing next to a placed copy), and that still counts once, correctly.</para></summary>
         public bool Holds(int objectId) => _stored.TryGetValue(objectId, out var c) && c >= 1;
 
+        /// <summary>Does the tile carry <paramref name="objectId"/> as a PLACED object? Iter-45: the
+        /// locate feature needs both — an arrow to a placed object was always correct and useful,
+        /// only the wording ("in N chests") was wrong. Splitting the read lets the tooltip say
+        /// which without giving up the arrow.</summary>
+        public bool HoldsPlaced(int objectId) => _placed.TryGetValue(objectId, out var c) && c >= 1;
+
         /// <summary>Append this tile's line.
         /// <para>v4: <c>x,z|&lt;stored&gt;|&lt;aux&gt;|&lt;placed&gt;</c>. The placed segment is
         /// LAST on purpose — the first three fields keep exactly their v3 meaning, so a v3 file
@@ -133,6 +192,18 @@ namespace ItemChecklist.Possession
         /// the optional fourth segment is new.</para></summary>
         public void AppendTo(List<string> lines, int x, int z)
         {
+            // A tile whose provenance is still the v3 assumption is written as a v3-SHAPED line
+            // (three segments). The uncertainty then survives the save and is corrected on the
+            // tile's first real observation, instead of hardening into a split we never verified —
+            // which for a tile the player has not revisited since the update would otherwise make
+            // the "in N chests" claim permanent. Costs nothing: the parser already reads both
+            // shapes, and once anything has been observed here the flag is gone and a full v4 line
+            // is written.
+            if (StoredProvenanceUnknown)
+            {
+                lines.Add(x + "," + z + "|" + Pairs(_stored) + "|" + Pairs(_aux));
+                return;
+            }
             lines.Add(x + "," + z + "|" + Pairs(_stored) + "|" + Pairs(_aux) + "|" + Pairs(_placed));
         }
 
@@ -614,6 +685,12 @@ namespace ItemChecklist.Possession
                     absenceIsConfirmed = containerObserved;
                 }
 
+                // BEFORE the merges: correct a migrated tile's provenance from what was observed,
+                // without booking it as a removal. Running it first means an observed container's
+                // buffer is re-added right after by MergeStored, so a tile that legitimately holds
+                // the same id both stored and placed stays correct.
+                entry.ReclassifyMigrated(tilePlaced, mayShrinkStored);
+
                 int units = entry.MergeStored(tileStored, mayShrinkStored, absenceIsConfirmed, _scanSeq);
                 units += entry.MergePlaced(tilePlaced, mayShrinkPlacedOrAux, _scanSeq);
                 int auxKeys = entry.MergeAux(tileAux, mayShrinkPlacedOrAux, _scanSeq);
@@ -785,14 +862,27 @@ namespace ItemChecklist.Possession
         {
             var keys = new List<long>();
             foreach (var pair in _tiles)
-                if (pair.Value.Holds(objectId))
+                if (pair.Value.Holds(objectId) || pair.Value.HoldsPlaced(objectId))
                     keys.Add(pair.Key);
             return keys;
         }
 
-        /// <summary>How many container tiles hold <paramref name="objectId"/> — the
-        /// allocation-free count used by the trackable gate and the tooltip hint.</summary>
+        /// <summary>How many remembered tiles have <paramref name="objectId"/> anywhere — stored OR
+        /// placed. The trackable gate and the arrow count: both provenances are real locations, and
+        /// a tile that has it both ways counts once.</summary>
         public int CountTilesHolding(int objectId)
+        {
+            int n = 0;
+            foreach (var pair in _tiles)
+                if (pair.Value.Holds(objectId) || pair.Value.HoldsPlaced(objectId))
+                    n++;
+            return n;
+        }
+
+        /// <summary>How many tiles hold it in a CONTAINER. Only the tooltip wording needs this —
+        /// "in N chests" is a claim about containers, and before Iter-45 it was made about placed
+        /// objects too.</summary>
+        public int CountContainerTilesHolding(int objectId)
         {
             int n = 0;
             foreach (var pair in _tiles)
@@ -844,7 +934,13 @@ namespace ItemChecklist.Possession
 
         public string Serialize()
         {
-            var lines = new List<string>(_tiles.Count + 2) { VersionMarker, CountPrefix + _tiles.Count };
+            // Build the data lines FIRST, then declare their real count. Deriving the count from
+            // `_tiles.Count` before a loop that may emit fewer lines meant that if the
+            // "unreachable" empty-entry guard below ever fired, the file would declare N and carry
+            // N-1 — and the load-side check would then read that as damage, put the store
+            // read-only and stop saving entirely. A one-tile drop plus a warning must not escalate
+            // into permanent save suppression blamed on the file.
+            var data = new List<string>(_tiles.Count);
             foreach (var pair in _tiles)
             {
                 var entry = pair.Value;
@@ -864,8 +960,10 @@ namespace ItemChecklist.Possession
                     }
                     continue;
                 }
-                entry.AppendTo(lines, KeyX(pair.Key), KeyZ(pair.Key));
+                entry.AppendTo(data, KeyX(pair.Key), KeyZ(pair.Key));
             }
+            var lines = new List<string>(data.Count + 2) { VersionMarker, CountPrefix + data.Count };
+            lines.AddRange(data);
             return string.Join("\n", lines);
         }
 
@@ -913,6 +1011,11 @@ namespace ItemChecklist.Possession
             if (firstLine != VersionMarker && firstLine != PreviousVersionMarker)
                 return -1; // discard (pre-v3 file, or corrupt — the caller reports it)
             int declared = -1;
+            // Data lines that yielded no tile, for ANY reason. Subtracted from the `#n=` check so a
+            // malformed line is reported once as a parse failure rather than twice (once there and
+            // once as a count mismatch) — the incident text quotes this number as "line(s) could not
+            // be read".
+            int droppedLines = 0;
             foreach (var raw in text.Split('\n'))
             {
                 var line = raw.Trim();
@@ -929,12 +1032,14 @@ namespace ItemChecklist.Possession
                 if (seg.Length != 3 && seg.Length != 4)
                 {
                     skipped++;
+                    droppedLines++;
                     continue;
                 }
                 var xz = seg[0].Split(',');
                 if (xz.Length != 2 || !int.TryParse(xz[0], out int x) || !int.TryParse(xz[1], out int z))
                 {
                     skipped++;
+                    droppedLines++;
                     continue;
                 }
                 long key = Key(x, z);
@@ -944,30 +1049,56 @@ namespace ItemChecklist.Possession
                 // rewritten file — where Iter-44's OWN first draft (`_tiles[key] = entry`) silently
                 // discarded the first line's half. Iter-43's two independent dicts had kept both,
                 // so this is a self-caught regression of the refactor, not an inherited one.
-                if (!_tiles.TryGetValue(key, out var entry))
+                bool mergedIntoExisting = _tiles.TryGetValue(key, out var entry);
+                if (!mergedIntoExisting)
                     entry = new TileEntry();
+                else
+                    // This line did not add a TILE, so it must not be expected to. Otherwise the
+                    // `#n=` check below would read a concatenated file as damaged and put the store
+                    // read-only — while the merge path right here exists precisely to SALVAGE such a
+                    // file. Both reviewers called that self-contradictory, and they were right.
+                    droppedLines++;
 
-                // Segment 1 = stored. For a v3 line this is the undifferentiated old `contents`, so
-                // it lands in stored: provenance is assumed for one visit and replaced by the real
-                // split the first time the tile is observed (see PreviousVersionMarker).
+                // Segment 1 = stored. For a THREE-segment line this is the undifferentiated old
+                // `contents`, so it lands in stored and the tile is flagged: the split is an
+                // assumption until an observation corrects it (ReclassifyMigrated). Note the flag
+                // follows the line SHAPE, not the file's marker — a v4 file can carry three-segment
+                // lines for tiles that have not been observed since the migration.
+                if (seg.Length == 3)
+                    entry.MarkStoredProvenanceUnknown();
                 bool lineOk = RestoreInts(seg[1], entry, placed: false);
                 lineOk &= RestoreAuxSegment(seg[2], entry);
                 // Segment 4 = placed, v4 only. Absent on a v3 line, which is not damage.
                 if (seg.Length == 4)
                     lineOk &= RestoreInts(seg[3], entry, placed: true);
                 // A line with valid coordinates but nothing in any segment carries no information;
-                // Serialize never emits one, so it is damage like any other.
-                if (!lineOk || entry.IsEmpty)
+                // Serialize never emits one, so it is damage like any other. Counted ONCE — such a
+                // line also makes the tile count fall short of `#n=`, and reporting both would
+                // double the number the incident text quotes as "line(s) could not be read".
+                bool emptyLine = entry.IsEmpty;
+                if (!lineOk || emptyLine)
                     skipped++;
-                if (entry.IsEmpty)
+                if (emptyLine)
+                {
                     _tiles.Remove(key);
+                    droppedLines++;
+                }
                 else
                     _tiles[key] = entry;
             }
             // The boundary-truncation detector: a file cut cleanly between two lines is otherwise a
-            // valid shorter file. `declared < 0` means a pre-Iter-45 file with no count line, which
-            // is accepted unchecked and gains one on the next save.
-            if (declared >= 0 && declared != _tiles.Count)
+            // valid shorter file.
+            //   • under the CURRENT marker the count line is mandatory, because every v4 writer
+            //     emits it — so its absence is itself damage, and that is exactly the shape a
+            //     truncation after line 1 produces. Treating `declared < 0` as "accepted unchecked"
+            //     there would have let a file cut to its first line load as a clean, WRITABLE,
+            //     EMPTY ledger, i.e. the Iter-42 symptom with a green light on it.
+            //   • under the PREVIOUS marker there is no count line to expect, so it stays unchecked
+            //     and the file gains one on its next save.
+            bool countRequired = firstLine == VersionMarker;
+            if (countRequired && declared < 0)
+                skipped++;
+            else if (declared >= 0 && declared != _tiles.Count + droppedLines)
                 skipped++;
             return _tiles.Count;
         }
