@@ -5,6 +5,16 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.3.5] - 2026-08-06
+
+### Fixed
+
+- Declared as client-only (`requiredOn: Client`). The mod previously declared
+  itself as required on client **and** server, which made Core Keeper refuse to
+  join any server that does not also have it installed — the player was offered
+  only "disable the mod" or "cancel the connection". Nothing in this mod needs
+  the server, so joining unmodded servers now works.
+
 ## [1.3.4] - 2026-07-31
 
 Rebuilds the owned-item bookkeeping around one record per location instead of two

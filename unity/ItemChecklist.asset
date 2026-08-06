@@ -20,7 +20,7 @@ MonoBehaviour:
     disableScripts: 0
     accessesExtraAssemblies: 1
     disableHarmonyPatching: 0
-    requiredOn: 3
+    requiredOn: 1
     files: []
     dependencies:
     - modName: CoreLib
