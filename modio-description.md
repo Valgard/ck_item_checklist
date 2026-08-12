@@ -39,8 +39,10 @@ Press **F1** to open it. Discovery and possession are tracked per world × per p
 - **English & German**, following your in-game language live.
 
 ## Requirements
-Requires **CoreLib** and **Mod Settings Menu** (both pulled in automatically when
-you subscribe).
+Requires **CoreLib**, **Mod Settings Menu** and **Complete Tiny Font** (all
+pulled in automatically when you subscribe). Without Complete Tiny Font, Item
+Checklist does not load at all — no F1 window, no HUD counter — rather than
+running with broken text; re-enabling it brings the checklist back.
 
 ## Known limitations
 Per-colour possession is counted for placeable furniture only (not floor or wall
