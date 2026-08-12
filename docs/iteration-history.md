@@ -2461,5 +2461,27 @@ levels below it): `✓ Build complete`, 0 `error CS`, no `files: []`. The genera
 `ModManifest.json` carries all three dependencies (`CoreLib`, `ModSettingsMenu`, `CompleteTinyFont`)
 with `required: true`, and the file count dropped 62 → 61 (`ThinTinyGlyphPatch.cs` gone, nothing
 else file-wise); `command grep -rn "ThinTinyGlyphPatch\|thinTiny_glyphs" unity/` returns nothing.
-In-game verification, the negative test (disabling Complete Tiny Font and confirming the exact
-`skipping mod` line plus the mod's disappearance), and the 1.4.0 publish follow in a separate pass.
+**Verified in-game.** ItemChecklist's chrome renders umlauts correctly with its own glyph injection
+removed — screenshots of the filter and sort panels show "Alle löschen", "Entdeckung",
+"Gewöhnlich", "Seltenheit" and "Nicht im Besitz" rendering cleanly. This is the first clean proof
+of the extracted font: the old 85-glyph patch used to mask exactly these characters, so a broken
+accent here would have meant the extraction regressed something the removed code used to paper
+over.
+
+**The negative test passed.** Disabling Complete Tiny Font via the loader's `disabledMods` made
+ItemChecklist disappear entirely — no F1 window, no HUD counter, no Mod Settings entry — and
+`Player.log` carries the exact line `skipping mod ItemChecklist because of missing dependency:
+CompleteTinyFont`. That is the failure mode `README.md`/`CHANGELOG.md` describe; it is now
+observed, not just derived from the loader source.
+
+**Two font defects surfaced during this verification, fixed in Complete Tiny Font rather than
+here** (context only, since the effect showed up on this mod's UI): glyphs sat one pixel too low
+(CK discards the bottom row of every rect box, so the font now hands it a rect two rows taller),
+and the lowercase `t` collided with its neighbours in `lt`/`td` until the kerning rule was given a
+one-column margin. Both are fixed in Complete Tiny Font **1.0.1**, which this mod's 1.4.0 expects.
+
+**Live on mod.io.** ItemChecklist's platform dependencies list CoreLib, Mod Settings Menu and
+Complete Tiny Font (modId 6302514), so subscribers receive the font automatically. The dedicated
+server was reconciled with `server.sh relink`, which added the font mod's link — required because
+the server loads ItemChecklist too, and a missing dependency there would drop it server-side and
+surface as a version mismatch on join.
