@@ -20,8 +20,12 @@ other mod can depend on too.
   loader silently drops it from the mod list (only a log line, no in-game
   message), so a missing font mod shows up as "the checklist disappeared",
   not an error. Re-enabling Complete Tiny Font restores it.
-- Removed the mod's own glyph-injection patch; the rendered result is
-  unchanged.
+- Removed the mod's own glyph-injection patch. The accented characters come
+  from the same hand-drawn set as before, so they look the same. The plain
+  letters and digits in the chrome now come from the font mod's own build
+  rather than the game's original font, which makes the digits a pixel
+  flatter and a few letters — `m` and `M` most of all — slightly wider, so
+  some labels sit a little differently than in 1.3.5.
 
 ## [1.3.5] - 2026-08-06
 
