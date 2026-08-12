@@ -5,6 +5,24 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 without strict adherence — entries describe what shipped per release, not
 every commit. The topmost `## [x.y.z]` entry is the current published version.
 
+## [1.4.0] - 2026-08-12
+
+The accented characters in the small chrome labels ("Gewöhnlich",
+"Ungewöhnlich", "Legendär") now come from the **Complete Tiny Font** mod
+instead of a patch bundled with this one — the same fix, moved to a mod any
+other mod can depend on too.
+
+### Changed
+
+- **Adds a required dependency: Complete Tiny Font.** Subscribing to Item
+  Checklist on mod.io installs it automatically, so most players will not
+  notice a thing. **Without it, Item Checklist does not load at all** — the
+  loader silently drops it from the mod list (only a log line, no in-game
+  message), so a missing font mod shows up as "the checklist disappeared",
+  not an error. Re-enabling Complete Tiny Font restores it.
+- Removed the mod's own glyph-injection patch; the rendered result is
+  unchanged.
+
 ## [1.3.5] - 2026-08-06
 
 ### Fixed

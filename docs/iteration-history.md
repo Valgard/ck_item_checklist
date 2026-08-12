@@ -2391,3 +2391,75 @@ write/read/write.
 **Deliberately still open** (carried over in `docs/roadmap.md`): an aux trigger channel, which
 needs a measured baseline of aux reductions in normal play before its threshold can be anything but
 a guess — the lesson from Iter-44's four refuted false-positive claims.
+
+**Iter-46 (extract the glyph fix into a shared mod) — DONE (2026-08-12, branch `iter-46`).**
+Iter-25's runtime glyph injection is gone from this mod entirely; the accented-glyph fix for
+`thinTiny` now lives in a new, separate mod — **Complete Tiny Font** — that ItemChecklist depends
+on. Not a bugfix: the on-screen result is unchanged (the chrome labels still render
+"Gewöhnlich"/"Ungewöhnlich"/"Legendär" with correct umlauts) — only the mechanism and its ownership
+moved.
+
+**Why extract it.** Iter-25's fix inserted 85 mod-authored glyphs into the live `thinTiny` PugFont
+*at runtime*, from inside ItemChecklist — so any other mod rendering small chrome text in
+`thinTiny` inherited CK's own bug (silent CJK fallback on a missing accent) with no benefit from
+ItemChecklist's fix unless it happened to load first and reuse the same override. Complete Tiny
+Font instead **replaces the `thinTiny` atlas wholesale** (a full 337-glyph rebuild via its own
+`ThinTinyFontPatch.cs`, not a per-glyph append into the vanilla 114-glyph atlas), so the fix now
+applies process-wide to every mod, this one included.
+
+**The move.** `sources/thinTiny.pixaki` (the hand-drawn master) and `sources/thinTiny-review.md`
+(its revision review) had already relocated to the `complete-tiny-font` repo in an earlier task of
+this project. This iteration finished the extraction:
+- `sources/glyph-templates/{build_glyph_grids.py, dump_log_to_json.py, README.md}` copied
+  byte-identical (verified by SHA-256) into `complete-tiny-font/sources/glyph-templates/`, then
+  `git rm`'d here. `pixaki_to_glyphs.py` was **not** copied — it had already become the shared,
+  generalized `utils/pixaki_to_glyphs.py` (a from-scratch CLI rewrite: `--pixaki`/`--sheet`/
+  `--kerning`/`--check-only`, no `glyph_metrics.json` dependency, a hardcoded 32×12 grid instead of
+  one derived from a runtime dump); duplicating the old ItemChecklist-local copy under the same name
+  would have shipped two divergent tools.
+- `unity/ItemChecklist/ThinTinyGlyphPatch.cs` (+ `.meta`) and
+  `unity/ItemChecklist/Art/thinTiny_glyphs.png` (+ `.meta`) deleted outright — the mechanism, not
+  just its source material.
+- The three-line call + comment in `ItemCatalogWorldLoadHook.BakeWhenReady()` removed; the coroutine
+  now goes straight from the player-ready `WaitUntil` to `Catalog.Bake()`.
+- `unity/ItemChecklist.asset`'s `dependencies:` list gained `CompleteTinyFont, required: 1`,
+  alongside the existing `CoreLib`/`ModSettingsMenu` entries.
+
+**The dependency is hard, and the failure mode is silent.** With `required: 1` and the dependency
+missing or disabled, the loader's `ModSorter.SortMods` removes ItemChecklist from the load list
+entirely — `Debug.LogWarning("skipping mod … because of missing dependency: …")` is the *only*
+signal, no in-game dialogue, no error toast. A player who disables Complete Tiny Font (or whose
+mod.io sync drops it) sees ItemChecklist simply vanish: no F1 window, no HUD counter, nothing to
+click on. `README.md` and `CHANGELOG.md` now name this failure mode explicitly so a future "the
+checklist disappeared" report is diagnosable from the symptom alone.
+
+**A doc correction inherited from stale measurement, not from this change.** This mod's own
+`CLAUDE.md` architecture table has long stated the catalog bakes **8116** items. Measured fresh
+from `Player.log` across two launches — one of them predating Complete Tiny Font's existence — the
+catalog actually bakes **8113**. This is pre-existing staleness from a changed mod set between when
+"8116" was last verified and now (a foreign mod's catalog contribution shifting by a few entries is
+exactly the drift class the project's own no-hardcoded-counts lesson warns about), not a regression
+from this iteration — Iter-46 touches no catalog-bake code. Corrected here rather than in the
+historical entries that recorded "8116" while it was true.
+
+**A second correction, to Iter-25's own claim.** Iter-25's entry above states "CK itself never uses
+`thinTiny` for prose — only damage/score numbers." Measured against the shipped assets while
+auditing what needed Complete Tiny Font's coverage: **exactly 14 assets use `thinTiny`** — the
+seven inventory/progress slot prefabs, `RecipeSlot`, `RecipeCategorySlot`, `BossStatueRecipeSlot`,
+`DroppedItem`, `ConditionUI`, the score-text prefab, and the main-manager prefab. **Damage numbers
+are not among them**: `CombatText.prefab` renders in `thinSmall`, and CK's own
+`isDamageNumber → SetDefaultFont(thinTiny)` path is dead in practice — it writes
+`defaultStyle.fontFace`, but `PugText` rendering reads `style.fontFace`, a different field the
+setter never touches. Per this project's convention, Iter-25's entry is left as written above
+(historical findings are not rewritten); this correction lives here instead, the way Iter-43
+corrected Iter-42's claims in place.
+
+**Build-verified.** `dotnet csharpier format .` (no reformat beyond the intended edit),
+`../../../utils/build.sh` from the worktree (the parent `core_keeper/.envrc` was sourced explicitly
+first — the documented `../.envrc` manual-source fallback assumes the mod root, not a worktree two
+levels below it): `✓ Build complete`, 0 `error CS`, no `files: []`. The generated
+`ModManifest.json` carries all three dependencies (`CoreLib`, `ModSettingsMenu`, `CompleteTinyFont`)
+with `required: true`, and the file count dropped 62 → 61 (`ThinTinyGlyphPatch.cs` gone, nothing
+else file-wise); `command grep -rn "ThinTinyGlyphPatch\|thinTiny_glyphs" unity/` returns nothing.
+In-game verification, the negative test (disabling Complete Tiny Font and confirming the exact
+`skipping mod` line plus the mod's disappearance), and the 1.4.0 publish follow in a separate pass.

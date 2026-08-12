@@ -771,6 +771,24 @@ remaining backlog.
     read `auxReduced=`/`shrunkAux=` from a normal diagnostics session, then set the threshold.
     Also still open and unchanged: full per-container identity (buys the near-vacuous residual only).
 
+- **Iter-46 -- extract the thinTiny glyph fix into a required dependency (Complete Tiny
+  Font). DONE** (2026-08-12, see `docs/iteration-history.md`). Iter-25's runtime
+  append-85-glyphs-into-`thinTiny` patch is gone from this mod; a new, separate mod —
+  **Complete Tiny Font** — replaces the `thinTiny` atlas wholesale instead (a font swap,
+  not a per-glyph append), so the fix now benefits every mod rendering in that face, not
+  just this one. ItemChecklist gained a third **required** manifest dependency
+  (`CompleteTinyFont`, alongside CoreLib/Mod Settings Menu); with it missing, the loader's
+  `ModSorter.SortMods` silently drops ItemChecklist from the load list (`Debug.LogWarning`,
+  no in-game dialogue) — `README.md`/`CHANGELOG.md` now name that failure mode. Two doc
+  corrections landed alongside, neither caused by this iteration: the catalog bakes
+  **8113** items, not the long-stated 8116 (pre-existing staleness from a changed mod set,
+  measured fresh from `Player.log`); and Iter-25's "CK never uses thinTiny for prose" claim
+  is wrong — 14 shipped assets use it (none of them damage numbers, which render in
+  `thinSmall`; CK's own damage-number `thinTiny` code path is dead — it writes a field
+  `PugText` rendering never reads). Build-verified (the manifest carries all three
+  dependencies as `required: true`); in-game verification, the negative test, and the 1.4.0
+  publish are a separate pass.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See

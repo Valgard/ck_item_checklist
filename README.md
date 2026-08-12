@@ -54,13 +54,17 @@ Discovery is tracked **per world × per player**.
 - Core Keeper (verified on 1.2.1.5)
 - [CoreLib](https://mod.io/g/corekeeper/m/corelib) — required dependency
 - **Mod Settings Menu** — required dependency (drives the in-game settings)
+- **Complete Tiny Font** — required dependency (supplies the accented glyphs
+  the small chrome labels use)
 
 ## Installation
 
 Subscribe in-game through the **Mods** menu (or on the mod.io website) and
-restart. [CoreLib](https://mod.io/g/corekeeper/m/corelib) and Mod Settings Menu
-must be installed alongside it — both are pulled in automatically when you
-subscribe.
+restart. [CoreLib](https://mod.io/g/corekeeper/m/corelib), Mod Settings Menu
+and Complete Tiny Font must be installed alongside it — all three are pulled
+in automatically when you subscribe. Without Complete Tiny Font, Item
+Checklist does not load at all (no F1 window, no HUD counter) rather than
+running with broken text — re-enable it to bring the checklist back.
 
 ## Known Limitations
 
