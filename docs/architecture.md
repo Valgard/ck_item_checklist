@@ -1603,8 +1603,9 @@ the symptom rather than fixing it.
 
 ## Runtime Glyph Injection (Iter-25 / Iter-46)
 
-The chrome labels (Sort/Filter/header) render in `thinTiny`, CK's reduced
-**digits-only** face — so accented characters never had a real glyph.
+The chrome labels (Sort/Filter/header) render in `thinTiny`, CK's reduced face:
+it carries basic Latin from ASCII 33 up, but **no accented characters** — so
+`ö`, `ä` and friends never had a real glyph there.
 
 ### The rrs* font family
 
@@ -1614,7 +1615,7 @@ resolved by `Manager.text.GetFont(fontFace)`:
 
 | FontFace | Atlas | Size | Glyphs |
 |---|---|---|---|
-| `thinTiny` | `rrs5` | 256×40 | 114 — CK's reduced **digits-only** face (no accents) |
+| `thinTiny` | `rrs5` | 256×40 | 114 — CK's reduced face: basic Latin from ASCII 33, **no accents** |
 | `thinSmall` | `rrsthin8` | — | 331 |
 
 A char absent from a face's `codePoints` is **not** an error: `PugFont.GetGlyphData`

@@ -2403,9 +2403,11 @@ moved.
 *at runtime*, from inside ItemChecklist — so any other mod rendering small chrome text in
 `thinTiny` inherited CK's own bug (silent CJK fallback on a missing accent) with no benefit from
 ItemChecklist's fix unless it happened to load first and reuse the same override. Complete Tiny
-Font instead **replaces the `thinTiny` atlas wholesale** (a full 337-glyph rebuild via its own
+Font instead **replaces the `thinTiny` atlas wholesale** (a full 331-glyph rebuild via its own
 `ThinTinyFontPatch.cs`, not a per-glyph append into the vanilla 114-glyph atlas), so the fix now
-applies process-wide to every mod, this one included.
+applies process-wide to every mod, this one included. 331 is the number of characters that
+render; the atlas paints 337 cells, six of which are controller-button slots CK addresses by
+glyph index and a codepoint-based replacement never reaches.
 
 **The move.** `sources/thinTiny.pixaki` (the hand-drawn master) and `sources/thinTiny-review.md`
 (its revision review) had already relocated to the `complete-tiny-font` repo in an earlier task of
