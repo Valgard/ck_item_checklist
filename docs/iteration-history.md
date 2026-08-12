@@ -884,7 +884,7 @@ that convention *exactly* fixed it — the project's standing lesson: mirror CK'
 internals, don't approximate. Verified in-game (1.2.1.4, fake-ID 9999997): clean sandbox
 compile, `inserted 85 accented glyphs into thinTiny`, "Gewöhnlich"/"Ungewöhnlich"/"Legendär"
 render correct umlauts at thinTiny size. **The `.pixaki` format was reverse-engineered**
-along the way (`docs/research/pixaki-format.md`). Font architecture: the
+along the way (now `core_keeper/docs/pixaki-format.md`, shared). Font architecture: the
 `reference-ck-pugfont-architecture` memory.
 
 **Iter-22 (row-hover tooltips) — DONE (2026-06-24, branch `iter-22`).** Hovering a

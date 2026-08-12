@@ -221,9 +221,10 @@ remaining backlog.
   (`Art/thinTiny_glyphs.png`), replicating `PugFont.InitCodePoints`' `rect2`+centered-pivot
   convention exactly. Glyphs hand-drawn in Pixaki (`sources/thinTiny_full.pixaki`),
   extracted 3-layer (Atlas=sprite, Rects=advance width, thinSmall arrangement=char).
-  Covers full Western-European + partial Eastern-European/Cyrillic/typography. thinTiny
-  is digits-only in CK, so the global insert is harmless. Full font architecture in the
-  `reference-ck-pugfont-architecture` memory + `docs/research/pixaki-format.md`.
+  Covers full Western-European + partial Eastern-European/Cyrillic/typography. CK's
+  thinTiny carries basic Latin but no accents, so inserting the accented glyphs globally
+  adds characters without replacing any. Full font architecture in the
+  `reference-ck-pugfont-architecture` memory + `core_keeper/docs/pixaki-format.md`.
 - **Iter-26 (tentative) -- search-field focus race fix.** Iter-20's mitigation (run the
   scan + `ListView.Refresh()` **before** `OpenModUI` so the rebind doesn't race the
   search field's focus-init) is **incomplete**: the race **recurred during Iter-17** —
