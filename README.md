@@ -45,7 +45,7 @@ Discovery is tracked **per world × per player**.
   colour (5 colour slots each), and paintable items (furniture, rugs) get a row
   per paint colour with its real colour name (e.g. "(Red)").
 - **English and German**, following the in-game language; switches live.
-- **In-game settings** (Options → Mod Settings) — a master Enabled toggle to
+- **In-game settings** (Options → Mod settings) — a master Enabled toggle to
   switch the whole mod on/off without uninstalling, the discovered/owned counter
   mode, the possession scan interval, and the base anchor radius.
 

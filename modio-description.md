@@ -33,7 +33,7 @@ Press **F1** to open it. Discovery and possession are tracked per world × per p
   search** in your game's language.
 - **Per-row Level & Value**, rarity colouring, and per-permutation cooked-food
   tracking (~8,100 entries).
-- **In-game settings** under Options → Mod Settings — a master Enabled toggle,
+- **In-game settings** under Options → Mod settings — a master Enabled toggle,
   the discovered/owned counter mode, the possession scan interval, and the base
   anchor radius.
 - **English & German**, following your in-game language live.

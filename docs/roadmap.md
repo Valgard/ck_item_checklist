@@ -428,7 +428,7 @@ remaining backlog.
 - **Iter-38 -- possession-scan interval as a setting. DONE** (see
   `docs/iteration-history.md`). Exposes the possession-scan cadence (was the hardcoded
   `const float PossessionRefreshSeconds = 3f`, reset onto `_possessionTimer` each cycle in
-  `Update()`) as an in-game Mod Settings control, so the player trades owned-tally freshness
+  `Update()`) as an in-game Mod settings control, so the player trades owned-tally freshness
   against per-scan overhead (a freshness knob, not a perf necessity -- the user-facing form of
   the "simpler lever" Iter-29 named). **The user changed the widget mid-iter from the planned
   Slider to a `.Choice<int>`** of fixed presets **{1,2,3,5,8,10,15,20,25,30} s, default 3**

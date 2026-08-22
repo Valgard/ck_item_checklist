@@ -144,7 +144,7 @@ ControlMapper:
     en: "Item Checklist: Stop locating"
     de: "Item-Checkliste: Orten beenden"
 
-# Mod Settings Menu section (Options -> Mod Settings). The framework looks up each SETTING label by
+# Mod Settings Menu section (Options -> Mod settings). The framework looks up each SETTING label by
 # `<ModId>-Config/<key>` and the section HINT by `<ModId>-Config/_hint`. Slider/Toggle values render
 # without loc; the counterMode Choice's per-option labels live in a separate
 # `ItemChecklist-Config/counterMode` namespace block at the end of this file.
