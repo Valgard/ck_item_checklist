@@ -790,6 +790,21 @@ remaining backlog.
   dependencies as `required: true`); in-game verification, the negative test, and the 1.4.0
   publish are a separate pass.
 
+- **Iter-47 -- honour "hide in-game UI" in both HUD gates. OPEN.** Both HUDs stay on
+  screen when the player hides CK's interface, so they are the only thing left on an
+  otherwise empty screen. Confirmed in game 2026-08-23 (found while reviewing
+  player-coordinates-hud, which had the identical defect and fixed it there).
+  `Manager.prefs.hideInGameUI` is not a niche setting: it sits on the regular
+  `PlayerInput.InputType.TOGGLE_UI` keybind **and** on an options entry, and CK's own
+  gameplay UI honours it via `CalcGameplayUITargetScaleMultiplier()` collapsing to
+  `Vector3.zero`. The fix is one term in each of the two visibility expressions --
+  `unity/ItemChecklist/ui/ItemChecklistHud.cs:62` and
+  `unity/ItemChecklist/ui/TrackerHud.cs:84` -- both of which already read
+  `WorldState.IsInPlayableWorld && !isAnyInventoryShowing && !IsAnyMenuActive()`.
+  Do **not** switch these gates to `CalcGameplayUITargetScaleMultiplier()` instead: it is
+  a global scale, not a per-element one, and it collapses for several unrelated reasons
+  at once (hidden UI, fades, load screens) that `WorldState` already covers separately.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
