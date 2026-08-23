@@ -805,6 +805,22 @@ remaining backlog.
   a global scale, not a per-element one, and it collapses for several unrelated reasons
   at once (hidden UI, fades, load screens) that `WorldState` already covers separately.
 
+- **Iter-48 -- put the HUD row on CK's pixel grid. OPEN.** `ItemChecklistHUD.prefab`'s
+  `hudRoot` sits at `y: 7.8`, and its `CounterText` hangs `0.0625` below that, so the
+  drawn text centre lands on `7.7375`. CK's UI grid is `1/16 = 0.0625` per pixel, which
+  makes those `124.8 px` and `123.8 px` -- both between pixels. The atlas is
+  point-filtered and nothing on the prefab snaps positions, so this is the condition
+  under which glyph edges go soft. Found 2026-08-23 while calibrating
+  player-coordinates-hud against this row; that mod moved its own anchor to `7.8125`
+  (125 px) and now sits `0.2 px` above ICL rather than exactly on its line.
+
+  **Whether it is visible is unmeasured** -- 0.8 px of sub-pixel offset may well be
+  invisible at every scale factor, and the row has looked fine for many releases. So
+  this is a "look at it zoomed in, then decide" item, not a defect. If it does move:
+  `7.8125` is the nearest grid value going up (`0.8 px` up) and `7.75` the nearest going
+  down (`0.8 px` down), and picking the former restores exact row parity with
+  player-coordinates-hud for free.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
