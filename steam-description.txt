@@ -1,0 +1,31 @@
+[h1]Item Checklist[/h1]
+
+Item Checklist adds a scrollable, searchable checklist of every discoverable item in Core Keeper — vanilla and mod-added alike, roughly 8,100 in total — so you always know what's left to find, and how much of it you own. Press F1 to open it. Discovery and possession are tracked per world and per player.
+
+[b]Two ways to complete the game.[/b] Discovery tracks every item you've found — auto-checked on pickup, with undiscovered items staying spoiler-hidden as "???". Possession tracks how many of each item you currently own — carried inventory plus base storage and display furniture — with the checkbox turning blue once you own at least one, and a filter to hunt down items you've seen but don't actually have.
+
+[b]Collect them all.[/b] Pets are tracked per skin — every colour variant is its own row. Critters, fireflies and farm animals get their own categories, and cattle and paintable furniture get a row per colour. Cooked dishes are tracked down to the exact ingredient combination — Mushroom Soup and Tomato Soup are different rows.
+
+[b]Everything you'd expect.[/b] Left-click any row to track it and a HUD arrow points to every container that holds it, so you walk straight to it instead of opening every chest. A live HUD counter shows your progress at a glance. Sort by name, rarity, level or value; filter by discovery, category, rarity and craftability; and search by name in your game's language.
+
+[b]Not standalone — needs its full dependency chain.[/b] Item Checklist requires CoreLib, Mod Settings Menu and Complete Tiny Font. Without Complete Tiny Font specifically, Item Checklist does not load at all — no F1 window, no HUD counter — rather than running with broken text; it comes back the moment you re-enable that mod.
+
+[b]Multiplayer:[/b] this mod runs entirely client-side — install it for yourself and it works on any server, whether or not the server or other players have it too.
+
+[h2]Settings[/h2]
+
+Open Options → Mod settings for a master on/off switch, the discovered/owned counter mode, the possession scan interval, and the base anchor radius.
+
+[h2]Requirements[/h2]
+
+[list]
+[*] CoreLib (required)
+[*] Mod Settings Menu (required) — hosts the in-game settings screen
+[*] Complete Tiny Font (required) — without it, Item Checklist will not load
+[/list]
+
+Steam does not prompt for required items the way mod.io does — subscribe to all three as well, or the mod will not load.
+
+[hr][/hr]
+
+Built with the official Pugstorm Core Keeper Mod SDK. Personal-use, non-commercial (Core Keeper EULA). Not affiliated with or endorsed by Pugstorm.
