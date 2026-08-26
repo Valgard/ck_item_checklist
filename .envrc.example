@@ -51,6 +51,13 @@ export CK_MODIO_TYPE="Visual|Item|Quality of Life"
 # spaces. Read by utils/discord_post.py; Discord allows at most five.
 export CK_DISCORD_TAGS="Utilities|Content"
 
+# Images and clips for the post, beyond the logo — PIPE-separated, in the order
+# they should appear. A relative path becomes an attachment, an http(s) URL
+# becomes its own follow-up message (the only route for a clip past Discord's
+# upload ceiling). Empty is legitimate here, unlike CK_DISCORD_TAGS: it means
+# the mod has nothing to show beyond its logo.
+export CK_DISCORD_MEDIA="sources/core_keeper_item_checklist_hud.png|sources/core_keeper_item_checklist_search.png|sources/core_keeper_item_checklist_filter.png|sources/core_keeper_item_checklist_filter_selected.png|sources/core_keeper_item_checklist_sort.png|sources/core_keeper_item_checklist_settings.png|sources/core_keeper_item_checklist_controls.png"
+
 # --- Localisation (Iter-11) -------------------------------------------------
 # LOC_YAML lives OUTSIDE unity/<Mod>/ on purpose (else the ModBuilder packs it
 # into the AssetBundle redundantly). The generator reads it by file path.
