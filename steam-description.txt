@@ -16,16 +16,6 @@ Item Checklist adds a scrollable, searchable checklist of every discoverable ite
 
 Open Options → Mod settings for a master on/off switch, the discovered/owned counter mode, the possession scan interval, and the base anchor radius.
 
-[h2]Requirements[/h2]
-
-[list]
-[*] CoreLib (required)
-[*] Mod Settings Menu (required) — hosts the in-game settings screen
-[*] Complete Tiny Font (required) — without it, Item Checklist will not load
-[/list]
-
-Steam does not prompt for required items the way mod.io does — subscribe to all three as well, or the mod will not load.
-
 [hr][/hr]
 
 Built with the official Pugstorm Core Keeper Mod SDK. Personal-use, non-commercial (Core Keeper EULA). Not affiliated with or endorsed by Pugstorm.
