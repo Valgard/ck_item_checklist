@@ -8,38 +8,20 @@ guidance (build setup, sandbox rules, macOS/CrossOver workflow,
 **ItemChecklist-specific** detail that other Core Keeper mods would not
 need.
 
-## Architecture (post-Iter-3.8)
+## Architecture
 
-Discovery state is split across four collaborating classes:
+Discovery state is split across four collaborating classes: `ItemCatalog` (the
+catalog of every discoverable item, baked once per world-load),
+`DiscoveredState` (the in-memory mirror of the character's discoveries), and
+two Harmony postfixes that feed it. Driving them is a load order in which
+three steps sit where they do because the obvious earlier place throws — the
+bake in particular hangs off `PlayerController.OnOccupied`, never off
+`IMod.Init`.
 
-| Class | Responsibility |
-|---|---|
-| `ItemCatalog` | Static catalog of every discoverable item, baked once per world-load. **Four-loop architecture:** Loop 1 (Iter-3.7) enumerates standard items from `PugDatabase.objectsByType.Keys` (skipping `IsCookedFood()`, pets, and cattle, all re-emitted later; **Iter-17** lifts the `variation != 0` guard to also emit `PaintableObjectCD` colour variants); Loop 2 (α-enumeration) cartesians ingredient-pairs to emit cooked-food permutations × up-to-3 tier-variants (**Iter-33** gates the Epic tier on CK's cook `flag` — a Rare-rarity Flower / Legendary ingredient — so unreachable Epic "phantoms" are not emitted, and records any it drops in `suppressedCookedPhantoms`; **Iter-39** marks every emitted cooked entry `IsCraftable=true` — cooking has no workbench recipe, so the generic `requiredObjectsToCraft.Count > 0` derivation used at the other bake sites would wrongly file dishes as not-craftable); Loop 3 (Iter-16.1) emits one entry per `(petObjectID, skinIndex)`; Loop 4 (Iter-17) emits all 5 colour slots per cattle species (from `CattleRegistry.ColoursOf`, read from the `PossibleChildVariation[]` palette). Catalog grows to ~8,120 entries (post-Iter-33's −2145 unreachable-Epic drop from 10,265; ~11,119 pre-Iter-32). |
-| `DiscoveredState` | In-memory mirror of `CharacterData.discoveredObjects2` for the active character. Keyed on packed `long` (`(objectId << 32) \| (uint)variation`) via `PackKey`. Two events: `Discovered(int, int)` per new pickup, `Changed` after any mutation. |
-| `SaveManagerDiscoveryHook` | Harmony postfix on `SaveManager.SetObjectAsDiscovered`. Filters `__result == true` (CK fires the method ~261×/30s including non-new from `DetectUndiscoveredObjectsInInventory`). Mirrors `(objectID, variation)` into `DiscoveredState`. |
-| `CharacterDataDiscoverySnapshot` | Harmony postfix on `CharacterData.OnAfterDeserialize`. Cache keyed on `characterGuid` (read directly via `__instance.characterGuid` field-access — the sandbox-safe path after several banned alternatives). Active-char resolution piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`. |
-
-Lifecycle:
-- `IMod.EarlyInit` loads the CoreLib `UserInterfaceModule` **and**
-  `ControlMappingModule` submodules — the latter registers the rebindable
-  toggle action (default F1), polled in `IMod.Update` to open the window
-  (the raw-F1 fallback was dropped in Iter-23).
-- `IMod.ModObjectLoaded` registers the window prefab via
-  `UserInterfaceModule.RegisterModUI`.
-- `IMod.Init` subscribes the loc-change hook; **no Bake-call here** (too
-  early — `PugDatabase.objectsByType` is null).
-- `PlayerController.OnOccupied` (D2 anchor) Harmony-postfix kicks the
-  bake coroutine. `Manager.main.player` is non-null at this point;
-  earlier anchors (`PugDatabase.UpdateEntityMonos`, `SaveManager.SetWorldId`,
-  `IMod.Init`) all produce NRE. The bake call is launched via
-  `__instance.StartCoroutine`; the coroutine does
-  `WaitUntil(() => ClientWorldStateSystem.HasRunAtLeastOnce)` before calling
-  `ItemCatalog.Bake()`. Never call Bake synchronously inside the postfix —
-  that races ECS world readiness.
-- `LocalizationManager.OnLocalizeEvent` re-bakes synchronously and
-  triggers `ItemChecklistWindow.Instance.RebindRows()`.
-- `ItemChecklistWindow.Awake` subscribes `DiscoveredState.Changed`
-  for live title-quote refresh.
+`docs/architecture.md` carries all of it, and is **deliberately not an
+`@`-reference**: § Mod Lifecycle for the load order and the bake anchor,
+§ Data Architecture for the four classes and the catalog's four-loop bake, and
+one section per feature for everything built on top.
 
 ## CK Decompile References (relevant for ItemChecklist)
 

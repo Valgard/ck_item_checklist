@@ -1,7 +1,34 @@
 # ItemChecklist Architecture
 
-This document describes the design and data flow of the ItemChecklist mod
-beyond what fits in the mod's `CLAUDE.md` overview.
+This document describes the design and data flow of the ItemChecklist mod.
+`CLAUDE.md` keeps a few sentences of orientation and points here; everything
+below is the detail behind them.
+
+## Mod Lifecycle
+
+The order these run in is load-bearing, and three of the steps sit where they
+do because the obvious earlier place throws.
+
+- **`IMod.EarlyInit`** loads the CoreLib `UserInterfaceModule` **and**
+  `ControlMappingModule` submodules — the latter registers the rebindable
+  toggle action (default F1), polled in `IMod.Update` to open the window. The
+  raw-F1 fallback was dropped in Iter-23.
+- **`IMod.ModObjectLoaded`** registers the window prefab via
+  `UserInterfaceModule.RegisterModUI`.
+- **`IMod.Init`** subscribes the loc-change hook. **No `Bake()` call here** —
+  it is too early, `PugDatabase.objectsByType` is still null.
+- **`PlayerController.OnOccupied`** (the "D2 anchor") is Harmony-postfixed to
+  kick the bake coroutine. `Manager.main.player` is non-null by this point,
+  whereas every earlier anchor tried — `PugDatabase.UpdateEntityMonos`,
+  `SaveManager.SetWorldId`, `IMod.Init` — produces an NRE. The postfix launches
+  it via `__instance.StartCoroutine`, and the coroutine waits on
+  `WaitUntil(() => ClientWorldStateSystem.HasRunAtLeastOnce)` before calling
+  `ItemCatalog.Bake()`. **Never call `Bake()` synchronously inside the
+  postfix** — that races ECS world readiness.
+- **`LocalizationManager.OnLocalizeEvent`** re-bakes synchronously, then
+  triggers `ItemChecklistWindow.Instance.RebindRows()`.
+- **`ItemChecklistWindow.Awake`** subscribes `DiscoveredState.Changed` for the
+  live title-quote refresh.
 
 ## UI Architecture
 
@@ -392,6 +419,33 @@ fine-tuning + real sprites are deferred to Iter-12 (pixel-art).
 ---
 
 ## Data Architecture
+
+Discovery state is split across four collaborating classes:
+
+| Class | Responsibility |
+|---|---|
+| `ItemCatalog` | The static catalog of every discoverable item, baked once per world-load — § ItemCatalog Four-Loop Bake, below. |
+| `DiscoveredState` | In-memory mirror of `CharacterData.discoveredObjects2` for the active character, keyed on a packed `long` — § DiscoveredState Packed-Long Key Schema. Raises two events: `Discovered(int, int)` per new pickup, `Changed` after any mutation. |
+| `SaveManagerDiscoveryHook` | Mirrors each newly discovered `(objectID, variation)` into `DiscoveredState` — § Discovery Mirroring Hooks. |
+| `CharacterDataDiscoverySnapshot` | Resolves and caches the active character's discovery data — § Discovery Mirroring Hooks. |
+
+### Discovery Mirroring Hooks
+
+Two Harmony postfixes feed `DiscoveredState`, and each had to solve a problem
+that is not visible from the method it patches.
+
+**`SaveManagerDiscoveryHook`** postfixes `SaveManager.SetObjectAsDiscovered`
+and filters on `__result == true`. Without that filter it fires far more often
+than there are discoveries: CK calls the method roughly 261 times per 30
+seconds, most of them from `DetectUndiscoveredObjectsInInventory` re-reporting
+items the player already carries.
+
+**`CharacterDataDiscoverySnapshot`** postfixes
+`CharacterData.OnAfterDeserialize` and caches per `characterGuid`, read
+directly via the `__instance.characterGuid` **field** — the sandbox-safe path,
+arrived at after several banned alternatives. Which of the deserialized
+characters is the active one is not knowable at that point, so the resolution
+piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`.
 
 ### ItemCatalog Four-Loop Bake (Iter-3.7 / Iter-16.1 / Iter-17)
 
