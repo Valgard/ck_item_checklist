@@ -78,8 +78,8 @@ subscription lands only when the Mods menu is opened — the same sync that
 applies the subscription wipes every fake-ID mod. Plan for it as a two-step:
 open the menu, let the change land, then rebuild each fake-ID mod.
 
-See the parent `CLAUDE.md § Fake-ID dev install` for the full fake-ID
-mechanism.
+See the parent repo's `../docs/macos-crossover-loader.md § Fake-ID dev install`
+for the full fake-ID mechanism.
 
 ## SpriteMask Clipping
 
@@ -287,7 +287,7 @@ that surfaces only at game launch. New BCL or Unity API usage added in Iter-7
 be confirmed by actually launching the game and watching `Player.log`, not
 just by a green Editor build.
 
-See `CLAUDE.md § Build-verify` for the canonical `Player.log` grep pattern.
+See `CLAUDE.md § Conventions` for the canonical `Player.log` grep pattern.
 
 **Corollary — deletion-only fixes are near-zero sandbox risk.** The gate fires on
 *additions* of new BCL surface (a newly-referenced `System.IO.*`, reflection-emit,
