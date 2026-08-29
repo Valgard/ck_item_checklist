@@ -8,6 +8,23 @@ guidance (build setup, sandbox rules, macOS/CrossOver workflow,
 **ItemChecklist-specific** detail that other Core Keeper mods would not
 need.
 
+## Dependencies
+
+Hard-depends on **CoreLib** and **Mod Settings Menu**, each wired twice — a
+runtime asmdef reference so the code compiles, and `required: 1` in the
+ModBuilderSettings `.asset` so the loader refuses to start the mod without
+them.
+
+The five in-game settings are declared through Mod Settings Menu, and how that
+framework behaves is its documentation rather than this repo's:
+`../mod-settings-menu/docs/tutorial.md` covers the widget kinds, the
+`ModConfig` adapter pattern this mod follows, where values persist, the
+localization term scheme, and how options are ordered. Read it there rather
+than trusting a copy here — a copy of § 9 in this file had already drifted,
+stating declaration order as fixed when it is the default and `.SortOptions(…)`
+overrides it. What this mod's five settings *are* is the `ModConfig` row in
+`docs/architecture.md § Possession (Iter-20) + Discovery Gate (Iter-21)`.
+
 ## Architecture
 
 Discovery state is split across four collaborating classes: `ItemCatalog` (the
@@ -47,24 +64,6 @@ reference; keep these in mind when writing mod code):**
   Persist via `API.ConfigFilesystem` (hand-ASCII), not file I/O.
 
 **Other:**
-- **Mod settings (via Mod Settings Menu)** — five live in-game settings under
-  Options → Mod settings, registered in `ItemChecklistMod.Init` (that call order
-  is the render order) and read live: `ModConfig.Enabled` (Toggle, default on —
-  master switch; when off the mod is fully inert: no possession scan, window won't
-  open, HUD hidden), `.Mode` (Choice `CounterMode` {Discovery, Possession},
-  Iter-36 — what the HUD + footer counter shows), `.AnchorRadius` (Slider 16-96,
-  default 48), `.ScanIntervalSeconds` (Choice of preset seconds
-  {1,2,3,5,8,10,15,20,25,30}, default 3; Iter-38 — read live each cycle in
-  `Update()`) and `.Diagnostics` (Toggle, default off). `ModConfig`
-  (`unity/ItemChecklist/ModConfig.cs`, root `ItemChecklist` namespace) is the mod's
-  config adapter — renamed from `PossessionConfig` so every mod exposes a uniform
-  root-namespace `ModConfig`. This replaced the former
-  CoreLib `API.Config` surface; the framework persists them to
-  `mods/ItemChecklist/config.cfg`. The loader now hard-depends on `ModSettingsMenu`
-  (runtime asmdef ref + `.asset` `dependencies`, `required: 1`), alongside CoreLib.
-  The possession *ledger* still persists separately via `API.ConfigFilesystem`
-  (unchanged). Labels/hint live in `localization/localization.yaml`
-  (`ItemChecklist-Config` namespace).
 - **Almost no offline testing** — testing = `utils/build.sh` + in-game Player.log grep
   + manual UI verification; canonical 7-phase list in `docs/conventions.md § Testing`.
   The **one** exception (Iter-44) is `dotnet run --project tests/possession-harness`:
