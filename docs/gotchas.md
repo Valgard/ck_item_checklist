@@ -766,7 +766,7 @@ spawn-from-Core **intro cutscene** does NOT call `ShowHUD(false)`; it calls
 layer-27 renderers. So a mod's layer-27 HUD stays visible during the intro cutscene
 and must be gated explicitly — Iter-15 added `!sceneHandler.cutsceneIsPlaying` to
 `WorldState.IsInPlayableWorld` (see the `SceneHandler.cutsceneIsPlaying` row in
-`CLAUDE.md § CK Decompile References`).
+`docs/ck-decompile-reference.md`).
 
 ### `CalcGameplayUITargetScaleMultiplier()` returns (0,0,0) for a mod HUD
 CK's own HUD elements set
@@ -804,7 +804,8 @@ Both signals are the same API category as the already-used `Manager.ui.*` /
 in-game: full `Init`/bake lifecycle ran, zero `CompileFailed`). Cutscenes/intro were
 later closed by Iter-15 (the `!sceneHandler.cutsceneIsPlaying` term added to
 `WorldState.IsInPlayableWorld` — see the caveat above and the
-`SceneHandler.cutsceneIsPlaying` decompile row in `CLAUDE.md`).
+`SceneHandler.cutsceneIsPlaying` decompile row in
+`docs/ck-decompile-reference.md`).
 
 ### Diagnosing "active but invisible" CK UI — log `isVisible` + `z` + `layer`
 When a UI element is active, on-screen and full-alpha but nothing shows, log

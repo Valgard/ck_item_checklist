@@ -36,8 +36,10 @@ ItemChecklist uses Core Keeper's native `SpriteRenderer`-based UI stack,
 mediated by CoreLib's `UserInterfaceModule`. This is the only viable approach
 in CK — uGUI (Canvas/Image) is structurally incompatible because CK's
 `UIMouse` does a `Physics.Raycast` in the UI layer and Canvas elements have no
-Collider. See `CLAUDE.md § Mod-Specific Gotchas` for the structural
-explanation and the survey of 10 CK UI mods (all use SpriteRenderer).
+Collider. See `docs/gotchas.md § uGUI (Canvas/Image) structurally fails in CK`
+for the structural explanation and the survey of 10 CK UI mods (all use
+SpriteRenderer), and the parent handbook's `docs/ck/ui-framework.md` for CK's
+UI stack in general.
 
 ### Mod Load → Registration → Mount → Open → Close
 
@@ -138,7 +140,7 @@ Production reference implementations:
 
 This section captures the decompile findings for `UIScrollWindow` (in
 `Pug.Other.dll`). Key behavioral facts that affect ItemChecklist are also
-summarized in `CLAUDE.md § CK Decompile References`; this section gives the
+summarized in `docs/ck-decompile-reference.md`; this section gives the
 full internal picture for anyone implementing a new `IScrollable` or
 diagnosing scroll behavior.
 

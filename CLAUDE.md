@@ -49,36 +49,27 @@ and the traps that only a decompile reveals are collected in
 `docs/ck-decompile-reference.md`, one row per type, together with the ILSpy
 command to re-derive any of them. **Deliberately not an `@`-reference.**
 
-## Mod-Specific Gotchas
+## Gotchas — where to look
 
-**Sandbox bans (AI guardrails — each `CompileFailed`s the whole mod on first
-reference; keep these in mind when writing mod code):**
-- **`Manager.saves.*` property-access is banned** — but field-access on serialized
-  struct-fields (`__instance.characterGuid`, `objectData.variation`) is OK.
-- **`.Name` on a reflected type inside a catch is banned** (`Type.Name` →
-  `MemberInfo.get_Name()`; symptom `Illegal Member References`). Use typed catches
-  (`catch (NullReferenceException ex)`) or log only `ex.Message`.
-- **Never `using System.Reflection;`** — it `CS0104`-clashes with
-  `PugMod.MemberInfo`. Use `API.Reflection.SetValue` / `.Invoke` directly.
-- **`System.IO.*` is banned** (also reflection-emit, `System.Diagnostics.Process`).
-  Persist via `API.ConfigFilesystem` (hand-ASCII), not file I/O.
+Nothing is kept here any more: every trap this section used to list is
+documented at the level it belongs to, and in two cases the copy here had
+drifted against it.
 
-**Other:**
-- **Almost no offline testing** — testing = `utils/build.sh` + in-game Player.log grep
-  + manual UI verification; canonical 7-phase list in `docs/conventions.md § Testing`.
-  The **one** exception (Iter-44) is `dotnet run --project tests/possession-harness`:
-  `PossessionLedger` + `PetCollection` are pure logic, so the harness compiles the real
-  sources against ~40 lines of Unity stubs and asserts the shrink/prune/parse rules
-  offline. Run it after touching either file. Nothing else — ECS, Harmony, UI, and
-  above all the Roslyn sandbox — can be checked outside the game.
-- **uGUI (Canvas/Image) structurally fails in CK** (no `Collider` → CK's
-  `Physics.Raycast` `UIMouse` never sees it) — use `SpriteRenderer` + Layer 5 +
-  `UIelement`. See `docs/gotchas.md § uGUI structurally fails in CK`.
-- **PugText pool-leak** — spawned rows must `Clear()` their `PugText` children on
-  teardown (now in `ItemChecklistContent.OnDestroy`). See `docs/architecture.md
-  § Viewport Virtualization`.
-- **Em-dash cosmetic** — PugText's pixel-font renders U+2014 as `-` (the title
-  `"Item Checklist — N / M"` shows as `"… - N / M"`).
+- **The Roslyn sandbox** — what is banned, why an innocent `ex.GetType().Name`
+  trips it, and what to use instead: the parent handbook's
+  `../docs/ck/sandbox.md`. It is deliberately *more careful* than the summary
+  that stood here, which claimed `Manager.saves.*` is banned outright: the
+  handbook names published mods that call it cleanly and says to bisect the
+  expression rather than trust a deny list.
+- **CK's UI stack** — why uGUI cannot work at all: `../docs/ck/ui-framework.md`,
+  with this mod's own consequences and the 10-mod survey in
+  `docs/gotchas.md § uGUI (Canvas/Image) structurally fails in CK`.
+- **This mod's own traps** — the row pool's `PugText` teardown, which Iter-3.8
+  moved to `ItemChecklistContent.OnDestroy` and which is therefore no longer
+  the per-destroy fix described here, and the cosmetic em-dash rendering:
+  `docs/architecture.md`.
+- **Testing** — the offline `possession-harness` and the mandatory 7-phase
+  in-game pass: `docs/conventions.md § Testing Conventions`.
 
 ## UI Clipping Pattern
 
