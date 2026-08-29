@@ -821,6 +821,34 @@ remaining backlog.
   down (`0.8 px` down), and picking the former restores exact row parity with
   player-coordinates-hud for free.
 
+- **Iter-49 -- gallery screenshots: one set, two capture formats. OPEN.** All seven
+  pictures in `sources/` are named in `CK_DISCORD_MEDIA` and are what the mod.io gallery
+  shows, but they were taken two different ways. Three are clean 16:9 full-screen frames
+  at `3520x1980` -- `hud` (July), `settings` and `controls` (August). The other four --
+  `filter`, `filter_selected`, `search`, `sort`, all from the 2026-06-26 gallery refresh
+  -- are `4112x2658` window captures with a **174 px black bar at the top and another at
+  the bottom**.
+
+  **What is inside those bars is not stale**, which is what makes this cheap rather than
+  a re-shoot. The framed content measures `4112x2310` -- already 16:9, and larger than
+  the full-screen set. It shows the current UI (the unified `Display` field from Iter-18)
+  and the current catalogue: the footer reads `359 / 11119`, the post-Iter-17 figure. Nor
+  do these carry a macOS title bar, unlike the window captures in the sibling mods
+  (caveling-divining-rod, simple-crafting-pool-extender), whose own roadmaps cover that
+  separately. Cutting the two bars off leaves a usable frame.
+
+  `../utils/crop-center-169.sh` is the wrong tool for it, and looks like the right one:
+  it takes the centre 16:9 slice at *full height*, so it narrows the width and leaves a
+  horizontal bar exactly where it was.
+
+  **To decide.** Crop the four -- costs nothing, keeps what they show -- or retake the
+  whole set at one size, which buys a uniform gallery at the price of re-staging seven
+  scenes. Cropping still leaves the set at two resolutions (`4112x2310` beside
+  `3520x1980`), so whether *that* matters is the question to settle first; if it does,
+  cropping is not actually the cheaper path. Secondary, and noticed while measuring
+  rather than looked for: the four show a character at 3,2 % discovery, so nearly every
+  visible row in them reads `???`.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
