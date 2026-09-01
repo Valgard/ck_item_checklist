@@ -372,12 +372,12 @@ continue` (icon-guard, mirroring NonUsable).
 
 CK ships `TextInputField` (`Pug.Other.dll`) — a `UIelement,
 InputManager.TextInputInterface` that renders through `PugText`, carries a
-`CharacterMarkBlinker` caret, and self-activates in
-`OnLeftClicked → Manager.input.SetActiveInputField(this)`. Subclass it
-(`SearchBar : TextInputField`). The committed-but-orphaned
-`UnityInputFieldAdapter` (a `UnityEngine.UI.InputField` wrapper) was the wrong
-abstraction — uGUI structurally fails in CK — and was deleted in Iter-8. IB's
-`SearchBar : TextInputField` is the canonical reference; its prefab lives in
+`CharacterMarkBlinker` caret, and self-activates in `OnLeftClicked →
+Manager.input.SetActiveInputField(this)`. Subclass it (`SearchBar :
+TextInputField`). The committed-but-orphaned `UnityInputFieldAdapter` (a
+`UnityEngine.UI.InputField` wrapper) was the wrong abstraction — uGUI
+structurally fails in CK — and was deleted in Iter-8. IB's `SearchBar :
+TextInputField` is the canonical reference; its prefab lives in
 `ItemBrowserUI.prefab`.
 
 ### Freshly-added SpriteRenderers default to a DEAD material → render nothing
@@ -688,10 +688,10 @@ when `maxWidth > 0f`. That method throws `IndexOutOfRangeException` on labels
 whose text length exceeds the configured `maxWidth` — which English text may
 not, but longer translations (e.g. German) routinely do.
 
-Critically, the throw occurs inside `ShowUI()` (via
-`FilterWidget.RebuildList` / `DropdownWidget` label renders), which
-aborts before CoreLib sets `currentInterface`. The result: the window opens
-but cannot be closed with ESC or E — only the mod's own F1 toggle works.
+Critically, the throw occurs inside `ShowUI()` (via `FilterWidget.RebuildList` /
+`DropdownWidget` label renders), which aborts before CoreLib sets
+`currentInterface`. The result: the window opens but cannot be closed with ESC
+or E — only the mod's own F1 toggle works.
 
 Fix: set `PugText.maxWidth = 0f` on every localised single-line label (filter
 rows, section headers, dropdown labels). With `maxWidth == 0f` the wrap path is
@@ -769,10 +769,10 @@ and must be gated explicitly — Iter-15 added `!sceneHandler.cutsceneIsPlaying`
 `docs/ck-decompile-reference.md`).
 
 ### `CalcGameplayUITargetScaleMultiplier()` returns (0,0,0) for a mod HUD
-CK's own HUD elements set
-`localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier()` each frame, but for
-a mod HUD mounted as above it returns `(0,0,0)` — used as a scale source it makes
-the element invisible. Drive visibility explicitly instead (toggle the root active
+CK's own HUD elements set `localScale =
+Manager.ui.CalcGameplayUITargetScaleMultiplier()` each frame, but for a mod HUD
+mounted as above it returns `(0,0,0)` — used as a scale source it makes the
+element invisible. Drive visibility explicitly instead (toggle the root active
 on `WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing &&
 !Manager.menu.IsAnyMenuActive()`).
 
@@ -848,11 +848,11 @@ A sprite drawn `Sliced` (`m_DrawMode: 1`) with `spriteBorder {1,1,1,1}` keeps
 only the outermost 1px ring sharp and **stretches** everything inside. If the
 pixel-art corner is thicker than 1px, its inner pixels fall in the stretched
 "center" zone and distort. The `Entry Selected` selection marker has **3px
-L-shaped corners** (transparent edge-midpoints), so it needs
-`spriteBorder {3,3,3,3}` — with `{1,1,1,1}` the corners stretched instead of
-9-slicing. Rule: read the sprite's alpha map, measure the corner, set the border
-to the corner size. (Verify with PIL: crop the sprite rect from the sheet and
-print an alpha map.)
+L-shaped corners** (transparent edge-midpoints), so it needs `spriteBorder
+{3,3,3,3}` — with `{1,1,1,1}` the corners stretched instead of 9-slicing. Rule:
+read the sprite's alpha map, measure the corner, set the border to the corner
+size. (Verify with PIL: crop the sprite rect from the sheet and print an alpha
+map.)
 
 ### A static checkbox box GO needs `m_IsActive: 1` — the code only toggles the fill
 In `FilterCheckboxButton`, the wired `checkMark` SpriteRenderer is the **fill**
@@ -925,10 +925,10 @@ feature involved, just Bash + a macOS OS tool + an image-capable `Read`:
 
 For a **blinking** element (the search caret), a single capture often lands on
 the blink-off phase and shows nothing. Take ~5 rapid captures ~180 ms apart to
-guarantee catching the blink-on phase — pause with
-`perl -e 'select(undef,undef,undef,0.18)'` between captures, **not** `sleep`
-(foreground `sleep` is blocked in this environment). Read whichever frame shows
-the caret lit.
+guarantee catching the blink-on phase — pause with `perl -e
+'select(undef,undef,undef,0.18)'` between captures, **not** `sleep` (foreground
+`sleep` is blocked in this environment). Read whichever frame shows the caret
+lit.
 
 This loop must run **inline in the main session** (it needs the live CrossOver
 window and the build lock) — see `docs/conventions.md`.
@@ -1037,12 +1037,12 @@ silent no-op (the sprite renders, no recolor).
 
 **The trap:** two decompile agents guessed `Radical/SpritesDefault`. That shader
 **also exists**, so `Shader.Find("Radical/SpritesDefault")` returned a non-null
-(but wrong) shader, masking the failure — the icon still rendered, the keyword was
-ignored, and nothing recolored, with no error to point at the cause. Lesson: an
-existent-but-wrong shader name silently no-ops; `Shader.Find` returning non-null
-proves nothing. The fix came from the **working reference mod** — Item Browser's
-`GetUISpriteColorReplaceMaterial()` is literally
-`new Material(Shader.Find("Amplify/UISpriteColorReplace"))` — which beat two
+(but wrong) shader, masking the failure — the icon still rendered, the keyword
+was ignored, and nothing recolored, with no error to point at the cause. Lesson:
+an existent-but-wrong shader name silently no-ops; `Shader.Find` returning
+non-null proves nothing. The fix came from the **working reference mod** — Item
+Browser's `GetUISpriteColorReplaceMaterial()` is literally `new
+Material(Shader.Find("Amplify/UISpriteColorReplace"))` — which beat two
 decompile guesses. Full recipe (shared per-skin material, keyword + gradient
 texture, base-material restore for non-pet rows) in `ui/PetSkinIcon.cs`.
 
@@ -1105,11 +1105,11 @@ and a redundant bounds guard is dead weight.
 
 ### Pet-skin tooltips: `ckVariation` must be 0, not `skinIndex`
 `ItemRow.Bind`'s `skinIndex` param is a **skin selector**, not a CK variation —
-pets always sit at CK variation 0 (`SaveManager.SetObjectAsDiscovered` force-zeroes
-it; see `§ Pet Skins`). The tooltip helper must be fed
-`ckVariation = isPetSkin ? 0 : skinIndex`; passing `skinIndex` builds an
-**unresolvable** `ObjectDataCD` (CK finds the wrong object / empty tooltip).
-Verified in-game on `Eulux (Skin 3)`.
+pets always sit at CK variation 0 (`SaveManager.SetObjectAsDiscovered`
+force-zeroes it; see `§ Pet Skins`). The tooltip helper must be fed `ckVariation
+= isPetSkin ? 0 : skinIndex`; passing `skinIndex` builds an **unresolvable**
+`ObjectDataCD` (CK finds the wrong object / empty tooltip). Verified in-game on
+`Eulux (Skin 3)`.
 
 ### An Editor-only authoring aid must be force-disabled at runtime
 The per-row `ContentMask` SpriteMask is an **Editor authoring aid** (it previews
@@ -1243,323 +1243,391 @@ world on a timer (e.g. an ECS-driven HUD). See `docs/iteration-history.md § Ite
 
 ### A persisted store that grows unbounded → an autosave `Serialize()` main-thread spike (not the scan)
 
-A mod that persists per-character state in lockstep with CK's save (a Harmony postfix on
-`SaveManager.WriteCharacter(int)`) pays the **full serialize cost synchronously on the main
-thread at every autosave**. If the persisted structure can grow unbounded, *that* — not the
-periodic read/scan — becomes the recurring frame spike. Iter-28: the possession ledger had
-grown to 5503 entries / 89 KB, and `PossessionLedger.Serialize()` of it was **12–37 ms**
-(serialize 8–24 ms + write 4–13 ms), firing ~10× in a short session. Because it runs on the
-main thread it also pushed CK's **host simulation** over its **55 ms** frame budget
-(`ServerUpdateFrequencyTracker` warnings: 626/1109 host frames over budget) — felt as
-*constant* rubber-banding, distinct from a per-3s scan hitch. **Diagnose the save, not just
-the scan:** the Iter-27 PERF data already showed `BuildView` was ~0.8 ms even at 5503 entries,
-so the read was never the peak. Budget the autosave serialize like any < 16.7 ms frame op, and
-**keep the persisted store small at the source** (the world-nature gate below). A
-radius-bounded self-heal (`PruneStaleNear`, then 180 tiles) does **not** retroactively clear a
-backlog an old bug accumulated, so Iter-28 paired the source fix with a one-time full eviction
-(`PossessionLedger.PruneByPredicate` at the first scan, gated by a `WorldNaturePruned` flag).
-**Iter-42 removed that eviction: it was a data-loss bug on two counts** — see the third section
-below, which is the durable lesson. The backlog-clearing need was real *then*; it no longer
-exists (the Iter-31/41 `v2→v3` discard migrations dropped every pre-gate ledger outright, which
-is the safe way to retire a polluted store: throw the whole file away and re-scan, never
-selectively delete entries you cannot attribute).
+A mod that persists per-character state in lockstep with CK's save (a Harmony
+postfix on `SaveManager.WriteCharacter(int)`) pays the **full serialize cost
+synchronously on the main thread at every autosave**. If the persisted structure
+can grow unbounded, *that* — not the periodic read/scan — becomes the recurring
+frame spike. Iter-28: the possession ledger had grown to 5503 entries / 89 KB,
+and `PossessionLedger.Serialize()` of it was **12–37 ms** (serialize 8–24 ms +
+write 4–13 ms), firing ~10× in a short session. Because it runs on the main
+thread it also pushed CK's **host simulation** over its **55 ms** frame budget
+(`ServerUpdateFrequencyTracker` warnings: 626/1109 host frames over budget) —
+felt as *constant* rubber-banding, distinct from a per-3s scan hitch. **Diagnose
+the save, not just the scan:** the Iter-27 PERF data already showed `BuildView`
+was ~0.8 ms even at 5503 entries, so the read was never the peak. Budget the
+autosave serialize like any < 16.7 ms frame op, and **keep the persisted store
+small at the source** (the world-nature gate below). A radius-bounded self-heal
+(`PruneStaleNear`, then 180 tiles) does **not** retroactively clear a backlog an
+old bug accumulated, so Iter-28 paired the source fix with a one-time full
+eviction (`PossessionLedger.PruneByPredicate` at the first scan, gated by a
+`WorldNaturePruned` flag). **Iter-42 removed that eviction: it was a data-loss
+bug on two counts** — see the third section below, which is the durable lesson.
+The backlog-clearing need was real *then*; it no longer exists (the Iter-31/41
+`v2→v3` discard migrations dropped every pre-gate ledger outright, which is the
+safe way to retire a polluted store: throw the whole file away and re-scan,
+never selectively delete entries you cannot attribute).
 
 ### CK encodes no "world-spawned vs player-placed" signal — don't try to derive it
 
-Iter-28 had to exclude wild nature (bushes/grass/kelp/stalagmites/lilies/ruins) from the
-"count the placed object itself" path while keeping placed walls/torches/furniture/trophies/
-waypoints. **No object-level signal separates them** — proven over three in-game probe rounds:
-`cat`/`stack`/`icon` are uniformly true; `craft` collides (PottedGoldenOrbBush 5589 is
-craftable décor → `craft=True` like a torch; Caveling/Slime/Mushroom/Larva trophies are
-non-craftable décor → `craft=False` like wild nature); `tags` collide (Stalagmite 5610 and
-WaterLily 5614 are **tag-less**, exactly like WayPoint 6514 which must count); and even the
-entity-level candidates collide — `DontDropSelfCD` is an `IEnableableComponent` (present on
-*everything*; its enabled state isn't sandbox-stable), and `DiggableCD`/`DestructibleObjectCD`
-give Stalagmite ≡ CavelingFloorTile 5710 and GraveTree 5622 ≡ WayPoint ≡ Idol 3930 ≡
-RuinsPiece 5571. **CK simply does not store the distinction** — it is a real property of CK,
-not a search failure. The sanctioned fallback is a **curated, editable tag+ObjectID blacklist**
-(`PossessionClassifier.IsWorldNature`): nature tags (`Greenery`/`Destructible`/`CattleKelpFood`/
-`Ruins` = stable `ObjectCategoryTag` ints 5/13/33/4) catch the bulk and future tagged nature,
-plus a short ObjectID list for the tag-less stragglers. (Iter-20 had removed the `MineableCD`
-gate so menu-removable furniture counts — which is what let mineable wild nature in;
-`MineableCD` is not a usable discriminator either.) Gate **only the placed-object path** —
-container contents + carried are untouched, so nature actually stored in a chest still counts.
+Iter-28 had to exclude wild nature (bushes/grass/kelp/stalagmites/lilies/ruins)
+from the "count the placed object itself" path while keeping placed
+walls/torches/furniture/trophies/ waypoints. **No object-level signal separates
+them** — proven over three in-game probe rounds: `cat`/`stack`/`icon` are
+uniformly true; `craft` collides (PottedGoldenOrbBush 5589 is craftable décor →
+`craft=True` like a torch; Caveling/Slime/Mushroom/Larva trophies are
+non-craftable décor → `craft=False` like wild nature); `tags` collide
+(Stalagmite 5610 and WaterLily 5614 are **tag-less**, exactly like WayPoint 6514
+which must count); and even the entity-level candidates collide —
+`DontDropSelfCD` is an `IEnableableComponent` (present on *everything*; its
+enabled state isn't sandbox-stable), and `DiggableCD`/`DestructibleObjectCD`
+give Stalagmite ≡ CavelingFloorTile 5710 and GraveTree 5622 ≡ WayPoint ≡ Idol
+3930 ≡ RuinsPiece 5571. **CK simply does not store the distinction** — it is a
+real property of CK, not a search failure. The sanctioned fallback is a
+**curated, editable tag+ObjectID blacklist**
+(`PossessionClassifier.IsWorldNature`): nature tags
+(`Greenery`/`Destructible`/`CattleKelpFood`/ `Ruins` = stable
+`ObjectCategoryTag` ints 5/13/33/4) catch the bulk and future tagged nature,
+plus a short ObjectID list for the tag-less stragglers. (Iter-20 had removed the
+`MineableCD` gate so menu-removable furniture counts — which is what let
+mineable wild nature in; `MineableCD` is not a usable discriminator either.)
+Gate **only the placed-object path** — container contents + carried are
+untouched, so nature actually stored in a chest still counts.
 
 ### A "one-time" cleanup gated on an unpersisted flag runs on EVERY load (Iter-42)
 
 Two independent defects, both in the Iter-28 eviction above, each sufficient to lose data:
 
-1. **The gate was in-memory only.** `WorldNaturePruned` was a plain `public bool` field on
-   `PossessionLedger`; `Serialize()` never wrote it and `LoadFrom()` never set it, so a ledger
-   read from disk always started `false` and the "one-time" sweep ran at the first scan of
-   **every world load**. **If a cleanup must happen once per store, the "already done" mark has
-   to live IN the store** — for this ledger that means the version marker (`#icl-ledger-vN`),
-   which is the mechanism the migrations already use.
-2. **The predicate could not distinguish what it deleted.** The ledger holds one flat
-   `Dictionary<int,int>` per tile, filled by *both* scan path #3 (`AddOne`, the placed object —
-   the intended eviction target) and path #2 (`AddBuffer`, container contents — legitimate
-   possession). An id-predicate sweep sees only `(tile, id, count)`, so evicting "wild
-   Stalagmite" necessarily also evicted **1129 Stalagmite stored in a chest**. The Iter-28
-   comment's promise that "legitimately-stored items re-add themselves via the live scan" holds
-   **only where the container is observed**, i.e. at base. **Never run a predicate delete over a
-   store that does not record provenance** — gate at the write site (as the `IsWorldNature`
-   path-#3 gate correctly does) or discard the whole file. (Count-path numbering — #1 carried,
-   #2 container contents, #3 the placed object — is defined once at the top of
-   `PossessionScanner.Scan`; the Iter-28-era code comments used to number `AddOne` as #1 and
-   were corrected in Iter-43.)
+1. **The gate was in-memory only.** `WorldNaturePruned` was a plain `public
+   bool` field on `PossessionLedger`; `Serialize()` never wrote it and
+   `LoadFrom()` never set it, so a ledger read from disk always started `false`
+   and the "one-time" sweep ran at the first scan of **every world load**. **If
+   a cleanup must happen once per store, the "already done" mark has to live IN
+   the store** — for this ledger that means the version marker
+   (`#icl-ledger-vN`), which is the mechanism the migrations already use.
+2. **The predicate could not distinguish what it deleted.** The ledger holds one
+   flat `Dictionary<int,int>` per tile, filled by *both* scan path #3 (`AddOne`,
+   the placed object — the intended eviction target) and path #2 (`AddBuffer`,
+   container contents — legitimate possession). An id-predicate sweep sees only
+   `(tile, id, count)`, so evicting "wild Stalagmite" necessarily also evicted
+   **1129 Stalagmite stored in a chest**. The Iter-28 comment's promise that
+   "legitimately-stored items re-add themselves via the live scan" holds **only
+   where the container is observed**, i.e. at base. **Never run a predicate
+   delete over a store that does not record provenance** — gate at the write
+   site (as the `IsWorldNature` path-#3 gate correctly does) or discard the
+   whole file. (Count-path numbering — #1 carried, #2 container contents, #3 the
+   placed object — is defined once at the top of `PossessionScanner.Scan`; the
+   Iter-28-era code comments used to number `AddOne` as #1 and were corrected in
+   Iter-43.)
 
-**Why it stayed invisible for ~4 weeks, and the test that exposes this bug class.** At base the
-next 3 s scan re-observed the containers and `SetLiveContainer` wrote the true contents straight
-back, so the deletion was repaired within one scan interval. It only becomes visible when the
-world is **loaded far from base**: the containers are unobserved, the deleted entries stay gone
-until the player walks back — and the next autosave persists the loss to disk. So for anything
-touching remembered/persisted spatial state, **the load-far-from-base case is the test**, not the
-load-at-base case; the latter is self-repairing and proves nothing. (Diagnosed with no build at
-all, by diffing the ledger against its own `.pugbackup`: 21 ids / 2677 units gone, every one of
-them an `IsWorldNature` match and no other — the predicate left its fingerprint in the data.
-Cf. § Possession Base Scope & Persistence (Iter-31) below and the
-[[feedback_validate_against_savegame]] habit of parsing the real save instead of reasoning
-about it.)
+**Why it stayed invisible for ~4 weeks, and the test that exposes this bug
+class.** At base the next 3 s scan re-observed the containers and
+`SetLiveContainer` wrote the true contents straight back, so the deletion was
+repaired within one scan interval. It only becomes visible when the world is
+**loaded far from base**: the containers are unobserved, the deleted entries
+stay gone until the player walks back — and the next autosave persists the loss
+to disk. So for anything touching remembered/persisted spatial state, **the
+load-far-from-base case is the test**, not the load-at-base case; the latter is
+self-repairing and proves nothing. (Diagnosed with no build at all, by diffing
+the ledger against its own `.pugbackup`: 21 ids / 2677 units gone, every one of
+them an `IsWorldNature` match and no other — the predicate left its fingerprint
+in the data. Cf. § Possession Base Scope & Persistence (Iter-31) below and the
+[[feedback_validate_against_savegame]] habit of parsing the real save instead of
+reasoning about it.)
 
 ### A load that fails "softly" gets persisted over the good file (Iter-43)
 
-The generalisable shape, found by the Iter-42 review in code Iter-42 never touched. A load
-returning an **empty store** for a *failure* is not a display bug — it is a delayed **write** bug,
-because the next save persists that emptiness over the intact file:
+The generalisable shape, found by the Iter-42 review in code Iter-42 never
+touched. A load returning an **empty store** for a *failure* is not a display
+bug — it is a delayed **write** bug, because the next save persists that
+emptiness over the intact file:
 
-1. `Load` returned a bare empty object for four different outcomes — empty id, no file, `Read`
-   returned null (**not even logged**), any exception — so the caller could not tell "new
-   character" from "could not read".
-2. Nothing checked. The scan then repopulated whatever was live, which **at base looks entirely
-   plausible** — the same masking as Iter-42.
-3. The write-skip cache is **per-session**, so the first save of a launch always lands: an empty
-   store can never hash-match a populated file. ~14 bytes replaced ~14 KB, and the *next* autosave
-   overwrote the `.pugbackup` — the last copy.
+1. `Load` returned a bare empty object for four different outcomes — empty id,
+   no file, `Read` returned null (**not even logged**), any exception — so the
+   caller could not tell "new character" from "could not read".
+2. Nothing checked. The scan then repopulated whatever was live, which **at base
+   looks entirely plausible** — the same masking as Iter-42.
+3. The write-skip cache is **per-session**, so the first save of a launch always
+   lands: an empty store can never hash-match a populated file. ~14 bytes
+   replaced ~14 KB, and the *next* autosave overwrote the `.pugbackup` — the
+   last copy.
 
 **Rules that fall out of this, worth applying to any persisted store:**
-- **Return a load STATUS, not just data.** "Empty because new" and "empty because broken" must be
-  distinguishable at the call site, and a failed load must make the store **read-only** until the
-  next successful load. Not saving costs one session; saving costs everything on disk.
-- **Set the failure flag BEFORE anything else can throw.** Our `LoadFrom` clears its dicts *before*
-  parsing, so a mid-parse throw leaves a **partially** populated store that is indistinguishable
-  from a complete one — the worst case, because it looks like success.
-- **A silent `null` return is worse than an exception.** The `Read`-returned-null branch had no log
-  at all and was the one path no amount of `catch` would have surfaced.
-- **Weigh recoverability per store, and fix the unrecoverable one first.** The possession ledger
-  self-rebuilds from the player's containers; the pet-skin collection is an *ever-owned* set with
-  no second source, so an empty write is final. Same bug, different blast radius.
-- **A wholesale-replace write path needs a confirmation predicate.** `_containers[key] = contents`
-  deletes everything the previous scan knew. When two producers write one record for *different*
-  entities that can leave the observed set independently (a container and a torch sit in different
-  DOTS archetype chunks), only the *confirmed* part may shrink it — here: a container entity was
-  actually observed on that tile, and the world is past the post-load streaming grace. Gating on
-  the grace alone is not enough; that covers loading far from base but not walking away, which is
-  the same loss in normal play. **Iter-44 replaced the concrete predicate** (`containerTiles` could
-  never be true for cattle/paint aux, so that half could never shrink at all — see the C-1 entry
-  below): a removal now needs the grace AND either a container observed on that tile, or the tile to
-  be one the scan WOULD have seen anything on (within `PruneRadius` of the player and anchor-covered).
-- **Count and report every deletion, even the legitimate ones.** Not one destructive path here
-  logged anything, and the diagnostic printed only the *endpoint* after all mutations. Report the
-  **transition** (`ledgerC=505->505 lostUnits=2677`) — that one line would have made Iter-42
-  self-evident on the first far-from-base load instead of costing a month.
-- **Pick an anomaly trigger that cannot false-positive, or don't ship one.** A shrink is normal
-  (emptying a chest drops its content), so neither a magnitude threshold nor "any shrink" is usable.
-  Trigger on a *shape* that normal play cannot produce — units lost on ≥5 tiles within one 3 s scan.
-  A false alarm about data loss is worse than no alarm. **This one was asserted and then refuted
-  four ways** — the interval is player-settable to 30 s, the streaming grace batches everything into
-  the first scan after it, playing with the mod disabled desynchronises the ledger while saves
-  continue, and **CK automation moves items out of chests continuously**, which is precisely the
-  benign bulk event on the contents axis that the justification claimed did not exist. Iter-44's
-  version scales with the configured interval, suppresses the batched scans (with a much higher
-  override bound, because the first post-grace scan is the ONLY one a load-time bug can strike on),
-  buckets its dedup key by magnitude and by character, and names automation in the player-facing
-  text. The lesson survives, but state such a claim as "no benign event we have MEASURED produces
-  this shape" — not as an absolute.
-- **Durable beats logged for anything a user must report.** `Player.log` rotates every launch, so a
-  warning is gone by the time someone writes the bug report. Persist it (here
-  `PossessionIncidentStore` → `mods/ItemChecklist/possession-incidents.txt`) and keep it **ungated**
-  by the default-off diagnostics flag — a report that requires prior suspicion reports nothing.
+- **Return a load STATUS, not just data.** "Empty because new" and "empty
+  because broken" must be distinguishable at the call site, and a failed load
+  must make the store **read-only** until the next successful load. Not saving
+  costs one session; saving costs everything on disk.
+- **Set the failure flag BEFORE anything else can throw.** Our `LoadFrom` clears
+  its dicts *before* parsing, so a mid-parse throw leaves a **partially**
+  populated store that is indistinguishable from a complete one — the worst
+  case, because it looks like success.
+- **A silent `null` return is worse than an exception.** The
+  `Read`-returned-null branch had no log at all and was the one path no amount
+  of `catch` would have surfaced.
+- **Weigh recoverability per store, and fix the unrecoverable one first.** The
+  possession ledger self-rebuilds from the player's containers; the pet-skin
+  collection is an *ever-owned* set with no second source, so an empty write is
+  final. Same bug, different blast radius.
+- **A wholesale-replace write path needs a confirmation predicate.**
+  `_containers[key] = contents` deletes everything the previous scan knew. When
+  two producers write one record for *different* entities that can leave the
+  observed set independently (a container and a torch sit in different DOTS
+  archetype chunks), only the *confirmed* part may shrink it — here: a container
+  entity was actually observed on that tile, and the world is past the post-load
+  streaming grace. Gating on the grace alone is not enough; that covers loading
+  far from base but not walking away, which is the same loss in normal play.
+  **Iter-44 replaced the concrete predicate** (`containerTiles` could never be
+  true for cattle/paint aux, so that half could never shrink at all — see the
+  C-1 entry below): a removal now needs the grace AND either a container
+  observed on that tile, or the tile to be one the scan WOULD have seen anything
+  on (within `PruneRadius` of the player and anchor-covered).
+- **Count and report every deletion, even the legitimate ones.** Not one
+  destructive path here logged anything, and the diagnostic printed only the
+  *endpoint* after all mutations. Report the **transition** (`ledgerC=505->505
+  lostUnits=2677`) — that one line would have made Iter-42 self-evident on the
+  first far-from-base load instead of costing a month.
+- **Pick an anomaly trigger that cannot false-positive, or don't ship one.** A
+  shrink is normal (emptying a chest drops its content), so neither a magnitude
+  threshold nor "any shrink" is usable. Trigger on a *shape* that normal play
+  cannot produce — units lost on ≥5 tiles within one 3 s scan. A false alarm
+  about data loss is worse than no alarm. **This one was asserted and then
+  refuted four ways** — the interval is player-settable to 30 s, the streaming
+  grace batches everything into the first scan after it, playing with the mod
+  disabled desynchronises the ledger while saves continue, and **CK automation
+  moves items out of chests continuously**, which is precisely the benign bulk
+  event on the contents axis that the justification claimed did not exist.
+  Iter-44's version scales with the configured interval, suppresses the batched
+  scans (with a much higher override bound, because the first post-grace scan is
+  the ONLY one a load-time bug can strike on), buckets its dedup key by
+  magnitude and by character, and names automation in the player-facing text.
+  The lesson survives, but state such a claim as "no benign event we have
+  MEASURED produces this shape" — not as an absolute.
+- **Durable beats logged for anything a user must report.** `Player.log` rotates
+  every launch, so a warning is gone by the time someone writes the bug report.
+  Persist it (here `PossessionIncidentStore` →
+  `mods/ItemChecklist/possession-incidents.txt`) and keep it **ungated** by the
+  default-off diagnostics flag — a report that requires prior suspicion reports
+  nothing.
 
 ### When four rounds of point fixes each introduce the next bug, the shape is the bug (Iter-42/43 review backlog)
 
-Iter-42 fixed a data-loss bug; its review found four more; Iter-43 fixed those and introduced three
-new Criticals **of the same class**; the Iter-43 review found those, with three of four independent
-reviewers converging on one root cause. That sequence is itself the finding. The transferable parts,
-all paid for:
+Iter-42 fixed a data-loss bug; its review found four more; Iter-43 fixed those
+and introduced three new Criticals **of the same class**; the Iter-43 review
+found those, with three of four independent reviewers converging on one root
+cause. That sequence is itself the finding. The transferable parts, all paid
+for:
 
-- **A `bool` that carries a condition across a semantic boundary will be pasted to the wrong side.**
-  `allowShrink: allowPrune && containerTiles.Contains(key)` is correct for container contents and
-  structurally wrong for aux (cattle colour aux is keyed by an *anchor* tile, and anchors carry
-  `CraftingCD`, so they can never be in `containerTiles`). **The two call sites are visually
-  identical.** A flag says *what you may do*; it cannot say *which evidence justified it*, so it
-  cannot be checked at the place that owns the data. Pass the observation, not the permission.
-- **Two collections that must be kept in step by hand will drift the moment they stop being
-  symmetric.** `_containers`/`_auxContainers` were hand-paired at ~10 trivially symmetric sites and
-  that was survivable; Iter-43 added a **semantic** pairing (one shared correctness predicate whose
-  validity depends on which producer wrote the dict) and it was wrong immediately. The line between
-  "conventional pairing" and "actively error-prone" is exactly there. **Iter-44 folded both into one
-  `TileEntry` per tile.** The site count barely moved — what changed is *which* sites: the ones
-  spread across files and interleaved with gating logic (three ledger writers, two flush loops, a
-  reconcile pass, two key unions) are gone, and the remainder are adjacent, symmetric, and decide
-  nothing. Localisation, not elimination — but the pairs that could disagree about *correctness* no
-  longer exist.
-- **Calibrate a detector to the failure you MEASURED, not the one you just fixed.** The Iter-43
-  anomaly trigger watches the wholesale-replace path (Iter-42's shape). The catastrophe this ledger
-  actually suffered was Iter-41's `ledgerC` 402 → 0 through the *prune* — for which there is still
-  only a diagnostic line behind a default-off flag. A regression of the measured failure would be
-  reported by nothing. **Iter-44 built that channel**, per-scan and cumulative, and the cumulative
-  one requires a **net** decline: gross removals are healthy churn (Iter-43's own verification
-  measured "8 removed / 7 added in one interval" in a session whose ledger GREW), while the
-  historical failure was a net collapse. That distinction paid for itself on the first in-game run —
-  60 legitimate prunes in one session, and the net condition correctly stayed silent where a gross
-  count would have filed a durable data-loss report.
-- **A threshold that depends on a user-settable parameter is not the threshold you documented.**
-  "≥5 tiles in one 3 s scan cannot false-positive" was asserted absolutely; the scan interval is a
-  player Choice up to **30 s**, the post-load grace batches withdrawals into the first scan after it,
-  and playing with the mod disabled desynchronises the ledger while saves continue. Three false-alarm
-  paths in a claim of impossibility.
-- **A reporting channel must not fail on the fault it reports.** The new durable incident store read
-  its own file with a helper that returns `null` both for "absent" and for "present but unreadable" —
-  the exact conflation it was built to end, one file deeper — and then rewrote the file from scratch,
-  destroying the history. The trigger is *correlated* with the fault being reported, so this is the
-  common case for a misbehaving filesystem, not bad luck.
-- **A one-shot signal is spent by the benign occurrence.** The "no ECS world" warning is
-  once-per-process and fires during every world load, so a genuine mid-play world loss is silent
-  forever. Same for a `":session"` dedup key: the first harmless anomaly consumes the slot. Scope a
-  one-shot to an *episode*, or bucket the key by severity.
-- **Distinguishing "empty because new" from "empty because broken" is not enough — a parser that
-  never throws produces a third state.** The status flag added for exactly this catches a throw and
-  a null read, but a file truncated after its header parses to a *subset*, reports success, and gets
-  written back. Validate the body (a declared count, a checksum, or a skipped-line counter), not just
-  the header.
-- **Convergent independent reviewers are strong evidence; a single one is a hypothesis.** Three
-  reviewers arrived at the same root cause and two proposed the identical fix, having been given the
-  suspicion in different words. Conversely each also refuted suspicions of mine — the refutations
-  (listed in the roadmap's Iter-44 entry) are as valuable as the findings, because they stop the next
-  round from re-investigating settled ground.
+- **A `bool` that carries a condition across a semantic boundary will be pasted
+  to the wrong side.** `allowShrink: allowPrune && containerTiles.Contains(key)`
+  is correct for container contents and structurally wrong for aux (cattle
+  colour aux is keyed by an *anchor* tile, and anchors carry `CraftingCD`, so
+  they can never be in `containerTiles`). **The two call sites are visually
+  identical.** A flag says *what you may do*; it cannot say *which evidence
+  justified it*, so it cannot be checked at the place that owns the data. Pass
+  the observation, not the permission.
+- **Two collections that must be kept in step by hand will drift the moment they
+  stop being symmetric.** `_containers`/`_auxContainers` were hand-paired at ~10
+  trivially symmetric sites and that was survivable; Iter-43 added a
+  **semantic** pairing (one shared correctness predicate whose validity depends
+  on which producer wrote the dict) and it was wrong immediately. The line
+  between "conventional pairing" and "actively error-prone" is exactly there.
+  **Iter-44 folded both into one `TileEntry` per tile.** The site count barely
+  moved — what changed is *which* sites: the ones spread across files and
+  interleaved with gating logic (three ledger writers, two flush loops, a
+  reconcile pass, two key unions) are gone, and the remainder are adjacent,
+  symmetric, and decide nothing. Localisation, not elimination — but the pairs
+  that could disagree about *correctness* no longer exist.
+- **Calibrate a detector to the failure you MEASURED, not the one you just
+  fixed.** The Iter-43 anomaly trigger watches the wholesale-replace path
+  (Iter-42's shape). The catastrophe this ledger actually suffered was Iter-41's
+  `ledgerC` 402 → 0 through the *prune* — for which there is still only a
+  diagnostic line behind a default-off flag. A regression of the measured
+  failure would be reported by nothing. **Iter-44 built that channel**, per-scan
+  and cumulative, and the cumulative one requires a **net** decline: gross
+  removals are healthy churn (Iter-43's own verification measured "8 removed / 7
+  added in one interval" in a session whose ledger GREW), while the historical
+  failure was a net collapse. That distinction paid for itself on the first
+  in-game run — 60 legitimate prunes in one session, and the net condition
+  correctly stayed silent where a gross count would have filed a durable
+  data-loss report.
+- **A threshold that depends on a user-settable parameter is not the threshold
+  you documented.** "≥5 tiles in one 3 s scan cannot false-positive" was
+  asserted absolutely; the scan interval is a player Choice up to **30 s**, the
+  post-load grace batches withdrawals into the first scan after it, and playing
+  with the mod disabled desynchronises the ledger while saves continue. Three
+  false-alarm paths in a claim of impossibility.
+- **A reporting channel must not fail on the fault it reports.** The new durable
+  incident store read its own file with a helper that returns `null` both for
+  "absent" and for "present but unreadable" — the exact conflation it was built
+  to end, one file deeper — and then rewrote the file from scratch, destroying
+  the history. The trigger is *correlated* with the fault being reported, so
+  this is the common case for a misbehaving filesystem, not bad luck.
+- **A one-shot signal is spent by the benign occurrence.** The "no ECS world"
+  warning is once-per-process and fires during every world load, so a genuine
+  mid-play world loss is silent forever. Same for a `":session"` dedup key: the
+  first harmless anomaly consumes the slot. Scope a one-shot to an *episode*, or
+  bucket the key by severity.
+- **Distinguishing "empty because new" from "empty because broken" is not enough
+  — a parser that never throws produces a third state.** The status flag added
+  for exactly this catches a throw and a null read, but a file truncated after
+  its header parses to a *subset*, reports success, and gets written back.
+  Validate the body (a declared count, a checksum, or a skipped-line counter),
+  not just the header.
+- **Convergent independent reviewers are strong evidence; a single one is a
+  hypothesis.** Three reviewers arrived at the same root cause and two proposed
+  the identical fix, having been given the suspicion in different words.
+  Conversely each also refuted suspicions of mine — the refutations (listed in
+  the roadmap's Iter-44 entry) are as valuable as the findings, because they
+  stop the next round from re-investigating settled ground.
 
 ### Iter-44: what the structural rebuild taught, on top of the above
 
-- **"The write call did not throw" is not "the write landed."** CK's `StandaloneFilesystem.Write`
-  ends in `catch (IOException) { Debug.LogError(...) }` with **no rethrow**, and its inner
-  `File.Replace`/`File.Move` retry loop gives up after ten attempts with only a `LogError`. So the
-  entire `IOException` class — disk full, a locked file, the Wine faults this project ships six IL
-  patches for — is invisible to a mod. Worse, our FNV save-write-skip then cached "the disk holds
-  this" for content that was never written, so every later save with unchanged content was **skipped**:
-  one poisoned cache entry could suppress saving for a whole session, and for the pet store
-  `ClearDirty()` additionally cancelled the retry its own placement after the write was meant to
-  guarantee. **Verify by reading back before you record a write as done** — and note this was
-  invisible from the mod's own source. It took reading the decompile.
-- **One missed observation is not evidence of removal.** A container's chunk can be absent from a
-  single ECS query while it still exists; a penned animal can wander out of `AnchorRadius` for one
-  scan or vanish briefly during growth churn. Acting on the first miss produced a flickering count
-  that froze at the wrong value if the player then left. Requiring the **immediately preceding** scan
-  to have missed the same key too costs one interval and removes the whole class. Two details matter:
-  the marks must be **per key** (one per tile lets a neighbour's miss spend another key's grace, which
-  is routine where several keys share a tile) and **adjacent** (otherwise "the previous scan" means
-  "the previous scan that looked at this tile", which can be an hour and a teleport earlier).
-- **Apply such a delay to EVERY removal path or it is cosmetic.** The delay first went only into the
-  merge. But on most tiles the container is the *only* producer, so when its chunk flickers the tile
-  is not in the observed set at all, the merge never runs, and the *prune* takes the whole tile in one
-  scan. The rule was protecting the rarer shape and leaving the common one exposed.
-- **A multi-call protocol cannot be enforced at compile time in this language subset — so remove the
-  protocol.** Three shapes were tried: a permission bool per write (the caller owned a rule it could
-  not see), four evidence bools per tile (three derivable, one a duplicated predicate), then
-  `BeginScan`/`Publish`/`Prune` over ledger-held state — where a harness found that a publish *after*
-  the prune still shrank, because the "is a scan open" flag was a warning trigger and not part of the
-  authorization. Patching the condition was not the lesson. With a **single entry point** taking the
-  whole snapshot, "no scan is open" and "the prune was skipped" stop being representable.
-- **A stable bookkeeping key must not be derived from something that moves.** Cattle colour aux was
-  keyed to "the anchor nearest the animal", called stable because anchors do not move. The animal
-  does. Measured: ~12 tiles added and ~12 removed per save interval against 11 such tiles in
-  existence. That silently broke the Iter-31 save-write-skip for farm bases, and once the miss delay
-  existed it also double-counted colours. The fix is a key that does not depend on the moving thing at
-  all (the lowest packed anchor key of the scan) — and the "location" was safe to give up because
-  nothing reads it.
-- **A running game is not a stable measurement subject.** Twice during verification an intermediate
-  read produced a wrong conclusion — "no DIAG lines, so diagnostics was off" (the log was still being
-  written) and "the in-memory tile count exceeds the file's, so a save was wrongly skipped" (the file
-  was four minutes younger than the process). Both would have been written up as bugs. **Quit the
-  game before reading the log and the ledger**, or you are comparing two different points in time.
-- **Extract the pure-logic core and test it offline; it finds what reading does not.** The ledger and
-  the pet collection need no ECS, no Harmony, and no Unity API beyond `Debug.LogWarning` and
-  `Vector2`, so ~40 lines of stubs make them runnable outside the game
-  (`tests/possession-harness`). It caught two defects that four review agents reading the same code
-  did not. Compile the real sources into the harness rather than copying them — a copy drifts, and a
+- **"The write call did not throw" is not "the write landed."** CK's
+  `StandaloneFilesystem.Write` ends in `catch (IOException) {
+  Debug.LogError(...) }` with **no rethrow**, and its inner
+  `File.Replace`/`File.Move` retry loop gives up after ten attempts with only a
+  `LogError`. So the entire `IOException` class — disk full, a locked file, the
+  Wine faults this project ships six IL patches for — is invisible to a mod.
+  Worse, our FNV save-write-skip then cached "the disk holds this" for content
+  that was never written, so every later save with unchanged content was
+  **skipped**: one poisoned cache entry could suppress saving for a whole
+  session, and for the pet store `ClearDirty()` additionally cancelled the retry
+  its own placement after the write was meant to guarantee. **Verify by reading
+  back before you record a write as done** — and note this was invisible from
+  the mod's own source. It took reading the decompile.
+- **One missed observation is not evidence of removal.** A container's chunk can
+  be absent from a single ECS query while it still exists; a penned animal can
+  wander out of `AnchorRadius` for one scan or vanish briefly during growth
+  churn. Acting on the first miss produced a flickering count that froze at the
+  wrong value if the player then left. Requiring the **immediately preceding**
+  scan to have missed the same key too costs one interval and removes the whole
+  class. Two details matter: the marks must be **per key** (one per tile lets a
+  neighbour's miss spend another key's grace, which is routine where several
+  keys share a tile) and **adjacent** (otherwise "the previous scan" means "the
+  previous scan that looked at this tile", which can be an hour and a teleport
+  earlier).
+- **Apply such a delay to EVERY removal path or it is cosmetic.** The delay
+  first went only into the merge. But on most tiles the container is the *only*
+  producer, so when its chunk flickers the tile is not in the observed set at
+  all, the merge never runs, and the *prune* takes the whole tile in one scan.
+  The rule was protecting the rarer shape and leaving the common one exposed.
+- **A multi-call protocol cannot be enforced at compile time in this language
+  subset — so remove the protocol.** Three shapes were tried: a permission bool
+  per write (the caller owned a rule it could not see), four evidence bools per
+  tile (three derivable, one a duplicated predicate), then
+  `BeginScan`/`Publish`/`Prune` over ledger-held state — where a harness found
+  that a publish *after* the prune still shrank, because the "is a scan open"
+  flag was a warning trigger and not part of the authorization. Patching the
+  condition was not the lesson. With a **single entry point** taking the whole
+  snapshot, "no scan is open" and "the prune was skipped" stop being
+  representable.
+- **A stable bookkeeping key must not be derived from something that moves.**
+  Cattle colour aux was keyed to "the anchor nearest the animal", called stable
+  because anchors do not move. The animal does. Measured: ~12 tiles added and
+  ~12 removed per save interval against 11 such tiles in existence. That
+  silently broke the Iter-31 save-write-skip for farm bases, and once the miss
+  delay existed it also double-counted colours. The fix is a key that does not
+  depend on the moving thing at all (the lowest packed anchor key of the scan) —
+  and the "location" was safe to give up because nothing reads it.
+- **A running game is not a stable measurement subject.** Twice during
+  verification an intermediate read produced a wrong conclusion — "no DIAG
+  lines, so diagnostics was off" (the log was still being written) and "the
+  in-memory tile count exceeds the file's, so a save was wrongly skipped" (the
+  file was four minutes younger than the process). Both would have been written
+  up as bugs. **Quit the game before reading the log and the ledger**, or you
+  are comparing two different points in time.
+- **Extract the pure-logic core and test it offline; it finds what reading does
+  not.** The ledger and the pet collection need no ECS, no Harmony, and no Unity
+  API beyond `Debug.LogWarning` and `Vector2`, so ~40 lines of stubs make them
+  runnable outside the game (`tests/possession-harness`). It caught two defects
+  that four review agents reading the same code did not. Compile the real
+  sources into the harness rather than copying them — a copy drifts, and a
   drifting test is worse than none.
-- **A test protocol finds what it asks about; a data diff finds what happened.** The in-game protocol
-  asked whether a colour count still flickered *downward* (the regression just fixed). The ledger diff
-  showed a drift *upward* plus the hopping tiles — a different defect, in the opposite direction,
-  that no protocol step named.
+- **A test protocol finds what it asks about; a data diff finds what happened.**
+  The in-game protocol asked whether a colour count still flickered *downward*
+  (the regression just fixed). The ledger diff showed a drift *upward* plus the
+  hopping tiles — a different defect, in the opposite direction, that no
+  protocol step named.
 
 ### Iter-45: adding provenance to a persisted record
 
-- **A green test that picked the convenient configuration is worse than no test.** The migration test
-  passed a `containers` set, which forces `absenceIsConfirmed` — the ONE case where the provenance
-  correction lands atomically. So it asserted a behaviour the shipped code did not have, and both
-  reviewers spotted it independently. When writing a test for a new rule, use the shape that occurs
-  MOST, not the one that makes the assertion easy: here a placed-only tile, which is ~99 % of the
-  ledger per Iter-28's measurement.
-- **A migration that ADDS where it should MOVE double-counts, and the correction looks like a loss.**
-  Loading a v3 line's contents into `stored` and letting the first observation add to `placed` left
-  both populated until the shrink rule expired the stale one — a doubled count meanwhile, and
-  permanent for any tile observed from beyond the shrink envelope (ordinary play at a base, since
-  anchors reach ~91-115 tiles). Worse, the eventual removal was booked as `DroppedUnits`, so the
-  anomaly detector would have written "N owned unit(s) vanished — please report this file" on the
-  first post-update scan of every real base. **Re-filing is bookkeeping, not a removal: do it before
-  the merges and do not count it.**
-- **When one field is the SUM of two, the exact correction is subtraction, not a guess.** A v3 count
-  was `stored + placed`, so an id observed as placed accounts for exactly that much of it. 1 + 1 was
-  written as 2; observing 1 placed leaves 1, and the chest's copy survives. No heuristic, no
-  tolerance — but it must be gated on "this record is still the migrated assumption", because on a
-  verified record the same subtraction deletes real data whenever the container happens to be
-  unobserved.
-- **Carry migration uncertainty in the SHAPE, not in a new field.** An unverified tile is written as
-  a v3-shaped three-segment line, so the uncertainty survives a save with no extra format surface
-  and no extra parser branch. Without that, a tile the player has not revisited since the update
+- **A green test that picked the convenient configuration is worse than no
+  test.** The migration test passed a `containers` set, which forces
+  `absenceIsConfirmed` — the ONE case where the provenance correction lands
+  atomically. So it asserted a behaviour the shipped code did not have, and both
+  reviewers spotted it independently. When writing a test for a new rule, use
+  the shape that occurs MOST, not the one that makes the assertion easy: here a
+  placed-only tile, which is ~99 % of the ledger per Iter-28's measurement.
+- **A migration that ADDS where it should MOVE double-counts, and the correction
+  looks like a loss.** Loading a v3 line's contents into `stored` and letting
+  the first observation add to `placed` left both populated until the shrink
+  rule expired the stale one — a doubled count meanwhile, and permanent for any
+  tile observed from beyond the shrink envelope (ordinary play at a base, since
+  anchors reach ~91-115 tiles). Worse, the eventual removal was booked as
+  `DroppedUnits`, so the anomaly detector would have written "N owned unit(s)
+  vanished — please report this file" on the first post-update scan of every
+  real base. **Re-filing is bookkeeping, not a removal: do it before the merges
+  and do not count it.**
+- **When one field is the SUM of two, the exact correction is subtraction, not a
+  guess.** A v3 count was `stored + placed`, so an id observed as placed
+  accounts for exactly that much of it. 1 + 1 was written as 2; observing 1
+  placed leaves 1, and the chest's copy survives. No heuristic, no tolerance —
+  but it must be gated on "this record is still the migrated assumption",
+  because on a verified record the same subtraction deletes real data whenever
+  the container happens to be unobserved.
+- **Carry migration uncertainty in the SHAPE, not in a new field.** An
+  unverified tile is written as a v3-shaped three-segment line, so the
+  uncertainty survives a save with no extra format surface and no extra parser
+  branch. Without that, a tile the player has not revisited since the update
   hardens into a split nobody verified.
-- **Put the new segment LAST and the migration is nearly free.** v4 is `x,z|stored|aux|placed`, so
-  v3's three fields keep their meaning and ONE parser reads both. Inserting it in the middle would
-  have forced either two parsers or a discard — and a discard costs every player a full re-scan.
-- **A mandatory field must be mandatory under the marker that promises it.** The `#n=` count was
-  first treated as "absent ⇒ accepted unchecked" for every file. But only a v4 writer emits it, so
-  under the v4 marker its absence IS damage — and that absence is exactly what a truncation after
-  line 1 produces, which otherwise loaded as a clean, WRITABLE, EMPTY ledger.
-- **A damage detector must not double-report.** A malformed line fails the parse AND makes the tile
-  count fall short of the declared one; reporting both doubles the number the incident quotes to the
-  player as "lines that could not be read". Subtract every line that yielded no tile — including one
-  that merged into an existing tile, where the naive check read a concatenated file as damaged
-  although the merge path exists to SALVAGE such a file.
-- **If a fix removes a capability, the diagnosis was too coarse.** "The tooltip must count containers,
-  not everything" reads like the fix for a wrong claim — and silently removed the locate arrow for
-  every placed object. The arrow was always correct; only the WORDING was wrong. Split the READ
-  (both provenances, for the arrow) from the WORDING (containers only), rather than narrowing both.
+- **Put the new segment LAST and the migration is nearly free.** v4 is
+  `x,z|stored|aux|placed`, so v3's three fields keep their meaning and ONE
+  parser reads both. Inserting it in the middle would have forced either two
+  parsers or a discard — and a discard costs every player a full re-scan.
+- **A mandatory field must be mandatory under the marker that promises it.** The
+  `#n=` count was first treated as "absent ⇒ accepted unchecked" for every file.
+  But only a v4 writer emits it, so under the v4 marker its absence IS damage —
+  and that absence is exactly what a truncation after line 1 produces, which
+  otherwise loaded as a clean, WRITABLE, EMPTY ledger.
+- **A damage detector must not double-report.** A malformed line fails the parse
+  AND makes the tile count fall short of the declared one; reporting both
+  doubles the number the incident quotes to the player as "lines that could not
+  be read". Subtract every line that yielded no tile — including one that merged
+  into an existing tile, where the naive check read a concatenated file as
+  damaged although the merge path exists to SALVAGE such a file.
+- **If a fix removes a capability, the diagnosis was too coarse.** "The tooltip
+  must count containers, not everything" reads like the fix for a wrong claim —
+  and silently removed the locate arrow for every placed object. The arrow was
+  always correct; only the WORDING was wrong. Split the READ (both provenances,
+  for the arrow) from the WORDING (containers only), rather than narrowing both.
 
 ## Possession Base Scope & Persistence (Iter-31)
 
 ### Workbench = the semantic "is this the player's base?" discriminator
 
-CK has **no base concept** and (per the Iter-28 lesson above) **no world-spawned-vs-placed
-signal**, so neither position nor cluster-density tells a base from a world structure: a
-fixed radius around the player misses an outbuilding (Iter-20), and "≥ 2 crafting stations
-nearby" mis-fires because CK world structures *pack* functional stations — an abandoned camp
-has a campfire + cooking pot, a mechanical vault a seed extractor + generator — so they pass a
-cluster filter and anchor their loot as "owned". The clean discriminator is **semantic, and
-CK does encode it**: a base is built around a **Workbench** (the universal first build), and
-CK places **no** workbench in any world structure. Validated against a real save: **11
-workbenches, all at the Core base; 0 in any remote cluster.** So anchor on workbenches + the
-stations within a workbench's radius (link **workbench→station only**, never station→station,
-so the base can't chain out to a far structure; a single workbench suffices → no cluster count
-needed). Reusable for any CK mod that needs "does the player own/control this place?" — reach
-for a **player-built marker object** (workbench) before any spatial/type heuristic.
+CK has **no base concept** and (per the Iter-28 lesson above) **no
+world-spawned-vs-placed signal**, so neither position nor cluster-density tells
+a base from a world structure: a fixed radius around the player misses an
+outbuilding (Iter-20), and "≥ 2 crafting stations nearby" mis-fires because CK
+world structures *pack* functional stations — an abandoned camp has a campfire +
+cooking pot, a mechanical vault a seed extractor + generator — so they pass a
+cluster filter and anchor their loot as "owned". The clean discriminator is
+**semantic, and CK does encode it**: a base is built around a **Workbench** (the
+universal first build), and CK places **no** workbench in any world structure.
+Validated against a real save: **11 workbenches, all at the Core base; 0 in any
+remote cluster.** So anchor on workbenches + the stations within a workbench's
+radius (link **workbench→station only**, never station→station, so the base
+can't chain out to a far structure; a single workbench suffices → no cluster
+count needed). Reusable for any CK mod that needs "does the player own/control
+this place?" — reach for a **player-built marker object** (workbench) before any
+spatial/type heuristic.
 
 ### Hash width is the safety knob for a skip-if-unchanged persistence guard
 
-When you elide an expensive write because the serialized content is unchanged (Iter-31:
-`PossessionStore` skips the 5–13 ms Wine disk write when the freshly serialized ledger hashes
-to the last-written value), a **hash collision = a skipped needed save = silent data loss**,
-so the hash width *is* the data-safety margin. Use **FNV-1a/64** (collision ≈ 1/2⁶⁴ per save —
-negligible):
+When you elide an expensive write because the serialized content is unchanged
+(Iter-31: `PossessionStore` skips the 5–13 ms Wine disk write when the freshly
+serialized ledger hashes to the last-written value), a **hash collision = a
+skipped needed save = silent data loss**, so the hash width *is* the data-safety
+margin. Use **FNV-1a/64** (collision ≈ 1/2⁶⁴ per save — negligible):
 - **Not** 32-bit `string.GetHashCode` — 1/2³² is not negligible across a long session of
   saves, and it isn't even stable across runtimes.
 - **Not** SHA/MD5 — cryptographic strength is irrelevant (you're hashing your own data, not
@@ -1568,68 +1636,81 @@ negligible):
   `System.Security.Cryptography` is exactly the BCL surface the Roslyn sandbox bans — so it
   would `CompileFailed` the mod anyway. FNV has zero BCL dependency.
 
-Record the hash **only after a successful write**, and let the first save (no prior hash) always
-land — so the skip path can never drop the initial persist or a write that failed.
+Record the hash **only after a successful write**, and let the first save (no
+prior hash) always land — so the skip path can never drop the initial persist or
+a write that failed.
 
 ### Validate an inference against the actual savegame/ledger, not your own reasoning
 
-The possession ledger on disk (`possession-<guid>.txt`, ASCII `x,z|id:count` per container) is
-a **first-class diagnostic data source** — parse it; do not reason about what it "should"
-contain. Twice during Iter-31 an "those OreBoulders are inside the 48-tile base radius"
-inference was asserted from memory and was **wrong** — parsing the ledger proved the entries
-sat **337–693 tiles** from the Core base (remote world content the player had merely explored
-past: Sunken-Sea coral/jellyfish, abandoned-camp furniture, a vault's farm seeds, and loot
-inside world chests never opened). The on-disk file beats the inference every time the two can
-both be reached; let it redirect the fix (here: from "blacklist those boulders" to "the anchor
-model itself is wrong"). (Memory: `feedback_validate_against_savegame`.)
+The possession ledger on disk (`possession-<guid>.txt`, ASCII `x,z|id:count` per
+container) is a **first-class diagnostic data source** — parse it; do not reason
+about what it "should" contain. Twice during Iter-31 an "those OreBoulders are
+inside the 48-tile base radius" inference was asserted from memory and was
+**wrong** — parsing the ledger proved the entries sat **337–693 tiles** from the
+Core base (remote world content the player had merely explored past: Sunken-Sea
+coral/jellyfish, abandoned-camp furniture, a vault's farm seeds, and loot inside
+world chests never opened). The on-disk file beats the inference every time the
+two can both be reached; let it redirect the fix (here: from "blacklist those
+boulders" to "the anchor model itself is wrong"). (Memory:
+`feedback_validate_against_savegame`.)
 
 ### "GarbageCollector disposing of ComputeBuffer" is usually a SHUTDOWN artifact — check WHERE it fires
 
-A frame-hitch correlated with exploring/enemies is easy to misattribute. Iter-31's "lag spike
-outside base" looked like a textbook case: the log showed **40× "GarbageCollector disposing of
-ComputeBuffer"**, and the leading theory was a GPU leak in *another* mod's bundled render asset
-(no `.cs` references `ComputeBuffer`, so it would hide inside a prefab/material bundle, not
-source). **Both halves of that theory were wrong** — and how they were caught *is* the lesson:
+A frame-hitch correlated with exploring/enemies is easy to misattribute.
+Iter-31's "lag spike outside base" looked like a textbook case: the log showed
+**40× "GarbageCollector disposing of ComputeBuffer"**, and the leading theory
+was a GPU leak in *another* mod's bundled render asset (no `.cs` references
+`ComputeBuffer`, so it would hide inside a prefab/material bundle, not source).
+**Both halves of that theory were wrong** — and how they were caught *is* the
+lesson:
 
-- **Check the log POSITION of the GC warnings.** All 40 sat in the **last 40 lines** of the log,
-  immediately after `Input System module state changed to: Shutdown` — they are the GC's
-  **process-exit cleanup** of buffers never explicitly `Release()`d, not mid-play hitches (a
-  mid-play GC would *spread* the warnings through the log, not bunch them at the very end).
-  Benign. They never touched a gameplay frame.
-- **Isolate by toggling + the player's feel, not by a count.** The suspected render mod was
-  disabled via `state.json`'s `disabledMods` array (NOT the in-game mod menu — that triggers a
-  mod.io resync that deletes fake-ID dev entries; edit `…/mod.io/5289/state.json`, add the modId
-  string to `existingUsers/<uid>/disabledMods`, keep it in `subscribedMods`). The next session
-  ran **with no spikes** — *that* confirmed the culprit (a per-enemy render mod, by its rendering
-  cost), while the ComputeBuffer count was **unchanged at 40**, proving those warnings were never
-  the cause.
+- **Check the log POSITION of the GC warnings.** All 40 sat in the **last 40
+  lines** of the log, immediately after `Input System module state changed to:
+  Shutdown` — they are the GC's **process-exit cleanup** of buffers never
+  explicitly `Release()`d, not mid-play hitches (a mid-play GC would *spread*
+  the warnings through the log, not bunch them at the very end). Benign. They
+  never touched a gameplay frame.
+- **Isolate by toggling + the player's feel, not by a count.** The suspected
+  render mod was disabled via `state.json`'s `disabledMods` array (NOT the
+  in-game mod menu — that triggers a mod.io resync that deletes fake-ID dev
+  entries; edit `…/mod.io/5289/state.json`, add the modId string to
+  `existingUsers/<uid>/disabledMods`, keep it in `subscribedMods`). The next
+  session ran **with no spikes** — *that* confirmed the culprit (a per-enemy
+  render mod, by its rendering cost), while the ComputeBuffer count was
+  **unchanged at 40**, proving those warnings were never the cause.
 
-Lesson: don't promote a GC/leak warning to "the gameplay lag" without checking its **log
-position**; and isolate a render mod by **disable + subjective smoothness**, not by a GC count.
-(Prove your own innocence first: `grep -rn ComputeBuffer unity/` — ItemChecklist's is zero.)
+Lesson: don't promote a GC/leak warning to "the gameplay lag" without checking
+its **log position**; and isolate a render mod by **disable + subjective
+smoothness**, not by a GC count. (Prove your own innocence first: `grep -rn
+ComputeBuffer unity/` — ItemChecklist's is zero.)
 
 ### Possession scan: "loaded" ≠ "observed" — the prune must key off the observation boundary (Iter-41)
 
-For any spatial "is it still there?" self-heal (`PruneStaleNear`), the load radius is the **wrong**
-threshold. Ground truth from the decompile: the player carries
-`KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250, ImmediateLoadRadius=200 }`
-(`Pug.Base` `PLAYER_DISTANCE_TO_LOAD=200/…START=250/…UNLOAD=300`; `defaultSimDistance`/
-`SimulationDistance` are dead → the bubble is **not shrinkable by any setting**). So CK force-loads
-chunks within ~200 of the player. **But** the mod's scan resolves the **ServerWorld**, and base
-placed-object entities empirically leave the *observed* scan set at only **~91–115** — well below
-200 (best explanation: DOTS ArchetypeChunk unload granularity, so a container can leave the query
-while its co-located workbench stays; possibly a camera-frame offset). The Iter-41 bug was exactly
-this conflation: the prune ran at `LoadRadius = 180` (chosen "< 200 = loaded"), so it deleted
-loaded-**but-unobserved** base containers in the 91–180 band as the player walked away, wiping the
-remembered ledger (Possession `K` collapsed 385→40).
+For any spatial "is it still there?" self-heal (`PruneStaleNear`), the load
+radius is the **wrong** threshold. Ground truth from the decompile: the player
+carries `KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250,
+ImmediateLoadRadius=200 }` (`Pug.Base`
+`PLAYER_DISTANCE_TO_LOAD=200/…START=250/…UNLOAD=300`; `defaultSimDistance`/
+`SimulationDistance` are dead → the bubble is **not shrinkable by any
+setting**). So CK force-loads chunks within ~200 of the player. **But** the
+mod's scan resolves the **ServerWorld**, and base placed-object entities
+empirically leave the *observed* scan set at only **~91–115** — well below 200
+(best explanation: DOTS ArchetypeChunk unload granularity, so a container can
+leave the query while its co-located workbench stays; possibly a camera-frame
+offset). The Iter-41 bug was exactly this conflation: the prune ran at
+`LoadRadius = 180` (chosen "< 200 = loaded"), so it deleted
+loaded-**but-unobserved** base containers in the 91–180 band as the player
+walked away, wiping the remembered ledger (Possession `K` collapsed 385→40).
 
-**Rule:** a "not observed ⇒ destroyed" prune must fire only where a present object *would* be
-observed = **loaded AND would-pass-the-scan's-gate**. The Iter-41 airtight form: prune a remembered
-tile iff `dist(player) ≤ 48` (loaded — small, below the ~91 dropout AND the 200 floor; also above
-destruction range) **AND** `coveredByLoadedAnchor` (the same `WithinAnchor(anchors, …)` gate the
-scan uses) **AND** `∉ liveKeys`. Diagnose with the DIAG `maxSeen`/`minGhost` probe + a prune-off
-control run (if `K` is then stable, the prune is the sole cause). Full CK constants + file:line in
-the `reference_ck_entity_load_observe_radii` memory. Corollary: **mobile** entities (penned cattle)
-must not be keyed by their transient tile — key by the nearest **anchor** tile (stable) or they
-accumulate a stale aux entry per tile visited in the 48–~91 ring (a self-healing per-colour
-over-count).
+**Rule:** a "not observed ⇒ destroyed" prune must fire only where a present
+object *would* be observed = **loaded AND would-pass-the-scan's-gate**. The
+Iter-41 airtight form: prune a remembered tile iff `dist(player) ≤ 48` (loaded —
+small, below the ~91 dropout AND the 200 floor; also above destruction range)
+**AND** `coveredByLoadedAnchor` (the same `WithinAnchor(anchors, …)` gate the
+scan uses) **AND** `∉ liveKeys`. Diagnose with the DIAG `maxSeen`/`minGhost`
+probe + a prune-off control run (if `K` is then stable, the prune is the sole
+cause). Full CK constants + file:line in the
+`reference_ck_entity_load_observe_radii` memory. Corollary: **mobile** entities
+(penned cattle) must not be keyed by their transient tile — key by the nearest
+**anchor** tile (stable) or they accumulate a stale aux entry per tile visited
+in the 48–~91 ring (a self-healing per-colour over-count).

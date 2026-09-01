@@ -60,11 +60,11 @@ Discovery is tracked **per world × per player**.
 ## Installation
 
 Subscribe in-game through the **Mods** menu (or on the mod.io website) and
-restart. [CoreLib](https://mod.io/g/corekeeper/m/corelib), Mod Settings Menu
-and Complete Tiny Font must be installed alongside it — all three are pulled
-in automatically when you subscribe. Without Complete Tiny Font, Item
-Checklist does not load at all (no F1 window, no HUD counter) rather than
-running with broken text — re-enable it to bring the checklist back.
+restart. [CoreLib](https://mod.io/g/corekeeper/m/corelib), Mod Settings Menu and Complete Tiny Font must be installed
+alongside it — all three are pulled in automatically when you subscribe. Without
+Complete Tiny Font, Item Checklist does not load at all (no F1 window, no HUD
+counter) rather than running with broken text — re-enable it to bring the
+checklist back.
 
 ## Known Limitations
 
@@ -95,10 +95,10 @@ language in the mod's localization data file — and the mod rebuilt.
 
 ## Credits
 
-All shipped UI sprites are original pixel-art. Early development used placeholder
-sprites from [Item Browser](https://github.com/moorowl/ItemBrowser) by **moorowl**
-(MIT License, © 2026 moorowl); these were fully replaced with original art in
-Iter-12 and no longer ship.
+All shipped UI sprites are original pixel-art. Early development used
+placeholder sprites from [Item Browser](https://github.com/moorowl/ItemBrowser) by **moorowl** (MIT License, © 2026
+moorowl); these were fully replaced with original art in Iter-12 and no longer
+ship.
 
 ## License
 

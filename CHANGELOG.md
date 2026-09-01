@@ -1,9 +1,9 @@
 # Changelog
 
 All notable changes to this mod are documented in this file. The format is
-loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-without strict adherence — entries describe what shipped per release, not
-every commit. The topmost `## [x.y.z]` entry is the current published version.
+loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), without strict adherence — entries describe
+what shipped per release, not every commit. The topmost `## [x.y.z]` entry is
+the current published version.
 
 ## [1.4.0] - 2026-08-12
 

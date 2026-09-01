@@ -71,11 +71,11 @@ UI stack in general.
    - window visible → close via
      `Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false)` (the same
      path Escape/E use — see Close path);
-   - else a Vanilla menu/inventory is open, a text field/chat is focused,
-     or the world is not playable
-     (`Manager.menu.IsAnyMenuActive()` / `Manager.ui.isPlayerInventoryShowing`
-     / `Manager.input.textInputIsActive` / chat focus /
-     `!WorldState.IsInPlayableWorld`) → ignore, so F1 never opens on top of one;
+   - else a Vanilla menu/inventory is open, a text field/chat is focused, or the
+     world is not playable (`Manager.menu.IsAnyMenuActive()` /
+     `Manager.ui.isPlayerInventoryShowing` / `Manager.input.textInputIsActive` /
+     chat focus / `!WorldState.IsInPlayableWorld`) → ignore, so F1 never opens
+     on top of one;
    - else → `UserInterfaceModule.OpenModUI("ItemChecklist:Window")`.
 5. CoreLib calls `ItemChecklistWindow.ShowUI()`.
 6. `ShowUI` delegates to `ItemChecklistContent.PopulateContent` (Iter-3.8):
@@ -358,20 +358,21 @@ mask `scale.y = 6.5`, mask `localPos.y = -2.0`.
 
 **Iter-9 enlargement.** The window was sized to near-fullscreen with a thin
 **uniform border matching CK's inventory margin** (0.25 world-units). Final
-values (committed): background + root collider `29.5 × 16.375` (mask width 28.5), `windowHeight =
-13.75`, mask `scale.y = 13.75` / `localPos.y = -5.625` (`windowHeight` ==
-mask `scale.y`, preserving the flush invariant), `RowsContainer.y = 3.75`, row
-width `27.5`. The window is centered in the camera's **30 × 16.875-unit viewport**
-(measured once via a temporary log of `Manager.camera.uiCamera.orthographicSize`
-= `8.4375`, aspect 16:9; `world_height = 2·orthoSize`, `world_width = height·aspect`).
-**No runtime sizing logic:** CK's orthographic UI camera shows a constant world
-area regardless of resolution, and CK has no UI-scale option, so a fixed prefab
-size is "fullscreen with border" on every resolution (empirically confirmed).
-A later Iter-9 slice changed `RowHeight` from the pre-Iter-9 `2.5` to **`1.5`**
-(now read from the row prefab background at `Init` — see § Item-Row Layout
-(Iter-9)), so the recycled pool auto-grows via `ComputePoolSize` to fit the
-denser rows. Whole-row flush (row 0's top pinned to the mask top) was settled in
-the § Item-Row Layout slice.
+values (committed): background + root collider `29.5 × 16.375` (mask width
+28.5), `windowHeight = 13.75`, mask `scale.y = 13.75` / `localPos.y = -5.625`
+(`windowHeight` == mask `scale.y`, preserving the flush invariant),
+`RowsContainer.y = 3.75`, row width `27.5`. The window is centered in the
+camera's **30 × 16.875-unit viewport** (measured once via a temporary log of
+`Manager.camera.uiCamera.orthographicSize` = `8.4375`, aspect 16:9;
+`world_height = 2·orthoSize`, `world_width = height·aspect`). **No runtime
+sizing logic:** CK's orthographic UI camera shows a constant world area
+regardless of resolution, and CK has no UI-scale option, so a fixed prefab size
+is "fullscreen with border" on every resolution (empirically confirmed). A later
+Iter-9 slice changed `RowHeight` from the pre-Iter-9 `2.5` to **`1.5`** (now
+read from the row prefab background at `Init` — see § Item-Row Layout (Iter-9)),
+so the recycled pool auto-grows via `ComputePoolSize` to fit the denser rows.
+Whole-row flush (row 0's top pinned to the mask top) was settled in the §
+Item-Row Layout slice.
 
 ### Scrollbar (Iter-5)
 
@@ -496,10 +497,10 @@ for species in CattleRegistry.adults:               // 6 species
         emit CatalogEntry(species, variation=colour)
 ```
 
-`ColoursOf` reads each cattle prefab's `ObjectPropertiesCD.PossibleChildVariation[]`
-palette (property id `239678920`) — the breeding-outcome set, which is also the
-species' full caught-colour set. 6 × 5 = 30 cattle rows. See
-§ Per-Variation Tracking (Iter-17).
+`ColoursOf` reads each cattle prefab's
+`ObjectPropertiesCD.PossibleChildVariation[]` palette (property id `239678920`)
+— the breeding-outcome set, which is also the species' full caught-colour set. 6
+× 5 = 30 cattle rows. See § Per-Variation Tracking (Iter-17).
 
 **Resulting catalog size:** ~11,119 entries — broadly ~1240 standard + ~9480
 cooked-food permutations (3160 pairs × 3 tiers), plus the creature/variant
@@ -527,18 +528,17 @@ runtime-assigned (Bucket 2). A measurement sweep found the only runtime
 variations in play are cooked food (already handled by Loop 2) and cattle
 colours — so no generic Bucket-2 loop was built.
 
-**Bucket 2 — cattle (pet-skin model).** CK exposes no colour-count API, but
-each cattle prefab's `ObjectPropertiesCD` carries a
-`PossibleChildVariation[]` palette (property id `239678920`, the
-breeding-outcome / caught-colour set), read sandbox-safe via
-`PugDatabase.TryGetComponent<ObjectPropertiesCD>` + `props.TryGetList(...)`.
-Every species' palette is `{0,1,2,3,4}` — so Loop 4 emits a **fixed 5 colour
-slots** per species, always. Display follows the pet-skin model:
-`Entry.IsColourVariant` marks the rows so the species name is shown on **all**
-slots once any colour is discovered (`IsDiscoveredAnyVariation` — species-gated
-reveal-all, `???` otherwise), while the per-colour collected tick stays
-`IsDiscovered(id, colour)`. No placeholder row, no mod-owned ledger: CK's
-**native** per-`(id, variation)` discovery fires `Changed`, so the existing
+**Bucket 2 — cattle (pet-skin model).** CK exposes no colour-count API, but each
+cattle prefab's `ObjectPropertiesCD` carries a `PossibleChildVariation[]`
+palette (property id `239678920`, the breeding-outcome / caught-colour set),
+read sandbox-safe via `PugDatabase.TryGetComponent<ObjectPropertiesCD>` +
+`props.TryGetList(...)`. Every species' palette is `{0,1,2,3,4}` — so Loop 4
+emits a **fixed 5 colour slots** per species, always. Display follows the
+pet-skin model: `Entry.IsColourVariant` marks the rows so the species name is
+shown on **all** slots once any colour is discovered (`IsDiscoveredAnyVariation`
+— species-gated reveal-all, `???` otherwise), while the per-colour collected
+tick stays `IsDiscovered(id, colour)`. No placeholder row, no mod-owned ledger:
+CK's **native** per-`(id, variation)` discovery fires `Changed`, so the existing
 refresh path handles reveal. This structurally fixes the Iter-16.3
 `???`-on-non-0-variation trap.
 
@@ -658,12 +658,12 @@ the Iter-5 scrollbar's `None`). Sorting order 49 places the hollow frame above
 the icon (order 48). It defaults to `m_Enabled: 0` (hidden until `Bind` proves
 rarity ≥ Uncommon). The sprite is the placeholder `ui_rarity_border` (a white
 1-px hollow frame, tinted at runtime — the shipped placeholder was fully
-transparent until fixed; see `docs/gotchas.md § Bridge placeholder sprite may
-be fully transparent`), rendered as a proper **9-slice**
-(`spriteBorder {1,1,1,1}` in its `.meta`, `m_DrawMode: 1`) so the 1-px ring
-stays a thin fixed-pixel frame at any `m_Size` instead of thickening with the
-sprite. Real pixel-art (a designed border in place of the tinted white ring)
-remains Iter-12 (pixel-art) polish.
+transparent until fixed; see `docs/gotchas.md § Bridge placeholder sprite may be
+fully transparent`), rendered as a proper **9-slice** (`spriteBorder {1,1,1,1}`
+in its `.meta`, `m_DrawMode: 1`) so the 1-px ring stays a thin fixed-pixel frame
+at any `m_Size` instead of thickening with the sprite. Real pixel-art (a
+designed border in place of the tinted white ring) remains Iter-12 (pixel-art)
+polish.
 
 ---
 
@@ -965,14 +965,14 @@ The row-template prefabs carry both; clones inherit them, so setting the templat
 suffices.
 
 **Orthographic UI-camera cursor read — one mechanic, two problems.**
-`Manager.camera.uiCamera.ScreenToWorldPoint(Input.mousePosition)` gives the cursor in
-world space; the uiCamera is orthographic, so world X/Y are z-independent (no z
-calibration). Comparing against the panel's world rect
-(`popupPanel.position ± panel.size/2`) yields "cursor over popup," which serves BOTH
-**click-outside-to-close** (gap-A — the old `LateUpdate` closed on any mouse-down, so
-an inside click on a checkbox / section header / handle wrongly closed the popup) AND
-**wheel-ownership** (scroll only when the cursor is over the popup). `Manager.camera`
-is sandbox-safe (verified in-game).
+`Manager.camera.uiCamera.ScreenToWorldPoint(Input.mousePosition)` gives the
+cursor in world space; the uiCamera is orthographic, so world X/Y are
+z-independent (no z calibration). Comparing against the panel's world rect
+(`popupPanel.position ± panel.size/2`) yields "cursor over popup," which serves
+BOTH **click-outside-to-close** (gap-A — the old `LateUpdate` closed on any
+mouse-down, so an inside click on a checkbox / section header / handle wrongly
+closed the popup) AND **wheel-ownership** (scroll only when the cursor is over
+the popup). `Manager.camera` is sandbox-safe (verified in-game).
 
 **Wheel-ownership — Harmony prefix on `UIScrollWindow.UpdateScroll` (gap-F).** CK's
 `UIScrollWindow.UpdateScroll` (from its `LateUpdate`) reads the wheel via
@@ -1229,12 +1229,13 @@ methods).
   `ItemRow.RowHeight` is only a compile-time fallback. Change the row background
   `m_Size.y` in `ItemRow.prefab` alone and the pool size, row spacing and total
   scroll height all follow.
-- **Flush is RowHeight-independent.** Rows are placed by
-  `y = MaskTopLocalY - RowHeight*(displayIdx + 0.5)`: row 0's TOP is pinned to the
-  fixed `MaskTopLocalY` (1.25, the content-local mask top) and each centre is
-  offset by `RowHeight/2`, so the list start/end stay flush for any row height
-  (windowHeight = maskHeight and content = count*RowHeight do the rest). Replaces
-  the old `-(displayIdx*RowHeight)`, which only stayed flush at the original 2.5.
+- **Flush is RowHeight-independent.** Rows are placed by `y = MaskTopLocalY -
+  RowHeight*(displayIdx + 0.5)`: row 0's TOP is pinned to the fixed
+  `MaskTopLocalY` (1.25, the content-local mask top) and each centre is offset
+  by `RowHeight/2`, so the list start/end stay flush for any row height
+  (windowHeight = maskHeight and content = count*RowHeight do the rest).
+  Replaces the old `-(displayIdx*RowHeight)`, which only stayed flush at the
+  original 2.5.
 - **Checklist checkbox.** `ItemRow.Bind` enables the empty checkbox sprite
   (`checkmark`) on **every** row; discovered rows additionally enable a
   `checkFill` child (the `ui_icon_requirement` glyph, sorting order above the box)
@@ -1272,21 +1273,22 @@ actually render (both proven only in-game — see `docs/gotchas.md`):
   static element left at the parent origin is outside the uiCamera frustum.
 
 ### Visibility — explicit, not the scale-multiplier idiom
-`Manager.ui.CalcGameplayUITargetScaleMultiplier()` returns `(0,0,0)` for this mod
-HUD (it is not a drop-in scale source — using it zeroes the element). `LateUpdate`
-instead toggles `hudRoot` active by explicit signals (`ItemChecklistHud`'s `show` visibility gate):
-`WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing &&
-!Manager.menu.IsAnyMenuActive()`. `isAnyInventoryShowing` (the CoreLib-patched
-aggregate) covers the player inventory, crafting, **and** the checklist window.
-The leading gate is the shared `WorldState.IsInPlayableWorld` predicate
-(`isInGame && isSceneHandlerReady && !Manager.load.IsLoading()`; Iter-15 also
-appends `!cutsceneIsPlaying` to suppress the intro cutscene), which Iter-11.6
+`Manager.ui.CalcGameplayUITargetScaleMultiplier()` returns `(0,0,0)` for this
+mod HUD (it is not a drop-in scale source — using it zeroes the element).
+`LateUpdate` instead toggles `hudRoot` active by explicit signals
+(`ItemChecklistHud`'s `show` visibility gate): `WorldState.IsInPlayableWorld &&
+!Manager.ui.isAnyInventoryShowing && !Manager.menu.IsAnyMenuActive()`.
+`isAnyInventoryShowing` (the CoreLib-patched aggregate) covers the player
+inventory, crafting, **and** the checklist window. The leading gate is the
+shared `WorldState.IsInPlayableWorld` predicate (`isInGame &&
+isSceneHandlerReady && !Manager.load.IsLoading()`; Iter-15 also appends
+`!cutsceneIsPlaying` to suppress the intro cutscene), which Iter-11.6
 substituted for the original `Manager.main.player != null` term: contrary to the
 earlier assumption, `player != null` does **not** suppress the world-load screen
 (the player object is instantiated at `PlayerController.OnOccupied` *while the
 load screen is still up* and survives the exit-to-menu transition, so it is true
-across both load screens). See `docs/gotchas.md § Manager.main.player != null does
-NOT suppress a load screen (Iter-11.6)`.
+across both load screens). See `docs/gotchas.md § Manager.main.player != null
+does NOT suppress a load screen (Iter-11.6)`.
 
 ### Content
 Icon = `ui_slot_toggled_border` box + `ui_icon_requirement` tick (0.7 scale, a
@@ -1524,12 +1526,12 @@ collectible, riding a mod-owned ledger).
 ### Why pets were already in the catalog
 
 The bake excludes `NonObtainable` / `Creature` / `PlayerType` (`Critter` is kept
-since Iter-16.2 behind an icon-guard). The
-relevant `ObjectType` enum values are `PlaceablePrefab = 800`, `Critter = 801`,
-**`Pet = 802`**, `Creature = 900`, `PlayerType = 6000` — so **`Pet` (802) is
-not on the exclusion list** and pets were always in the catalog (the roadmap's
-"relax the Creature filter" premise was wrong — the third such mis-guess after
-the Iter-21 waypoint case). The real gap was per-skin tracking, not the bake.
+since Iter-16.2 behind an icon-guard). The relevant `ObjectType` enum values are
+`PlaceablePrefab = 800`, `Critter = 801`, **`Pet = 802`**, `Creature = 900`,
+`PlayerType = 6000` — so **`Pet` (802) is not on the exclusion list** and pets
+were always in the catalog (the roadmap's "relax the Creature filter" premise
+was wrong — the third such mis-guess after the Iter-21 waypoint case). The real
+gap was per-skin tracking, not the bake.
 
 ### The CK pet model (skin = orthogonal aux data)
 
@@ -1590,13 +1592,12 @@ Item Browser renders item icons through CK's native `SlotUIBase` /
 (`Manager.ui.ApplyAnyIconGradientMap`) **and** hover tooltips for free.
 ItemChecklist is a raw-`SpriteRenderer` column list (not a slot grid), so it
 cannot reuse `SlotUIBase` wholesale — the gradient is applied by a **surgical
-per-skin material swap** instead (see `ui/PetSkinIcon.cs` and
-`docs/gotchas.md § Gradient-recolor shader`). Iter-22 later added row-hover
-tooltips **without** porting the list onto `SlotUIBase`: it kept the
-raw-`SpriteRenderer` rows and drove CK's native tooltip from one shared
-`TooltipSlot : SlotUIBase` helper the rows delegate to (see § Row-Hover Tooltips
-(Iter-22)) — so the gradient material-swap and the tooltips coexist, neither
-needing the full slot-grid port.
+per-skin material swap** instead (see `ui/PetSkinIcon.cs` and `docs/gotchas.md §
+Gradient-recolor shader`). Iter-22 later added row-hover tooltips **without**
+porting the list onto `SlotUIBase`: it kept the raw-`SpriteRenderer` rows and
+drove CK's native tooltip from one shared `TooltipSlot : SlotUIBase` helper the
+rows delegate to (see § Row-Hover Tooltips (Iter-22)) — so the gradient
+material-swap and the tooltips coexist, neither needing the full slot-grid port.
 
 ## Cattle Collection (Iter-16.3)
 

@@ -62,8 +62,8 @@ drifted against it.
   handbook names published mods that call it cleanly and says to bisect the
   expression rather than trust a deny list.
 - **CK's UI stack** — why uGUI cannot work at all: `../docs/ck/ui-framework.md`,
-  with this mod's own consequences and the 10-mod survey in
-  `docs/gotchas.md § uGUI (Canvas/Image) structurally fails in CK`.
+  with this mod's own consequences and the 10-mod survey in `docs/gotchas.md §
+  uGUI (Canvas/Image) structurally fails in CK`.
 - **This mod's own traps** — the row pool's `PugText` teardown, which Iter-3.8
   moved to `ItemChecklistContent.OnDestroy` and which is therefore no longer
   the per-destroy fix described here, and the cosmetic em-dash rendering:

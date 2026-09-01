@@ -28,17 +28,16 @@ remaining backlog.
   the two toggle classes so the chrome carries one shared toggle type. The
   unified-field header redesign (Toggle+AscDesc in one dark `Field` background)
   was explicitly deferred to its own visual iteration.
-- **Iter-14.1 -- search-caret alignment. DONE** (see `docs/iteration-history.md`).
-  The caret sat a few px too low and flush against the text.
-  `TextInputField.Update()` overwrites the caret GO's world X/Y every frame, so
-  the offset cannot live on that GO: a child GO (`CaretSprite`) now carries the
-  caret `SpriteRenderer` at a constant `localPosition` (+1px up to centre, +2px
-  right for a small gap). The caret was also shortened 8px->7px via the sprite's
-  existing vertical 9-slice (SR Sliced draw mode, size 2x7) -- a pure-prefab
-  change, no sheet/generator touch. **Corrected state note:** the sprite swap
-  (1x1 `white_pixel` -> the painted 2x8 `Caret` sheet sprite) and the
-  `{0.8,6,1}` scale-hack removal were already done in Iter-12; only the
-  position/height remained for 14.1.
+- **Iter-14.1 -- search-caret alignment. DONE** (see `docs/iteration-history.md`). The
+  caret sat a few px too low and flush against the text. `TextInputField.Update()`
+  overwrites the caret GO's world X/Y every frame, so the offset cannot live on that GO:
+  a child GO (`CaretSprite`) now carries the caret `SpriteRenderer` at a constant
+  `localPosition` (+1px up to centre, +2px right for a small gap). The caret was also
+  shortened 8px->7px via the sprite's existing vertical 9-slice (SR Sliced draw mode,
+  size 2x7) -- a pure-prefab change, no sheet/generator touch. **Corrected state note:**
+  the sprite swap (1x1 `white_pixel` -> the painted 2x8 `Caret` sheet sprite) and the
+  `{0.8,6,1}` scale-hack removal were already done in Iter-12; only the position/height
+  remained for 14.1.
 - **Iter-14.2 -- code refactor / optimisations. DONE** (see
   `docs/iteration-history.md`). Five consolidations, build-gated + smoke-tested
   (R1→R2→R4→R5→R3): `ClickButton` base for the five `ButtonUIElement` click
@@ -50,15 +49,14 @@ remaining backlog.
   and `PopupWidget` base sharing the Sort/Filter popup machinery (the one-row
   offset captured once as the abstract `FirstRowOffset`). Behaviour-neutral; net
   C# +23 LoC (structural win — single sources of truth — not line count).
-- **Iter-15 -- F1/HUD over the intro cutscene. DONE** (see
-  `docs/iteration-history.md`). Appended `!sceneHandler.cutsceneIsPlaying` to the
-  shared `WorldState.IsInPlayableWorld`, suppressing **both** the F1 open-guard
-  and the always-on HUD during the spawn-from-Core intro cutscene. One-line
-  behavioural change — both consumers already gate on the shared predicate (the
-  Iter-11.6 structure). The cutscene fades CK's own HUD via
-  `FadeOutAllGameplayUI()` (not `ShowHUD(false)`), which does not cull our
-  layer-27 HUD, hence the explicit gate. `cutsceneIsPlaying` is CK's own
-  discovery-path signal; sandbox-safe.
+- **Iter-15 -- F1/HUD over the intro cutscene. DONE** (see `docs/iteration-history.md`).
+  Appended `!sceneHandler.cutsceneIsPlaying` to the shared
+  `WorldState.IsInPlayableWorld`, suppressing **both** the F1 open-guard and the
+  always-on HUD during the spawn-from-Core intro cutscene. One-line behavioural change —
+  both consumers already gate on the shared predicate (the Iter-11.6 structure). The
+  cutscene fades CK's own HUD via `FadeOutAllGameplayUI()` (not `ShowHUD(false)`), which
+  does not cull our layer-27 HUD, hence the explicit gate. `cutsceneIsPlaying` is CK's
+  own discovery-path signal; sandbox-safe.
 - **Iter-16.1 -- per-skin pet collection. DONE** (see `docs/iteration-history.md`).
   **Re-scoped:** the roadmap's premise was wrong -- `ObjectType.Pet` (802) is not
   excluded, so pets were already in the catalog. Real work: each pet **skin** is a
@@ -119,18 +117,17 @@ remaining backlog.
   (`PaintToolCD.paintIndex`, enum name minus `PaintBrush`, localized via own
   `ItemChecklist-PaintColor` terms — "(Rot)" not "(Farbe 3)"). Catalog 10916 → 11119.
   The generic Bucket-2 loop (non-cattle runtime variants) was measured empty and not built.
-- **Iter-19 -- search-field word-wrap crash. DONE** (see
-  `docs/iteration-history.md`). `SearchBar` overrides `Awake` to force
-  `pugText.maxWidth = 0` after `base.Awake()`, removing the search field's PugText
-  from CK's buggy `PugFont.AddNewLinesToLinesExceedingMaxWidth` word-wrap path
-  (per-frame `IndexOutOfRangeException`, 127× on main → 0). **Corrected the
-  roadmap's own fix candidate:** the prefab `pugText.maxWidth = 0` is a no-op —
-  CK's `TextInputField.Awake` rewrites it to `maxWidth + 1 = 8.5` at runtime, so
-  the fix had to come from code. Visual width clipping is preserved via the field's
-  own `maxWidth` (7.5) through `TrimTextToFitRestrictions` (a char-trim, independent
-  of the word-wrap). Pure behavioural C# (one `Awake` override); no prefab/art
-  touch. Same CK PugFont bug class the Iter-9 ASCII hint + Iter-11 `RenderNoWrap`
-  labels sidestepped.
+- **Iter-19 -- search-field word-wrap crash. DONE** (see `docs/iteration-history.md`).
+  `SearchBar` overrides `Awake` to force `pugText.maxWidth = 0` after `base.Awake()`,
+  removing the search field's PugText from CK's buggy
+  `PugFont.AddNewLinesToLinesExceedingMaxWidth` word-wrap path (per-frame
+  `IndexOutOfRangeException`, 127× on main → 0). **Corrected the roadmap's own fix
+  candidate:** the prefab `pugText.maxWidth = 0` is a no-op — CK's
+  `TextInputField.Awake` rewrites it to `maxWidth + 1 = 8.5` at runtime, so the fix had
+  to come from code. Visual width clipping is preserved via the field's own `maxWidth`
+  (7.5) through `TrimTextToFitRestrictions` (a char-trim, independent of the word-wrap).
+  Pure behavioural C# (one `Awake` override); no prefab/art touch. Same CK PugFont bug
+  class the Iter-9 ASCII hint + Iter-11 `RenderNoWrap` labels sidestepped.
 - **Iter-18 -- combobox header + skeleton chrome. DONE** (see
   `docs/iteration-history.md`). The header is now one cohesive `Display` field:
   the caret moved inside it (the separate `ToggleButton` GO + its button-bg are
@@ -252,26 +249,29 @@ remaining backlog.
   buffers) were all **measured unnecessary** — `world`/`setup` were 0.26/0.12ms and only
   44 anchors. Pure behavioural C# (one query split + two loop reads); no prefab/art.
 - **Iter-28 -- possession scan: exclude world nature. DONE** (see
-  `docs/iteration-history.md`). A *second*, distinct stutter from Iter-27: peaks that grow
-  with session length and persist away from base. On-disk evidence: the possession ledger
-  had grown to **5503 entries / 89 KB**, ~90% **world-spawned nature** (bushes/grass/kelp/
-  stalagmites/lilies/ruins) counted as "owned" by Iter-20's place-object path and remembered
-  forever. The real peak was **not the scan** but the **autosave `Serialize()`** of that
-  89 KB ledger (12–37ms main-thread spike, also pushing CK's host sim over budget). **No
-  object-level signal separates wild nature from placed objects** in CK (cat/stack/icon/
+  `docs/iteration-history.md`). A *second*, distinct stutter from Iter-27: peaks that
+  grow with session length and persist away from base. On-disk evidence: the possession
+  ledger had grown to **5503 entries / 89 KB**, ~90% **world-spawned nature**
+  (bushes/grass/kelp/ stalagmites/lilies/ruins) counted as "owned" by Iter-20's
+  place-object path and remembered forever. The real peak was **not the scan** but the
+  **autosave `Serialize()`** of that 89 KB ledger (12–37ms main-thread spike, also
+  pushing CK's host sim over budget). **No object-level signal separates wild nature
+  from placed objects** in CK (cat/stack/icon/
   craft/sell/tags/DontDropSelfCD/Diggable/Destructible all collide: Stalagmite ≡
-  CavelingFloorTile, GraveTree ≡ WayPoint), proven over three in-game probe rounds — so the
-  filter is a **curated tag+ObjectID blacklist** (`PossessionClassifier.IsWorldNature`: tags
-  Greenery/Destructible/CattleKelpFood/Ruins + a short tag-less-straggler ID list, editable).
-  Gated on **path #3 only** (placed-object count; numbered #1 in the Iter-28-era text, unified
-  in Iter-43) — container contents + carried untouched,
-  so nature stored in a chest still counts and remember-from-afar is preserved. A **one-time
-  `PruneByPredicate` at first scan** evicts the pre-existing backlog (`PruneStaleNear`'s
-  180-tile window was far too slow), ledger **5503→~520**, save spike + host-overrun warnings
-  gone. **(That eviction was REMOVED in Iter-42: its gate was never serialized so it ran on
-  every load, and the sweep could not tell chest-stored nature from placed — see Iter-42.)** Verified smooth in-game (1.2.1.5). Process lesson: a runaway background decompile-grep
-  ate CPU through every test and confounded the "is it smooth?" signal for several rounds —
-  kill stray background jobs before measuring perf.
+  CavelingFloorTile, GraveTree ≡ WayPoint), proven over three in-game probe rounds — so
+  the filter is a **curated tag+ObjectID blacklist**
+  (`PossessionClassifier.IsWorldNature`: tags Greenery/Destructible/CattleKelpFood/Ruins
+  + a short tag-less-straggler ID list, editable). Gated on **path #3 only**
+  (placed-object count; numbered #1 in the Iter-28-era text, unified in Iter-43) —
+  container contents + carried untouched, so nature stored in a chest still counts and
+  remember-from-afar is preserved. A **one-time `PruneByPredicate` at first scan**
+  evicts the pre-existing backlog (`PruneStaleNear`'s 180-tile window was far too slow),
+  ledger **5503→~520**, save spike + host-overrun warnings gone. **(That eviction was
+  REMOVED in Iter-42: its gate was never serialized so it ran on every load, and the
+  sweep could not tell chest-stored nature from placed — see Iter-42.)** Verified smooth
+  in-game (1.2.1.5). Process lesson: a runaway background decompile-grep ate CPU through
+  every test and confounded the "is it smooth?" signal for several rounds — kill stray
+  background jobs before measuring perf.
 - **Iter-30 -- config-gated possession diagnostic log. DONE** (see
   `docs/iteration-history.md`). A permanent, default-OFF diag (`PossessionConfig.Diagnostics`,
   a second `API.Config` key) so a recurring stutter or blacklist gap is captured without a
@@ -510,31 +510,34 @@ remaining backlog.
   distinction lives in the `reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
   Reported 2026-07-15, done 2026-07-17.
 - **Iter-42 -- stored world nature evicted on every world load. DONE** (see
-  `docs/iteration-history.md`). Loading a save **far from base** dropped already-tracked owned
-  items; they only came back after walking to base. **Root-caused from the on-disk data with no
-  build** — diffing the ledger against its own `.pugbackup` showed 0 tiles removed but 21 ids /
-  **2677 units** gone from 5 tiles' *contents* (1129 stored Stalagmite, 598 Mushroom, …), every
-  one an `IsWorldNature` match and no other id touched. **Two defects in the Iter-28 one-time
-  eviction:** (1) its `WorldNaturePruned` gate was never serialized, so the "one-time" sweep ran
-  on **every** load; (2) `PruneByPredicate` cannot tell scan path #3 (the placed wild object,
-  the target) from path #2 (the same id STORED in a chest, legitimate possession) — one flat
-  per-tile dict serves both. At base the live scan rewrote the contents within one scan interval
-  (invisible); far from base the loss stood and the next autosave persisted it. **Fix: remove the
-  eviction, the flag and the method** (user's choice over persisting the flag) — the Iter-28
-  *write* gate keeps path-#3 nature out at the source and the Iter-31/41 v2/v3 discard migrations
-  dropped every pre-gate ledger, so nothing is left for the sweep to clear; stragglers from a
-  future blacklist edit self-heal via `PruneStaleNear`. Persisting the flag was rejected: it keeps
-  a mechanism that deletes unattributable entries (same loss, once per future blacklist edit) and
-  costs another schema bump. (The "exactly two removers" claim first written here was **wrong** —
-  `ClearAux` is a third and `SetLiveContainer` removes by replacing an observed tile's dict;
-  corrected in Iter-43. The true invariant: no path deletes by id-predicate any more.)
-  **General lesson (`docs/gotchas.md`):** a "one-time" cleanup must
-  keep its done-mark IN the store, never run a predicate delete over a store without provenance,
-  and test remembered-state changes by loading **far from base** — the at-base case self-repairs
-  and proves nothing. Verified in-game (1.2.1.5) against the ledger file: across a far-from-base
-  load the `.pugbackup` diff is **REMOVED=0 ADDED=0 CHANGED=0** (byte-identical, 13783 → 13783;
-  the pre-fix pair lost 2677 units) and all 21 ids are back at their original counts;
-  `safetyCheck=True`, 0 `CompileFailed`/NRE. Reported + done 2026-07-30.
+  `docs/iteration-history.md`). Loading a save **far from base** dropped already-tracked
+  owned items; they only came back after walking to base. **Root-caused from the on-disk
+  data with no build** — diffing the ledger against its own `.pugbackup` showed 0 tiles
+  removed but 21 ids / **2677 units** gone from 5 tiles' *contents* (1129 stored
+  Stalagmite, 598 Mushroom, …), every one an `IsWorldNature` match and no other id
+  touched. **Two defects in the Iter-28 one-time eviction:** (1) its `WorldNaturePruned`
+  gate was never serialized, so the "one-time" sweep ran on **every** load; (2)
+  `PruneByPredicate` cannot tell scan path #3 (the placed wild object, the target) from
+  path #2 (the same id STORED in a chest, legitimate possession) — one flat per-tile
+  dict serves both. At base the live scan rewrote the contents within one scan interval
+  (invisible); far from base the loss stood and the next autosave persisted it. **Fix:
+  remove the eviction, the flag and the method** (user's choice over persisting the
+  flag) — the Iter-28 *write* gate keeps path-#3 nature out at the source and the
+  Iter-31/41 v2/v3 discard migrations dropped every pre-gate ledger, so nothing is left
+  for the sweep to clear; stragglers from a future blacklist edit self-heal via
+  `PruneStaleNear`. Persisting the flag was rejected: it keeps a mechanism that deletes
+  unattributable entries (same loss, once per future blacklist edit) and costs another
+  schema bump. (The "exactly two removers" claim first written here was **wrong** —
+  `ClearAux` is a third and `SetLiveContainer` removes by replacing an observed tile's
+  dict; corrected in Iter-43. The true invariant: no path deletes by id-predicate any
+  more.) **General lesson (`docs/gotchas.md`):** a "one-time" cleanup must keep its
+  done-mark IN the store, never run a predicate delete over a store without provenance,
+  and test remembered-state changes by loading **far from base** — the at-base case
+  self-repairs and proves nothing. Verified in-game (1.2.1.5) against the ledger file:
+  across a far-from-base load the `.pugbackup` diff is **REMOVED=0 ADDED=0 CHANGED=0**
+  (byte-identical, 13783 → 13783; the pre-fix pair lost 2677 units) and all 21 ids are
+  back at their original counts; `safetyCheck=True`, 0 `CompileFailed`/NRE. Reported +
+  done 2026-07-30.
 
 - **Iter-43 -- the possession subsystem's remaining silent data-loss paths. DONE** (see
   `docs/iteration-history.md`). **Not a user report — this is what the Iter-42 review found** when
@@ -548,13 +551,14 @@ remaining backlog.
     false); and "exactly two removers" was untrue (`ClearAux` is a third, `SetLiveContainer` removes
     by replacing). Both corrected, the legend now stated once in `Scan`, and the true invariant put
     in its place: **no path deletes by id-predicate any more.**
-  - **C1 (critical):** a failed load was indistinguishable from "no file" — four outcomes returned a
-    bare empty store, `Read`-returned-null was not even logged, and the per-session save-skip cache
-    means the first save of a launch always lands, so ~14 bytes replaced ~14 KB and the next autosave
-    took the `.pugbackup` too. Under Wine this is real (six IL patches ship for such file APIs).
-    Fix: `Load(guid, out StoreLoadStatus)` + `s_ledgerReadOnly`/`s_petsReadOnly`, and
-    `SavePossessionLedger` skips a store whose load failed. **`PetCollectionStore` first** — it is
-    the unrecoverable one (ever-owned set, no second source, random egg hatch to re-earn).
+  - **C1 (critical):** a failed load was indistinguishable from "no file" — four
+    outcomes returned a bare empty store, `Read`-returned-null was not even logged, and
+    the per-session save-skip cache means the first save of a launch always lands, so
+    ~14 bytes replaced ~14 KB and the next autosave took the `.pugbackup` too. Under
+    Wine this is real (six IL patches ship for such file APIs). Fix: `Load(guid, out
+    StoreLoadStatus)` + `s_ledgerReadOnly`/`s_petsReadOnly`, and `SavePossessionLedger`
+    skips a store whose load failed. **`PetCollectionStore` first** — it is the
+    unrecoverable one (ever-owned set, no second source, random egg hatch to re-earn).
   - **I2:** the version discard threw a whole ledger away unlogged *while `Load` reported success*,
     so corruption was indistinguishable from a legitimate migration. Now reported with byte count +
     actual first line; marker compared as an exact first line (not `StartsWith`, which would accept
@@ -568,24 +572,27 @@ remaining backlog.
     shipped rule is stricter than first planned:** shrink only when a container was actually
     observed on that tile AND past the grace — merging during the grace alone would fix loading far
     from base but not walking away.
-  - **I5:** nothing destructive was reported. New **`PossessionIncidentStore`** (durable, **ungated**
-    by the default-off `Diagnostics`, deduped, 200-line cap) + the DIAG line now reports the
-    **transition** (`ledgerC=505->505 lostUnits=2677` would have made Iter-42 self-evident at once).
-    Anomaly trigger deliberately chosen false-positive-free: units lost on **≥5 tiles in one scan**
-    (a shrink itself is normal; nobody empties five chests within 3 s). Plus: the `ResolveWorld`
-    null case logged nothing ever, and the world pick started at `-1` so a world with **zero**
+  - **I5:** nothing destructive was reported. New **`PossessionIncidentStore`**
+    (durable, **ungated** by the default-off `Diagnostics`, deduped, 200-line cap) + the
+    DIAG line now reports the **transition** (`ledgerC=505->505 lostUnits=2677` would
+    have made Iter-42 self-evident at once). Anomaly trigger deliberately chosen
+    false-positive-free: units lost on **≥5 tiles in one scan** (a shrink itself is
+    normal; nobody empties five chests within 3 s). Plus: the `ResolveWorld` null case
+    logged nothing ever, and the world pick started at `-1` so a world with **zero**
     inventory entities could win.
-  - **General lesson (`docs/gotchas.md § A load that fails "softly" …`):** a load returning an empty
-    store on *failure* is a delayed WRITE bug; return a status and make the store read-only; set the
-    failure flag before anything can throw; fix the unrecoverable store first; a wholesale-replace
-    write path needs a confirmation predicate; count and report every deletion; and pick an anomaly
-    trigger that cannot false-positive or ship none. Verified in-game (1.2.1.5) against the ledger
-    file: `safetyCheck=True`, 0 `CompileFailed`/NRE, the new file present in both install `Scripts/`
-    and the generated manifest; **21/21** Iter-42 nature ids still present (Stalagmite 1129); the
-    shrink still honoured (`1001` −50, `1610` −100, `301` +12 — the check against this iteration's
-    OWN risk of over-merging into phantom ownership); pruning still active (8 tiles removed / 7 added
-    in one interval, retiring the suspicion behind the 504→681 tile growth); and
-    `possession-incidents.txt` absent, i.e. no false alarm. Reported + done 2026-07-30.
+  - **General lesson (`docs/gotchas.md § A load that fails "softly" …`):** a load
+    returning an empty store on *failure* is a delayed WRITE bug; return a status and
+    make the store read-only; set the failure flag before anything can throw; fix the
+    unrecoverable store first; a wholesale-replace write path needs a confirmation
+    predicate; count and report every deletion; and pick an anomaly trigger that cannot
+    false-positive or ship none. Verified in-game (1.2.1.5) against the ledger file:
+    `safetyCheck=True`, 0 `CompileFailed`/NRE, the new file present in both install
+    `Scripts/` and the generated manifest; **21/21** Iter-42 nature ids still present
+    (Stalagmite 1129); the shrink still honoured (`1001` −50, `1610` −100, `301` +12 —
+    the check against this iteration's OWN risk of over-merging into phantom ownership);
+    pruning still active (8 tiles removed / 7 added in one interval, retiring the
+    suspicion behind the 504→681 tile growth); and `possession-incidents.txt` absent,
+    i.e. no false alarm. Reported + done 2026-07-30.
 
 - **Iter-44 -- possession subsystem: the shape, not the next point fix. DONE** (2026-07-31, see
   `docs/iteration-history.md`). The stock-take below was taken on 2026-07-30 and **acted on**; it is
@@ -706,16 +713,18 @@ remaining backlog.
 
   **How it was resolved** (the user chose the structural change; full narrative in
   `docs/iteration-history.md § Iter-44`):
-  - **C-1** — fixed by the rebuild, not by the point fix. One `TileEntry { Contents, Aux }` per tile
-    and a single `ApplyScan` entry point; a dimension may shrink only past the grace and on evidence
-    for *itself*. `containerTiles` survives only as "this tile's container was observed, so its buffer
-    is authoritative", never as a universal predicate. One correction to the analysis above: paint was
-    only *usually* structurally frozen — a **paintable container** writes its paint aux and adds its
+  - **C-1** — fixed by the rebuild, not by the point fix. One `TileEntry { Contents, Aux
+    }` per tile and a single `ApplyScan` entry point; a dimension may shrink only past
+    the grace and on evidence for *itself*. `containerTiles` survives only as "this
+    tile's container was observed, so its buffer is authoritative", never as a universal
+    predicate. One correction to the analysis above: paint was only *usually*
+    structurally frozen — a **paintable container** writes its paint aux and adds its
     own tile in the same two branches.
-  - **C-2** — `TryReadAll` separates absent from unreadable and a failed read aborts the write; the
-    cap marker is written from the write's own result and recognised on load; an unreadable history no
-    longer counts as zero lines. The store also refuses to rewrite a file that vanished mid-session
-    (a lying `FileExists` was the last from-scratch path) and verifies its appends.
+  - **C-2** — `TryReadAll` separates absent from unreadable and a failed read aborts the
+    write; the cap marker is written from the write's own result and recognised on load;
+    an unreadable history no longer counts as zero lines. The store also refuses to
+    rewrite a file that vanished mid-session (a lying `FileExists` was the last
+    from-scratch path) and verifies its appends.
   - **C-3** — both parsers report unaccepted data lines and any such line makes the load FAILED. The
     pet file gained a declared entry count, which is the only way to see a cut exactly at a line
     boundary; headerless files stay valid and upgrade on the next save. A zero-byte file is damage.
@@ -725,52 +734,58 @@ remaining backlog.
     override, dedup keyed by GUID and magnitude), `_worldNullWarned` re-armed, the 200-line cap
     writing a `#full` marker and returning `false`, the read-only session visible in the window
     footer, and `LoadFrom`'s silent drops counted.
-  - **Found only after the rebuild** and worth recording because none of it was in the analysis above:
-    CK's file layer swallows the whole `IOException` class (so writes are now verified by reading
-    back, and the FNV cache no longer records unverified writes — a poisoning bug latent since
-    Iter-31); "one miss is not evidence" for both the merge and the prune; one scan per frame; and
-    cattle colour aux keyed to a deterministic anchor tile instead of the anchor nearest the animal,
-    which had been hopping ~12 tiles per save interval since Iter-41 and quietly disabling the
+  - **Found only after the rebuild** and worth recording because none of it was in the
+    analysis above: CK's file layer swallows the whole `IOException` class (so writes
+    are now verified by reading back, and the FNV cache no longer records unverified
+    writes — a poisoning bug latent since Iter-31); "one miss is not evidence" for both
+    the merge and the prune; one scan per frame; and cattle colour aux keyed to a
+    deterministic anchor tile instead of the anchor nearest the animal, which had been
+    hopping ~12 tiles per save interval since Iter-41 and quietly disabling the
     save-write-skip.
   - **Left open at the time, then assessed and acted on:** the three residuals below. Two were done
     in **Iter-45**; the third is deliberately waiting for a measurement.
 
-- **Iter-45 -- possession provenance: stored vs placed, plus a declared tile count (ledger v4). DONE**
-  (2026-07-31, see `docs/iteration-history.md`). The two Iter-44 residuals worth doing, taken together
-  because both are format changes to the same file and one schema bump covers both. Assessed first,
-  and **two of my own initial estimates were wrong** — I had rated the damage and only guessed the
-  cost:
-  - **Provenance was worth more than "the residual it would retire".** Splitting scan paths #2 and #3
-    fixes a *live wrong statement*: `CountTilesHolding` counted any remembered tile, and the Iter-40
-    tooltip renders that as "in N chests" with an arrow per tile — so a placed torch claimed a chest
-    that does not exist. That sat in a different feature, which is why the first assessment missed it.
-    The same bit also restores the ability to evict path-#3 entries specifically, i.e. the blacklist
-    self-heal Iter-42 had to remove. Full container IDENTITY still buys almost nothing and was NOT
-    built.
+- **Iter-45 -- possession provenance: stored vs placed, plus a declared tile count
+  (ledger v4). DONE** (2026-07-31, see `docs/iteration-history.md`). The two Iter-44
+  residuals worth doing, taken together because both are format changes to the same file
+  and one schema bump covers both. Assessed first, and **two of my own initial estimates
+  were wrong** — I had rated the damage and only guessed the cost:
+  - **Provenance was worth more than "the residual it would retire".** Splitting scan
+    paths #2 and #3 fixes a *live wrong statement*: `CountTilesHolding` counted any
+    remembered tile, and the Iter-40 tooltip renders that as "in N chests" with an arrow
+    per tile — so a placed torch claimed a chest that does not exist. That sat in a
+    different feature, which is why the first assessment missed it. The same bit also
+    restores the ability to evict path-#3 entries specifically, i.e. the blacklist
+    self-heal Iter-42 had to remove. Full container IDENTITY still buys almost nothing
+    and was NOT built.
   - **The declared count was far cheaper than estimated.** `#n=<tiles>` is a `#` comment line the
     parser already skips — additive, invisible to older readers, no migration. "Expensive because it
     is a format change" was simply wrong about an additive line.
   - The migration is lossless because `placed` is the LAST segment: v3's three fields keep their
     meaning, one parser reads both shapes, and the marker becomes an accepted SET — the scheme the
     Iter-44 review had already confirmed.
-  - **The review gate then found the defect that mattered**, both reviewers independently and by
-    running the code: the migration ADDED a copy instead of MOVING provenance, so every placed object
-    counted double (permanently, for a tile observed from beyond the shrink envelope) and the eventual
-    correction was booked as lost owned units — which would have written a durable "please report
-    this file" incident on every updating player's first base scan and burned that magnitude's dedup
-    slot. Fixed subtractively (a v3 count was `stored + placed`, so subtracting the observed placed
-    part is exact), uncounted, gated on a per-tile "provenance unknown" flag that survives a save by
-    being serialized as a v3-shaped line. Second finding: the naive form of the tooltip fix removed
-    the locate arrow for ~99 % of ledger tiles and told players they were carrying things they had
-    put down — the arrow was always right, only the wording was wrong.
-  - **Still open, deliberately:** an **aux trigger channel**. Aux reductions are reported (session
-    total in every incident detail, plus the DIAG line) but never trigger, so an aux-only regression
-    — the class that opened Iter-44 — would still be invisible. The cattle fix removed the dominant
-    benign source (hopping keys), which makes a cumulative channel viable for the first time, but
-    there is no measured baseline for aux reductions in normal play after that fix. Iter-44's four
-    refuted "cannot false-positive" claims are the reason this waits for a number instead of a guess:
-    read `auxReduced=`/`shrunkAux=` from a normal diagnostics session, then set the threshold.
-    Also still open and unchanged: full per-container identity (buys the near-vacuous residual only).
+  - **The review gate then found the defect that mattered**, both reviewers
+    independently and by running the code: the migration ADDED a copy instead of MOVING
+    provenance, so every placed object counted double (permanently, for a tile observed
+    from beyond the shrink envelope) and the eventual correction was booked as lost
+    owned units — which would have written a durable "please report this file" incident
+    on every updating player's first base scan and burned that magnitude's dedup slot.
+    Fixed subtractively (a v3 count was `stored + placed`, so subtracting the observed
+    placed part is exact), uncounted, gated on a per-tile "provenance unknown" flag that
+    survives a save by being serialized as a v3-shaped line. Second finding: the naive
+    form of the tooltip fix removed the locate arrow for ~99 % of ledger tiles and told
+    players they were carrying things they had put down — the arrow was always right,
+    only the wording was wrong.
+  - **Still open, deliberately:** an **aux trigger channel**. Aux reductions are
+    reported (session total in every incident detail, plus the DIAG line) but never
+    trigger, so an aux-only regression — the class that opened Iter-44 — would still be
+    invisible. The cattle fix removed the dominant benign source (hopping keys), which
+    makes a cumulative channel viable for the first time, but there is no measured
+    baseline for aux reductions in normal play after that fix. Iter-44's four refuted
+    "cannot false-positive" claims are the reason this waits for a number instead of a
+    guess: read `auxReduced=`/`shrunkAux=` from a normal diagnostics session, then set
+    the threshold. Also still open and unchanged: full per-container identity (buys the
+    near-vacuous residual only).
 
 - **Iter-46 -- extract the thinTiny glyph fix into a required dependency (Complete Tiny
   Font). DONE** (2026-08-12, see `docs/iteration-history.md`). Iter-25's runtime

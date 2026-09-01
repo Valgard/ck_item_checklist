@@ -1,98 +1,100 @@
 # ItemChecklist — Iteration History
 
-Full per-iteration narrative of ItemChecklist's development (Iter-3.5
-onward), moved out of `CLAUDE.md` to keep that file focused. See `git log` for
-canonical per-iter merge points; retained (ADR-gated) design specs live under
-`docs/specs/` (transient plans/scratch under the gitignored `docs/superpowers/`).
+Full per-iteration narrative of ItemChecklist's development (Iter-3.5 onward), moved out
+of `CLAUDE.md` to keep that file focused. See `git log` for canonical per-iter merge
+points; retained (ADR-gated) design specs live under `docs/specs/` (transient
+plans/scratch under the gitignored `docs/superpowers/`).
 
 As of 2026-06-29: Iter-3.5 through Iter-12 (incl. the 3.x/7.1 point-iters and the
-Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20, Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25 (thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix), Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model + paintable colour variants), Iter-27 (possession-scan perf — bulk component reads kill the in-base stutter), and Iter-28 (possession scan — exclude world nature via tag+ID blacklist + one-time ledger eviction; kills the autosave-serialize spike), Iter-30 (config-gated possession diagnostic log), and Iter-31 (possession scope — anchor the base on workbenches, killing remote world-structure pollution; + save-write-skip + ledger v2 migration) are DONE on main. Iter-3.8
-replaced the per-entry SpawnRows (one GameObject per ~10718 catalog
-entries, ~905 ms open freeze) with viewport virtualization: a fixed ~5-row
-pool recycled from `IScrollable.UpdateContainingElements`, reporting the
-full catalog height via `GetCurrentWindowHeight`. Open latency dropped to
-~0-7 ms. Invariant from the geometry fix: `UIScrollWindow.windowHeight`
-must equal the SpriteMask height (and the mask top align to row 0's top)
-for the first/last rows to sit flush. **Iter-4 (DONE):** F1 is now a real toggle (one key opens and closes), and
-the checklist is mutually exclusive with CK's inventory/crafting UI — opening
-a Vanilla menu auto-hides it, and F1 won't open it over an open menu. See the
-`CoreLib UserInterfaceModule` row above and `docs/architecture.md § UI
-Architecture` for the mechanism. **Iter-5 (DONE):** a working, draggable
-scrollbar is wired into the window prefab using CK's native `ScrollBar` +
-`ScrollBarHandle`, with the Item-Browser bridge scrollbar sprites (track +
-handle + selected-border, sub-sprites of the `ui_classic` atlas). **Pure
-prefab change — zero C#:** once `UIScrollWindow.scrollBar` references the
-`ScrollBar`, CK's `UIScrollWindow.LateUpdate → UpdateScrollbar →
-ScrollBar.UpdateScrollBarPosition` drives handle sizing, position, and
-mouse-wheel sync itself (verified against Item Browser, which has no scrollbar
-C#). Scroll arrows stay unwired (`fileID: 0`); track-position fine-tuning and
-real sprites fold into Iter-12 (pixel-art). Two non-obvious facts proven during the build:
-the scrollbar SpriteRenderers must use **`maskInteraction: None`** to stay
-unclipped by the row SpriteMask (orders 46/47 sit inside the 40..55 mask
-range), and `ButtonUIElement.LateUpdate` toggles **GameObject activity** of
-`spritesShownUnpressed`/`spritesShownPressed` each frame — a GO must never be
-in both lists, and with a single handle sprite both lists stay **empty** so
-`handleSpriteRenderer` (rendered by `ScrollBar` itself) is the always-visible
-handle, with the selected-border wired only as `optionalSelectedMarker`
-(hover/selection highlight). Script-ref rule for hand-wired CK components:
-`m_Script.fileID` is a portable class-name MD4 hash, but the `guid` is this
-install's `Pug.Other.dll.meta` guid — see the
-`project-corekeeper-script-fileid-derivation` memory. **Iter-6 (DONE):**
-item rarity colouring — each row's CK rarity (`ObjectInfo.rarity`) shows as a
-name tint (all rarities; Common/Poor keep the default text colour, Uncommon+
-get their rarity colour) **and** a rarity border around the icon for Uncommon+
-(Common/Poor get no border, matching CK's `GetSlotBorderRarityColor`
-`useDefaultColorForCommon` grouping). Applies to undiscovered `???` rows too.
-`Rarity` baked into `ItemCatalog.Entry` (via a `rarityCache` mirroring
-`iconCache`); colour resolved at rebind in `ItemChecklistContent` via
-`Manager.ui.GetSlotBorderRarityColor(rarity, useDefaultColorForCommon: true,
-defaultColor)`; `ItemRow.Bind` paints it. **Distinct axis** from the Iter-3.7
-cooked-food tiers (`CookedFoodCD.rareVersion`/`epicVersion`). Two non-obvious
-facts proven in-game (see `docs/gotchas.md`): the label tint must use
-`SetTempColor(c, keepColorOnStart: true)` after `Render()` or it blanks on the
-first open (PugText `renderOnStart`), and the shipped `ui_rarity_border.png`
-placeholder was fully transparent (fixed to a white hollow frame, rendered as a
-9-slice via `spriteBorder {1,1,1,1}` so the ring stays thin; real pixel-art
-border remains **Iter-12** (pixel-art) polish).
-Full mechanism in `docs/architecture.md § Rarity Colouring (Iter-6)`. **Iter-7
-(DONE):** runtime-switchable list sorting — four modes (Name, Rarity, Found,
-Category/ObjectType), each with ascending/descending direction. A reusable
-`DropdownWidget : UIelement` shows the active sort mode in a header and lists
-the remaining modes in a popup; an `AscDescToggle : ButtonUIElement` flips
-direction. Sort state is static per session (resets on game restart). The view
-model `ItemListViewModel` owns the `int[] Order` indirection (display position →
-catalog index), runs `Recompute()` on three triggers (mode/direction change,
+Iter-12 extension), Iter-13, Iter-14.1, Iter-18, Iter-14.2, Iter-15, Iter-19, Iter-20,
+Iter-21, Iter-16.1, Iter-16.2, Iter-22 (row-hover tooltips), Iter-23, Iter-24, Iter-25
+(thinTiny accented-glyph injection), Iter-16.4 (discovery-filter/counter pet-skin fix),
+Iter-16.3 (cattle collection), Iter-17 (per-variation tracking — cattle pet-model +
+paintable colour variants), Iter-27 (possession-scan perf — bulk component reads kill
+the in-base stutter), and Iter-28 (possession scan — exclude world nature via tag+ID
+blacklist + one-time ledger eviction; kills the autosave-serialize spike), Iter-30
+(config-gated possession diagnostic log), and Iter-31 (possession scope — anchor the
+base on workbenches, killing remote world-structure pollution; + save-write-skip +
+ledger v2 migration) are DONE on main. Iter-3.8 replaced the per-entry SpawnRows (one
+GameObject per ~10718 catalog entries, ~905 ms open freeze) with viewport
+virtualization: a fixed ~5-row pool recycled from
+`IScrollable.UpdateContainingElements`, reporting the full catalog height via
+`GetCurrentWindowHeight`. Open latency dropped to ~0-7 ms. Invariant from the geometry
+fix: `UIScrollWindow.windowHeight` must equal the SpriteMask height (and the mask top
+align to row 0's top) for the first/last rows to sit flush. **Iter-4 (DONE):** F1 is now
+a real toggle (one key opens and closes), and the checklist is mutually exclusive with
+CK's inventory/crafting UI — opening a Vanilla menu auto-hides it, and F1 won't open it
+over an open menu. See the `CoreLib UserInterfaceModule` row above and
+`docs/architecture.md § UI Architecture` for the mechanism. **Iter-5 (DONE):** a
+working, draggable scrollbar is wired into the window prefab using CK's native
+`ScrollBar` + `ScrollBarHandle`, with the Item-Browser bridge scrollbar sprites (track +
+handle + selected-border, sub-sprites of the `ui_classic` atlas). **Pure prefab change —
+zero C#:** once `UIScrollWindow.scrollBar` references the `ScrollBar`, CK's
+`UIScrollWindow.LateUpdate → UpdateScrollbar → ScrollBar.UpdateScrollBarPosition` drives
+handle sizing, position, and mouse-wheel sync itself (verified against Item Browser,
+which has no scrollbar C#). Scroll arrows stay unwired (`fileID: 0`); track-position
+fine-tuning and real sprites fold into Iter-12 (pixel-art). Two non-obvious facts proven
+during the build: the scrollbar SpriteRenderers must use **`maskInteraction: None`** to
+stay unclipped by the row SpriteMask (orders 46/47 sit inside the 40..55 mask range),
+and `ButtonUIElement.LateUpdate` toggles **GameObject activity** of
+`spritesShownUnpressed`/`spritesShownPressed` each frame — a GO must never be in both
+lists, and with a single handle sprite both lists stay **empty** so
+`handleSpriteRenderer` (rendered by `ScrollBar` itself) is the always-visible handle,
+with the selected-border wired only as `optionalSelectedMarker` (hover/selection
+highlight). Script-ref rule for hand-wired CK components: `m_Script.fileID` is a
+portable class-name MD4 hash, but the `guid` is this install's `Pug.Other.dll.meta` guid
+— see the `project-corekeeper-script-fileid-derivation` memory. **Iter-6 (DONE):** item
+rarity colouring — each row's CK rarity (`ObjectInfo.rarity`) shows as a name tint (all
+rarities; Common/Poor keep the default text colour, Uncommon+ get their rarity colour)
+**and** a rarity border around the icon for Uncommon+ (Common/Poor get no border,
+matching CK's `GetSlotBorderRarityColor` `useDefaultColorForCommon` grouping). Applies
+to undiscovered `???` rows too. `Rarity` baked into `ItemCatalog.Entry` (via a
+`rarityCache` mirroring `iconCache`); colour resolved at rebind in
+`ItemChecklistContent` via `Manager.ui.GetSlotBorderRarityColor(rarity,
+useDefaultColorForCommon: true, defaultColor)`; `ItemRow.Bind` paints it. **Distinct
+axis** from the Iter-3.7 cooked-food tiers (`CookedFoodCD.rareVersion`/`epicVersion`).
+Two non-obvious facts proven in-game (see `docs/gotchas.md`): the label tint must use
+`SetTempColor(c, keepColorOnStart: true)` after `Render()` or it blanks on the first
+open (PugText `renderOnStart`), and the shipped `ui_rarity_border.png` placeholder was
+fully transparent (fixed to a white hollow frame, rendered as a 9-slice via
+`spriteBorder {1,1,1,1}` so the ring stays thin; real pixel-art border remains
+**Iter-12** (pixel-art) polish). Full mechanism in `docs/architecture.md § Rarity
+Colouring (Iter-6)`. **Iter-7 (DONE):** runtime-switchable list sorting — four modes
+(Name, Rarity, Found, Category/ObjectType), each with ascending/descending direction. A
+reusable `DropdownWidget : UIelement` shows the active sort mode in a header and lists
+the remaining modes in a popup; an `AscDescToggle : ButtonUIElement` flips direction.
+Sort state is static per session (resets on game restart). The view model
+`ItemListViewModel` owns the `int[] Order` indirection (display position → catalog
+index), runs `Recompute()` on three triggers (mode/direction change,
 `DiscoveredState.Changed` only when Mode=Found, and re-bake), and keeps the
-filter/search seam (`DiscoveryFilter`, `SearchText`) at no-op defaults for
-Iter-8. `ItemCatalog.Entry` gained `ObjectType ObjectType` (via a new
-`objectTypeCache`) for the Category comparator. `ItemChecklistMod.ListView` is
-(re-)constructed after each bake. Full mechanism in `docs/architecture.md §
-List View-Model, Sorting & Filtering (Iter-7 / Iter-8 / Iter-10)`. **Iter-7.1 (DONE):** catalog-completeness
-fix — `ItemCatalog.Bake` Loop 1 blanket-excluded `ObjectType.NonUsable` as
-"garbage", but CK files raw materials (ores, bars, raw wood, scrap) under that
-type, so they were silently missing. Replaced with a narrow guard that drops a
-`NonUsable` item only when it has no icon (`smallIcon` and `icon` both null);
-verified in-game (1.2.1.4) that the 126 `NonUsable` items are 117 real
-materials (all have an icon) + 9 internal engine entities with no icon and no
-localized name (territory spawners, `TheCore`, the `DroppedItem` entity,
-boss-statue stubs). Catalog 10844 → 10835. IB's full `IsNonObtainable` can't be
-reused (needs ECS/registry APIs the sandbox blocks). Full reasoning in
-`docs/gotchas.md § Catalog / Bake (Iter-7.1)`. **Iter-8 (DONE):**
-runtime discovery filter (All/Discovered/Undiscovered) + name search, wired to
-the `ItemListViewModel` filter/search seam Iter-7 left at no-op defaults. Filter
-= a second `DropdownWidget` instance (the `SortDropdown` subtree duplicated via a
-deterministic fileID slot-remap, `ui_icon_filter` glyph). Search =
-`SearchBar : TextInputField` (CK-native — PugText/caret/focus inherited; **not**
-uGUI, the orphaned `UnityInputFieldAdapter` was deleted) + a `ClearSearchButton`,
-in a 9-slice `Display` slot matching the dropdowns. **Option A** semantics:
-search matches the *real* name of all items; undiscovered matches still render
-`???`. One-line ViewModel change (dropped the discovered-only guard) +
-`IsFiltered`-driven title `· N shown`. Focus persists while typing
+filter/search seam (`DiscoveryFilter`, `SearchText`) at no-op defaults for Iter-8.
+`ItemCatalog.Entry` gained `ObjectType ObjectType` (via a new `objectTypeCache`) for the
+Category comparator. `ItemChecklistMod.ListView` is (re-)constructed after each bake.
+Full mechanism in `docs/architecture.md § List View-Model, Sorting & Filtering (Iter-7 /
+Iter-8 / Iter-10)`. **Iter-7.1 (DONE):** catalog-completeness fix — `ItemCatalog.Bake`
+Loop 1 blanket-excluded `ObjectType.NonUsable` as "garbage", but CK files raw materials
+(ores, bars, raw wood, scrap) under that type, so they were silently missing. Replaced
+with a narrow guard that drops a `NonUsable` item only when it has no icon (`smallIcon`
+and `icon` both null); verified in-game (1.2.1.4) that the 126 `NonUsable` items are 117
+real materials (all have an icon) + 9 internal engine entities with no icon and no
+localized name (territory spawners, `TheCore`, the `DroppedItem` entity, boss-statue
+stubs). Catalog 10844 → 10835. IB's full `IsNonObtainable` can't be reused (needs
+ECS/registry APIs the sandbox blocks). Full reasoning in `docs/gotchas.md § Catalog /
+Bake (Iter-7.1)`. **Iter-8 (DONE):** runtime discovery filter
+(All/Discovered/Undiscovered) + name search, wired to the `ItemListViewModel`
+filter/search seam Iter-7 left at no-op defaults. Filter = a second `DropdownWidget`
+instance (the `SortDropdown` subtree duplicated via a deterministic fileID slot-remap,
+`ui_icon_filter` glyph). Search = `SearchBar : TextInputField` (CK-native —
+PugText/caret/focus inherited; **not** uGUI, the orphaned `UnityInputFieldAdapter` was
+deleted) + a `ClearSearchButton`, in a 9-slice `Display` slot matching the dropdowns.
+**Option A** semantics: search matches the *real* name of all items; undiscovered
+matches still render `???`. One-line ViewModel change (dropped the discovered-only
+guard) + `IsFiltered`-driven title `· N shown`. Focus persists while typing
 (`dontDeactivateOnDeselect = true` + `HideUI` deactivates to free WASD on close).
-Hard-won prefab traps (dead default material → invisible, Default-vs-GUI sorting
-layer, caret PPU scale, duplicate-and-strip leftover button hijacks clicks) in
-`docs/gotchas.md § Search Field / Header (Iter-8)`; full mechanism in
-`docs/architecture.md § Filter & Search (Iter-8)`. **Iter-9 (Polish) — DONE (2026-06-04, branch `iter-9`).** A large UI
+Hard-won prefab traps (dead default material → invisible, Default-vs-GUI sorting layer,
+caret PPU scale, duplicate-and-strip leftover button hijacks clicks) in `docs/gotchas.md
+§ Search Field / Header (Iter-8)`; full mechanism in `docs/architecture.md § Filter &
+Search (Iter-8)`. **Iter-9 (Polish) — DONE (2026-06-04, branch `iter-9`).** A large UI
 layout/behaviour pass:
 - **Window + suppression:** near-fullscreen window, thin uniform 0.25u border
   (matching CK's inventory margin); **fixed** size — CK's orthographic UI camera
@@ -154,60 +156,56 @@ structured for Iter-11 (localisation) routing. Three new `ItemCatalog.Entry` fie
 baked: `Level`, `SellValue`, `IsCraftable`.
 
 **Iter-11 (DONE):** native localisation via CK's `TextDataBlock` / `ScriptableData`
-mechanism. Term strings live in
-`localization/localization.yaml` (mod-root, outside `unity/` so ModBuilder does
-not pack it into the AssetBundle); the shared Editor helper
+mechanism. Term strings live in `localization/localization.yaml` (mod-root, outside
+`unity/` so ModBuilder does not pack it into the AssetBundle); the shared Editor helper
 `utils/LocalizationGenerator.cs` (namespace `CoreKeeperModUtils`, symlinked by
-`link.sh`; at the time gated behind `.envrc:USE_SHARED_EDITOR_HELPERS=1`, since
-removed — see below) reads that YAML and
-templates raw `.asset` YAML for each language — **Option II: raw asset templating**
-— keyed by `utils/ck-language-addresses.json` (13 runtime languages, address→ISO,
-runtime-dumped because `LanguageDataBlock`s are runtime-only and the SDK editor API
-cannot enumerate them at build time). At runtime, terms are resolved via
-`API.Localization.GetLocalizedTerm` through the `Loc.T` / `Loc.F` helpers, with
-the raw term key as fallback. EN + DE shipped; adding a language later = add a YAML
-language key and rebuild. The F1 keybind display name uses CK's own
+`link.sh`; at the time gated behind `.envrc:USE_SHARED_EDITOR_HELPERS=1`, since removed
+— see below) reads that YAML and templates raw `.asset` YAML for each language —
+**Option II: raw asset templating** — keyed by `utils/ck-language-addresses.json` (13
+runtime languages, address→ISO, runtime-dumped because `LanguageDataBlock`s are
+runtime-only and the SDK editor API cannot enumerate them at build time). At runtime,
+terms are resolved via `API.Localization.GetLocalizedTerm` through the `Loc.T` / `Loc.F`
+helpers, with the raw term key as fallback. EN + DE shipped; adding a language later =
+add a YAML language key and rebuild. The F1 keybind display name uses CK's own
 `ControlMapper/ItemChecklist-ToggleChecklistPC` term. Language changes re-bake the
-catalog (deferred to the next `Update` tick, guarded on `Manager.main.player !=
-null`). This mod is the **pilot** for the shared `utils/` editor helpers
-(`CLIBuildHelper`, `CLIPublishHelper`, `LocalizationGenerator`); `disable-durability`
-and `faster-talents` still used per-mod helpers at the time of Iter-11 (both have
-since migrated, and the opt-in flag `USE_SHARED_EDITOR_HELPERS` was then removed —
-the shared helpers are now unconditional). Hard-won findings:
-`LanguageDataBlock` is runtime-only (no SDK API at build time → Option II), the
-`m_Script.guid` for `ScriptableData.dll` is per-SDK-clone-local and must be resolved
-via `AssetDatabase.AssetPathToGUID` at generation time (not copied from IB), and
-`PugFont` crashes on labels exceeding `maxWidth > 0f` with longer translations →
-set `PugText.maxWidth = 0f` on all localised single-line labels. Full details in
-`docs/gotchas.md § Localisation (Iter-11)`.
+catalog (deferred to the next `Update` tick, guarded on `Manager.main.player != null`).
+This mod is the **pilot** for the shared `utils/` editor helpers (`CLIBuildHelper`,
+`CLIPublishHelper`, `LocalizationGenerator`); `disable-durability` and `faster-talents`
+still used per-mod helpers at the time of Iter-11 (both have since migrated, and the
+opt-in flag `USE_SHARED_EDITOR_HELPERS` was then removed — the shared helpers are now
+unconditional). Hard-won findings: `LanguageDataBlock` is runtime-only (no SDK API at
+build time → Option II), the `m_Script.guid` for `ScriptableData.dll` is
+per-SDK-clone-local and must be resolved via `AssetDatabase.AssetPathToGUID` at
+generation time (not copied from IB), and `PugFont` crashes on labels exceeding
+`maxWidth > 0f` with longer translations → set `PugText.maxWidth = 0f` on all localised
+single-line labels. Full details in `docs/gotchas.md § Localisation (Iter-11)`.
 
-**Iter-11.5 (DONE):** always-on HUD discovery counter — the window footer's
-`N / M (p.p%)` mirrored as a permanent top-right HUD readout (above the minimap),
-with a checkbox-framed icon (`ui_slot_toggled_border` box + `ui_icon_requirement`
-tick at 0.7 scale, like a discovered list row). This is the mod's first
-**non-modal** UI: a dedicated `ItemChecklistHud : UIelement` in its own
-`Prefabs/ItemChecklistHUD.prefab`, instantiated directly by `ItemChecklistMod`
-(routed by GameObject name in `ModObjectLoaded`, **not** via CoreLib
-`RegisterModUI`) and parented under `chestInventoryUI.transform.parent`
-(`IngameUI`). The counter string comes from a new shared `ProgressFormat.Counter`
-helper that the window footer (`FormatTitle`) also adopts — one source of truth,
-no drift. Live refresh via `DiscoveredState.Changed` plus both bake hooks
-(world-load + loc-change). Three hard-won in-game findings (see
-`docs/gotchas.md § HUD Counter (Iter-11.5)`): **(1)** the renderers must sit on
-the **HUD Unity layer (27)** — on layer 5 (UI) the uiCamera never draws them during
-plain gameplay (the modal window only renders because CoreLib's open-path activates
-it); **(2)** content must sit at local **z=10** (world z≈0), the plane CoreLib
-positions modal UIs to via `initialInterfacePosition` — at the parent origin
-(world z=-10) it is outside the uiCamera frustum (`SpriteRenderer.isVisible ==
-false`); **(3)** `Manager.ui.CalcGameplayUITargetScaleMultiplier()` (CK's "native
-HUD idiom") returns `(0,0,0)` for a mod HUD here, so visibility is explicit:
-`isInGame && Manager.main.player != null` (the player term suppresses the
-world-load screen — the Iter-15 bug class) `&& !Manager.ui.isAnyInventoryShowing
-&& !Manager.menu.IsAnyMenuActive()` (the CoreLib-patched aggregate
-`isAnyInventoryShowing` covers inventory, crafting **and** the checklist window).
-Bonus: HUD-layer membership means CK's own `CameraManager.ShowHUD(false)` culls the
-counter together with the rest of the gameplay HUD, for free. Full mechanism in
-`docs/architecture.md § HUD Counter (Iter-11.5)`.
+**Iter-11.5 (DONE):** always-on HUD discovery counter — the window footer's `N / M
+(p.p%)` mirrored as a permanent top-right HUD readout (above the minimap), with a
+checkbox-framed icon (`ui_slot_toggled_border` box + `ui_icon_requirement` tick at 0.7
+scale, like a discovered list row). This is the mod's first **non-modal** UI: a
+dedicated `ItemChecklistHud : UIelement` in its own `Prefabs/ItemChecklistHUD.prefab`,
+instantiated directly by `ItemChecklistMod` (routed by GameObject name in
+`ModObjectLoaded`, **not** via CoreLib `RegisterModUI`) and parented under
+`chestInventoryUI.transform.parent` (`IngameUI`). The counter string comes from a new
+shared `ProgressFormat.Counter` helper that the window footer (`FormatTitle`) also
+adopts — one source of truth, no drift. Live refresh via `DiscoveredState.Changed` plus
+both bake hooks (world-load + loc-change). Three hard-won in-game findings (see
+`docs/gotchas.md § HUD Counter (Iter-11.5)`): **(1)** the renderers must sit on the
+**HUD Unity layer (27)** — on layer 5 (UI) the uiCamera never draws them during plain
+gameplay (the modal window only renders because CoreLib's open-path activates it);
+**(2)** content must sit at local **z=10** (world z≈0), the plane CoreLib positions
+modal UIs to via `initialInterfacePosition` — at the parent origin (world z=-10) it is
+outside the uiCamera frustum (`SpriteRenderer.isVisible == false`); **(3)**
+`Manager.ui.CalcGameplayUITargetScaleMultiplier()` (CK's "native HUD idiom") returns
+`(0,0,0)` for a mod HUD here, so visibility is explicit: `isInGame &&
+Manager.main.player != null` (the player term suppresses the world-load screen — the
+Iter-15 bug class) `&& !Manager.ui.isAnyInventoryShowing &&
+!Manager.menu.IsAnyMenuActive()` (the CoreLib-patched aggregate `isAnyInventoryShowing`
+covers inventory, crafting **and** the checklist window). Bonus: HUD-layer membership
+means CK's own `CameraManager.ShowHUD(false)` culls the counter together with the rest
+of the gameplay HUD, for free. Full mechanism in `docs/architecture.md § HUD Counter
+(Iter-11.5)`.
 
 **Iter-11.6 (DONE):** load-screen visibility fix — the Iter-11.5 HUD showed on the
 world-load screen (entering) and lingered on the exit fade to the main menu, because
@@ -227,31 +225,29 @@ signal and remains open. Verified in-game (1.2.1.4): clean sandbox compile (zero
 `CompileFailed`), no per-frame NRE from the HUD `LateUpdate`. Full reasoning in
 `docs/gotchas.md § HUD Counter`.
 
-**Iter-12 (real pixel-art sprites) — DONE (2026-06-14, branch `iter-12`).**
-Replaced every Item Browser placeholder sprite with original pixel-art authored
-in Pixaki. A deterministic generator (`utils/pixaki_to_sheet.py`, TDD) packs the
-`.pixaki` layers into one `ui_checklist` sheet (25 sprites, stable internal IDs
-from name hashes) and templates the `.png.meta` (sprite rects + 9-slice borders);
-the prefabs were rewired off the IB `Art/Bridge/` GUIDs onto the sheet (verified
-**zero IB references** remain), and the dev-only `Art/Bridge/` folder was deleted.
-The `.pixaki` master is now versioned (`sources/`). After the user re-sliced /
-renamed sprites in Unity's Sprite Editor, the generator became **off-limits**
-(re-running would overwrite the manual `.meta` edits) — the committed sheet +
-prefab are the source of truth. Dropdown popups gained runtime auto-sizing
-(`DropdownWidget`/`FacetedFilterWidget` compute panel height/position from the row
-count, top edge read from the prefab), and the hardcoded `MaskTopLocalY` /
+**Iter-12 (real pixel-art sprites) — DONE (2026-06-14, branch `iter-12`).** Replaced
+every Item Browser placeholder sprite with original pixel-art authored in Pixaki. A
+deterministic generator (`utils/pixaki_to_sheet.py`, TDD) packs the `.pixaki` layers
+into one `ui_checklist` sheet (25 sprites, stable internal IDs from name hashes) and
+templates the `.png.meta` (sprite rects + 9-slice borders); the prefabs were rewired off
+the IB `Art/Bridge/` GUIDs onto the sheet (verified **zero IB references** remain), and
+the dev-only `Art/Bridge/` folder was deleted. The `.pixaki` master is now versioned
+(`sources/`). After the user re-sliced / renamed sprites in Unity's Sprite Editor, the
+generator became **off-limits** (re-running would overwrite the manual `.meta` edits) —
+the committed sheet + prefab are the source of truth. Dropdown popups gained runtime
+auto-sizing (`DropdownWidget`/`FacetedFilterWidget` compute panel height/position from
+the row count, top edge read from the prefab), and the hardcoded `MaskTopLocalY` /
 `FallbackWindowHeight` were derived from the `ContentsMask` (fixing a latent
 fallback-height drift). In-game calibration fixed three hard-won issues (all in
-`docs/gotchas.md § Sprite Sheet & UI Sorting`): **(1)** the footer status-line
-drew over open dropdown popups because all PugText sits on the GUI layer at
-`orderInLayer 9999` — lowered the footer to 50 (< popup BG 54); **(2)** the filter
-checkbox boxes were invisible because the static box GO (`Checkmark`) had
-`m_IsActive: 0` (the code only toggles the fill); **(3)** the selection marker
-stretched instead of 9-slicing because its 3px corners needed
-`spriteBorder {3,3,3,3}`, not `{1,1,1,1}`. A "fix didn't show" red herring was
-traced via mtime (edit newer than the last build = simply not rebuilt), not the
-AssetDatabase/symlink cache. Real pixel-art for the remaining placeholder sprites
-(rarity border, scrollbar) continues as polish toward 1.0.0.
+`docs/gotchas.md § Sprite Sheet & UI Sorting`): **(1)** the footer status-line drew over
+open dropdown popups because all PugText sits on the GUI layer at `orderInLayer 9999` —
+lowered the footer to 50 (< popup BG 54); **(2)** the filter checkbox boxes were
+invisible because the static box GO (`Checkmark`) had `m_IsActive: 0` (the code only
+toggles the fill); **(3)** the selection marker stretched instead of 9-slicing because
+its 3px corners needed `spriteBorder {3,3,3,3}`, not `{1,1,1,1}`. A "fix didn't show"
+red herring was traced via mtime (edit newer than the last build = simply not rebuilt),
+not the AssetDatabase/symlink cache. Real pixel-art for the remaining placeholder
+sprites (rarity border, scrollbar) continues as polish toward 1.0.0.
 
 **Iter-12 extension (2026-06-15, direct on `main`, no separate branch).** A
 follow-up pass that *reactivated* the generator and reworked the icon slot:
@@ -276,29 +272,27 @@ follow-up pass that *reactivated* the generator and reworked the icon slot:
   `ContentMask`, Unknown-Object feature, native-sizing feature, and a
   canonical-serialization commit in `item-checklist`).
 
-**Iter-14.1 (search-caret alignment) — DONE (2026-06-15, branch `iter-14-1`).**
-The blinking search caret sat a few px too low and flush against the text. Root
-cause (Pug.Other decompile): `TextInputField.Update()` recomputes the caret
-position every frame and writes `characterMarkBlinker.transform.position`
-(world X/Y, Z preserved) — so any offset on the caret GO itself is clobbered.
-Fix (pure prefab, zero C#): a child GO `CaretSprite` under the caret GO now
-carries the caret `SpriteRenderer` at a constant `localPosition`
-(`+1px` up to centre, `+2px` right for a small gap); the child inherits the
-per-frame parent position and adds the constant nudge. The `SpriteRenderer`
-kept its fileID (just re-homed to the child), so `CharacterMarkBlinker.sr`
-needed no rewire. The caret was also shortened `8px -> 7px` via the sprite's
-existing vertical 9-slice (SR `DrawMode` Sliced, `m_Size` 2x7) — the 1px
-top/bottom border caps stay fixed and the uniform middle column compresses
-invisibly; no sheet/generator change. All three (height, vertical centre,
-horizontal gap) calibrated in-game. **Corrected a stale assumption:** the
-roadmap/memory still described the caret as a stretched 1x1 `white_pixel`; in
-fact Iter-12 had already swapped it to the painted 2x8 `Caret` sheet sprite and
-removed the `{0.8,6,1}` scale hack — only the position/height remained.
-**Process note:** several confusing calibration rounds were lost to an
-*intermittent* Unity AssetDatabase staleness when building from the worktree
-(symlink-target edits silently not re-imported, fresh bundle mtime
-notwithstanding); the fix is clearing `Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}`
-to force a reimport. Documented in `docs/gotchas.md § Worktree builds`.
+**Iter-14.1 (search-caret alignment) — DONE (2026-06-15, branch `iter-14-1`).** The
+blinking search caret sat a few px too low and flush against the text. Root cause
+(Pug.Other decompile): `TextInputField.Update()` recomputes the caret position every
+frame and writes `characterMarkBlinker.transform.position` (world X/Y, Z preserved) — so
+any offset on the caret GO itself is clobbered. Fix (pure prefab, zero C#): a child GO
+`CaretSprite` under the caret GO now carries the caret `SpriteRenderer` at a constant
+`localPosition` (`+1px` up to centre, `+2px` right for a small gap); the child inherits
+the per-frame parent position and adds the constant nudge. The `SpriteRenderer` kept its
+fileID (just re-homed to the child), so `CharacterMarkBlinker.sr` needed no rewire. The
+caret was also shortened `8px -> 7px` via the sprite's existing vertical 9-slice (SR
+`DrawMode` Sliced, `m_Size` 2x7) — the 1px top/bottom border caps stay fixed and the
+uniform middle column compresses invisibly; no sheet/generator change. All three
+(height, vertical centre, horizontal gap) calibrated in-game. **Corrected a stale
+assumption:** the roadmap/memory still described the caret as a stretched 1x1
+`white_pixel`; in fact Iter-12 had already swapped it to the painted 2x8 `Caret` sheet
+sprite and removed the `{0.8,6,1}` scale hack — only the position/height remained.
+**Process note:** several confusing calibration rounds were lost to an *intermittent*
+Unity AssetDatabase staleness when building from the worktree (symlink-target edits
+silently not re-imported, fresh bundle mtime notwithstanding); the fix is clearing
+`Library/{SourceAssetDB,ArtifactDB,Artifacts,Bee}` to force a reimport. Documented in
+`docs/gotchas.md § Worktree builds`.
 
 **Iter-13 (Dropdown prefab extraction) — DONE (2026-06-16, branch `iter-13`).**
 Made the dropdown genuinely reusable: the header+popup skeleton, formerly
@@ -323,12 +317,12 @@ Hard-won points:
   nulled the header `DropdownToggleButton`'s serialized `owner` → header-click
   died (caught in-game, not by the Editor compile). Fix: wire `owner` at runtime
   in `Configure` for *all* child toggles, not just the one serialized `toggle`.
-- **One shared toggle type via a minimal `IPopupToggle` seam.** The chrome can
-  only carry a single toggle component; `DropdownToggleButton` and
-  `FacetToggleButton` differed only in `owner` type. Introduced
-  `IPopupToggle { TogglePopup() }` (both widgets implement it), retyped the
-  toggle's `owner` to it (runtime-wired), and **deleted `FacetToggleButton`**.
-  Narrow, prefab-driven seam — the broad six-subclass unification stays Iter-14.2.
+- **One shared toggle type via a minimal `IPopupToggle` seam.** The chrome can only
+  carry a single toggle component; `DropdownToggleButton` and `FacetToggleButton`
+  differed only in `owner` type. Introduced `IPopupToggle { TogglePopup() }` (both
+  widgets implement it), retyped the toggle's `owner` to it (runtime-wired), and
+  **deleted `FacetToggleButton`**. Narrow, prefab-driven seam — the broad six-subclass
+  unification stays Iter-14.2.
 - **Variant = base chrome + additions + deactivations + layout overrides.** The
   FacetedFilter variant adds `FacetedFilterWidget` + checkbox/header/action
   templates, **deactivates** the inherited `AscDescButton` (the filter has no sort
@@ -455,54 +449,51 @@ stack), so iter-14-2 neither caused nor worsened it. Net C# **+23 LoC** — thre
 `Player.log` per launch, rotating the prior session to `Player-prev.log` — so each
 grep is single-session.)
 
-**Iter-15 (F1/HUD over the intro cutscene) — DONE (2026-06-18, branch
-`iter-15`).** Closed the cutscene half of the Iter-4/Iter-11.6 toggle-guard work.
-The F1 open-guard already blocked both world-load screens (Iter-11.6 via
-`WorldState.IsInPlayableWorld`) but not the in-game spawn-from-Core intro
-cutscene; F1 could still pop the checklist over it. A latent instance of the same
-bug sat on the always-on HUD: the intro cutscene fades CK's HUD via
-`Manager.ui.FadeOutAllGameplayUI()` (which only fades CK's *own* registered
-gameplay UI), **not** `Manager.camera.ShowHUD(false)` (which would cull our
-layer-27 HUD for free), so the ItemChecklist HUD stayed visible during the
-cutscene. Fix = one term, `&& !sceneHandler.cutsceneIsPlaying`, appended to the
-shared `WorldState.IsInPlayableWorld`; because both the F1 guard and the HUD
-already gate on that predicate, the single edit fixed both. `cutsceneIsPlaying`
-(public `bool` on `SceneHandler`, delegating to `optionalCutsceneHandler.isPlaying`,
-false when no handler) is the canonical signal — CK itself gates a discovery path
-on it (Pug.Other ~301674) with the same companions this predicate uses. Rejected
-the broader `SendClientInputSystem.PlayerInputBlocked()` (overlaps the menu/
-inventory checks the guard already does + per-frame UI-input logic). Sandbox-safe
-by precedent (property access on the already-used `Manager.sceneHandler`),
-confirmed by a clean Phase-1 compile (zero `CompileFailed`). Pure behavioural
-one-liner + docstring/comment hygiene; no prefab/art touch.
+**Iter-15 (F1/HUD over the intro cutscene) — DONE (2026-06-18, branch `iter-15`).**
+Closed the cutscene half of the Iter-4/Iter-11.6 toggle-guard work. The F1 open-guard
+already blocked both world-load screens (Iter-11.6 via `WorldState.IsInPlayableWorld`)
+but not the in-game spawn-from-Core intro cutscene; F1 could still pop the checklist
+over it. A latent instance of the same bug sat on the always-on HUD: the intro cutscene
+fades CK's HUD via `Manager.ui.FadeOutAllGameplayUI()` (which only fades CK's *own*
+registered gameplay UI), **not** `Manager.camera.ShowHUD(false)` (which would cull our
+layer-27 HUD for free), so the ItemChecklist HUD stayed visible during the cutscene. Fix
+= one term, `&& !sceneHandler.cutsceneIsPlaying`, appended to the shared
+`WorldState.IsInPlayableWorld`; because both the F1 guard and the HUD already gate on
+that predicate, the single edit fixed both. `cutsceneIsPlaying` (public `bool` on
+`SceneHandler`, delegating to `optionalCutsceneHandler.isPlaying`, false when no
+handler) is the canonical signal — CK itself gates a discovery path on it (Pug.Other
+~301674) with the same companions this predicate uses. Rejected the broader
+`SendClientInputSystem.PlayerInputBlocked()` (overlaps the menu/ inventory checks the
+guard already does + per-frame UI-input logic). Sandbox-safe by precedent (property
+access on the already-used `Manager.sceneHandler`), confirmed by a clean Phase-1 compile
+(zero `CompileFailed`). Pure behavioural one-liner + docstring/comment hygiene; no
+prefab/art touch.
 
-**Iter-19 (search-field word-wrap crash) — DONE (2026-06-18, branch `iter-19`).**
-Killed the per-frame `IndexOutOfRangeException` thrown while typing in the search
-field via CK's `PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField` — a
-pre-existing CK bug logged out of scope during Iter-14.2 R5 (reproduced on **main**
-too, 127× same stack with the same input; silent to the player but log-spammy).
-Root cause (Pug.Other decompile): `TextInputField.Awake` sets
-`pugText.maxWidth = maxWidth + (dontAllowNewLines ? 1 : 0)` — for this field
-`7.5 + 1 = 8.5` — so every `pugText.Render()` runs the word-wrap path, whose
-`text[num3 - 1]` indexes out of range on certain input. A single-line field
-(`dontAllowNewLines: 1`) must never word-wrap. Fix = `SearchBar` overrides `Awake`
-(`private new void Awake()` — CK's `Awake` is non-virtual; calls `base.Awake()`
-then `pugText.maxWidth = 0f`). **Corrected the roadmap's own fix candidate:** the
-prefab `pugText.maxWidth = 0` is a no-op because `Awake` rewrites it at runtime, so
-the fix had to come from code. **Visual width is preserved**: the field's *own*
-`maxWidth` (7.5) still clips overflowing characters via
-`TextInputField.TrimTextToFitRestrictions` (a char-trim loop, independent of the
-PugText word-wrap) — the two `maxWidth` roles are decoupled. Done in `Awake` (not
-`LateUpdate`, which runs *after* the same-frame render) so it holds before the
-first render — covers `SyncFrom` restoring a long prior search on open; nothing
-rewrites `pugText.maxWidth` per frame, so one write persists. Same CK PugFont bug
-class the Iter-9 ASCII search-hint and the Iter-11 `RenderNoWrap` (`maxWidth = 0`)
-labels sidestepped — `TextInputField` is the one place the value is reimposed.
-Pure behavioural C# (one `Awake` override); no prefab/art touch. Verified in-game
-(1.2.1.4, fake-ID dev build 9999997): clean sandbox compile (passed code security
-verification, `safetyCheck=True`, zero `CompileFailed`), and typing a long string
-produced **0** `IndexOutOfRangeException` (127× on main with the same input). See
-`docs/gotchas.md § Search Field / Header` for the mechanism.
+**Iter-19 (search-field word-wrap crash) — DONE (2026-06-18, branch `iter-19`).** Killed
+the per-frame `IndexOutOfRangeException` thrown while typing in the search field via
+CK's `PugFont.AddNewLinesToLinesExceedingMaxWidth ← TextInputField` — a pre-existing CK
+bug logged out of scope during Iter-14.2 R5 (reproduced on **main** too, 127× same stack
+with the same input; silent to the player but log-spammy). Root cause (Pug.Other
+decompile): `TextInputField.Awake` sets `pugText.maxWidth = maxWidth +
+(dontAllowNewLines ? 1 : 0)` — for this field `7.5 + 1 = 8.5` — so every
+`pugText.Render()` runs the word-wrap path, whose `text[num3 - 1]` indexes out of range
+on certain input. A single-line field (`dontAllowNewLines: 1`) must never word-wrap. Fix
+= `SearchBar` overrides `Awake` (`private new void Awake()` — CK's `Awake` is
+non-virtual; calls `base.Awake()` then `pugText.maxWidth = 0f`). **Corrected the
+roadmap's own fix candidate:** the prefab `pugText.maxWidth = 0` is a no-op because
+`Awake` rewrites it at runtime, so the fix had to come from code. **Visual width is
+preserved**: the field's *own* `maxWidth` (7.5) still clips overflowing characters via
+`TextInputField.TrimTextToFitRestrictions` (a char-trim loop, independent of the PugText
+word-wrap) — the two `maxWidth` roles are decoupled. Done in `Awake` (not `LateUpdate`,
+which runs *after* the same-frame render) so it holds before the first render — covers
+`SyncFrom` restoring a long prior search on open; nothing rewrites `pugText.maxWidth`
+per frame, so one write persists. Same CK PugFont bug class the Iter-9 ASCII search-hint
+and the Iter-11 `RenderNoWrap` (`maxWidth = 0`) labels sidestepped — `TextInputField` is
+the one place the value is reimposed. Pure behavioural C# (one `Awake` override); no
+prefab/art touch. Verified in-game (1.2.1.4, fake-ID dev build 9999997): clean sandbox
+compile (passed code security verification, `safetyCheck=True`, zero `CompileFailed`),
+and typing a long string produced **0** `IndexOutOfRangeException` (127× on main with
+the same input). See `docs/gotchas.md § Search Field / Header` for the mechanism.
 
 **Iter-20 (possession counts) — DONE (2026-06-20, branch `iter-20`).** A second
 completion axis beside discovery: each checklist row shows how many of that item
@@ -1420,14 +1411,15 @@ bake-completion and discovery-snapshot-apply — NOT the possession scan) re-der
 `(discovered ∩ suppressed)` every load, so a lost write self-heals next load from CK's persisted
 discovery.
 
-**Verified in-game (1.2.1.5, fake-ID 9999997).** Clean sandbox compile (`safetyCheck=True`, 0
-`CompileFailed`, 0 NRE) across all commits; `baked: 8120`; a throwaway injection proved the durable
-write (correct path / format / dedup); the self-heal sweep ran at both triggers and correctly
-recorded nothing (2145 suppressed × 415 discovered = 0 intersection — a true negative). Pure
-behavioural C# + one new file (`PhantomViolationStore.cs`); no prefab/art. **Process:** measure-first
-(brainstorm → spec → plan), hybrid inline-execution with a per-code-task adversarial review; the
-durability + self-heal halves were user-directed mid-flight (a brief drift toward a possession-scan
-trigger was corrected to the world-load anchors).
+**Verified in-game (1.2.1.5, fake-ID 9999997).** Clean sandbox compile
+(`safetyCheck=True`, 0 `CompileFailed`, 0 NRE) across all commits; `baked: 8120`; a
+throwaway injection proved the durable write (correct path / format / dedup); the
+self-heal sweep ran at both triggers and correctly recorded nothing (2145 suppressed ×
+415 discovered = 0 intersection — a true negative). Pure behavioural C# + one new file
+(`PhantomViolationStore.cs`); no prefab/art. **Process:** measure-first (brainstorm →
+spec → plan), hybrid inline-execution with a per-code-task adversarial review; the
+durability + self-heal halves were user-directed mid-flight (a brief drift toward a
+possession-scan trigger was corrected to the world-load anchors).
 
 **Iter-34 (keybind rebind row — own control-mapping category) — DONE (2026-07-13, branch
 `iter-34`).** A user-reported "no rebind row under Mods" that the **in-game screenshot re-framed**
@@ -1513,34 +1505,37 @@ bake time, `GetObjectName(true/false)`, `dontLocalize`, `ObjectProperties "name"
   (ItemBrowser's `GetInternalName` source — but IB uses it only for sort/search; IB's *visible*
   fallback is the numeric "id:variation", so ICL goes one better).
 
-**Fix 1 — derived name (both render paths, one source).** `ItemCatalog.FallbackName`: when
-`GetObjectName(true)` is empty, derive the name from the internal name (strip the `Mod:` prefix +
-any CoreLib `$$N` suffix, then PascalCase-split → "Workbench Chest Extra") instead of the numeric
-objectID; record the key in `fallbackNameKeys` → `Entry.NameIsFallback`. `ItemRow.GetHoverTitle`
-returns that baked name `dontLocalize` for a `NameIsFallback` row (the same pattern the `???` rows
-already use) instead of delegating to CK's "missing:" path, and `GetHoverDescription`/`GetHoverStats`
-return null so no "missing:" leaks. One name feeds both label and tooltip.
+**Fix 1 — derived name (both render paths, one source).** `ItemCatalog.FallbackName`:
+when `GetObjectName(true)` is empty, derive the name from the internal name (strip the
+`Mod:` prefix + any CoreLib `$$N` suffix, then PascalCase-split → "Workbench Chest
+Extra") instead of the numeric objectID; record the key in `fallbackNameKeys` →
+`Entry.NameIsFallback`. `ItemRow.GetHoverTitle` returns that baked name `dontLocalize`
+for a `NameIsFallback` row (the same pattern the `???` rows already use) instead of
+delegating to CK's "missing:" path, and `GetHoverDescription`/`GetHoverStats` return
+null so no "missing:" leaks. One name feeds both label and tooltip.
 
-**Fix 2 — exclude the internal chain pages (user-requested refinement).** The user asked what these
-"Extra/Next" items even are: CoreLib workbench-chain **pages**. A base workbench folds in
-continuation objects via `WorkbenchDefinition.relatedWorkbenches` (`includeCraftedObjectsFromBuildings`)
-to present one unified crafting UI (the I/II/III tabs) — the Next/Extra are machinery, not
-collectibles, hence unnamed. The user wanted to exclude *only* the chain, not all term-less items
-(which could filter a legit foreign item). A **second verification probe** dumped the actual
-`relatedWorkbenches` graph and **REFUTED the naive "referenced → exclude" filter**: the refs are a
-**MESH** — ChestsGalore's siblings cross-reference each other, so `WorkbenchMagicChest` and
-`WorkbenchDoubleChest` list the **named bases** `WorkbenchChest`/`WorkbenchDoubleChest` as related.
-A "member of any relatedWorkbenches" filter would have dropped "Chest Workbench" (excludeSet came
-out as 6 IDs, including the 2 named bases). The precise, verified rule (`BuildWorkbenchChainSets` +
-a Loop-1 `continue`): a **chain member** (referenced by some non-root `relatedWorkbenches`) is
-dropped when it is a **leaf** (its own `relatedWorkbenches` empty → folds in nothing) **OR is
-term-less** (per the user, to also catch a hypothetical middle page). The named bases are hubs
-*with* a name → kept; the CoreLib root workbench is skipped (it aggregates via the
-`bindToRootWorkbench` flag, not `relatedWorkbenches`). The term-less test is confined to chain
-members, so a legit standalone term-less foreign item of another mod is untouched and still gets
-its derived name (Fix 1). Verified exclude-set = exactly `{32771, 32773, 32774, 32777}`; reading
-`LoadedMod.Assets.OfType<WorkbenchDefinition>()` is sandbox-safe (`WorkbenchDefinition` is in the
-already-referenced `CoreLib` assembly, namespace `CoreLib.Submodule.Entity`).
+**Fix 2 — exclude the internal chain pages (user-requested refinement).** The user asked
+what these "Extra/Next" items even are: CoreLib workbench-chain **pages**. A base
+workbench folds in continuation objects via `WorkbenchDefinition.relatedWorkbenches`
+(`includeCraftedObjectsFromBuildings`) to present one unified crafting UI (the I/II/III
+tabs) — the Next/Extra are machinery, not collectibles, hence unnamed. The user wanted
+to exclude *only* the chain, not all term-less items (which could filter a legit foreign
+item). A **second verification probe** dumped the actual `relatedWorkbenches` graph and
+**REFUTED the naive "referenced → exclude" filter**: the refs are a **MESH** —
+ChestsGalore's siblings cross-reference each other, so `WorkbenchMagicChest` and
+`WorkbenchDoubleChest` list the **named bases** `WorkbenchChest`/`WorkbenchDoubleChest`
+as related. A "member of any relatedWorkbenches" filter would have dropped "Chest
+Workbench" (excludeSet came out as 6 IDs, including the 2 named bases). The precise,
+verified rule (`BuildWorkbenchChainSets` + a Loop-1 `continue`): a **chain member**
+(referenced by some non-root `relatedWorkbenches`) is dropped when it is a **leaf** (its
+own `relatedWorkbenches` empty → folds in nothing) **OR is term-less** (per the user, to
+also catch a hypothetical middle page). The named bases are hubs *with* a name → kept;
+the CoreLib root workbench is skipped (it aggregates via the `bindToRootWorkbench` flag,
+not `relatedWorkbenches`). The term-less test is confined to chain members, so a legit
+standalone term-less foreign item of another mod is untouched and still gets its derived
+name (Fix 1). Verified exclude-set = exactly `{32771, 32773, 32774, 32777}`; reading
+`LoadedMod.Assets.OfType<WorkbenchDefinition>()` is sandbox-safe (`WorkbenchDefinition`
+is in the already-referenced `CoreLib` assembly, namespace `CoreLib.Submodule.Entity`).
 
 **Verified in-game (1.2.1.5, fake-ID 9999997).** `Successfully compiled ItemChecklist
 safetyCheck=True`, 0 `CompileFailed`, 0 NRE, 0 `BuildWorkbenchChainSets threw`; catalog **8120 →
@@ -1638,12 +1633,13 @@ describe, not as a static field + cross-class setter back in the mod:
   scan, the `DiscoveredState.Changed` subscription, and the mode toggle.
 
 `ItemChecklistMod` loses `s_lastHudCounter`, `NoteHudCounterShown` **and**
-`RefreshHudCounterIfChanged` entirely — it now holds zero HUD display state, just supplies
-`CurrentCounterNumerator()` and the triggers. Because every unconditional `Refresh()` syncs the
-cache, no path can leave the gate stale, so the redundant follow-up repaint is structurally
-impossible. Two bonus removals fall out: the mode-toggle's `-1` reset is gone (its `RefreshIfChanged`
-paints + syncs in one step), and routing the **discovery event** through the gate also drops the
-**possession-mode** repaint when a discovery leaves the owned tally `K` unchanged.
+`RefreshHudCounterIfChanged` entirely — it now holds zero HUD display state, just
+supplies `CurrentCounterNumerator()` and the triggers. Because every unconditional
+`Refresh()` syncs the cache, no path can leave the gate stale, so the redundant
+follow-up repaint is structurally impossible. Two bonus removals fall out: the
+mode-toggle's `-1` reset is gone (its `RefreshIfChanged` paints + syncs in one step),
+and routing the **discovery event** through the gate also drops the **possession-mode**
+repaint when a discovery leaves the owned tally `K` unchanged.
 
 Behaviour-neutral (identical numbers shown). Pure behavioural C# (net +38/−32 across
 `ItemChecklistHud.cs` + `ItemChecklistMod.cs`); no prefab/art/loc touch. **Verified in-game
@@ -1715,16 +1711,18 @@ bound + persisted, no empty-values warning); the user confirmed the row renders 
 same window), each still ~2.2 ms (no perf regression). Pure behavioural C# + YAML; no prefab/art
 touch.
 
-**Follow-up (iter-38.1): DIAG cadence fields.** The verification pain above — reading the cadence
-only by *counting* scan lines because Player.log carries no timestamps and the DIAG line omitted the
-frequency — motivated a small enhancement of the Iter-30 diagnostic. `PossessionScanner`'s DIAG scan
-line gained two fields: `interval={ScanIntervalSeconds:F0}s` (the configured value) and
-`dt={seconds-since-the-previous-diag-scan:F2}s` (the *realized* cadence, from a static `_lastScanRt`
-anchor). Now a scan reads `… interval=3s dt=3,01s …`, so a changed setting is **self-verifying**
-(configured vs. actual) instead of inferred from line counts — and a divergence would catch a timer
-that failed to pick up the new value. Diag-only, default-off (zero overhead when off); the first line
-after enabling shows `dt=0` (no prior sample — same "first line is special" character as the cold-start
-`total` outlier). Pure behavioural C#; no prefab/art/loc touch.
+**Follow-up (iter-38.1): DIAG cadence fields.** The verification pain above — reading
+the cadence only by *counting* scan lines because Player.log carries no timestamps and
+the DIAG line omitted the frequency — motivated a small enhancement of the Iter-30
+diagnostic. `PossessionScanner`'s DIAG scan line gained two fields:
+`interval={ScanIntervalSeconds:F0}s` (the configured value) and
+`dt={seconds-since-the-previous-diag-scan:F2}s` (the *realized* cadence, from a static
+`_lastScanRt` anchor). Now a scan reads `… interval=3s dt=3,01s …`, so a changed setting
+is **self-verifying** (configured vs. actual) instead of inferred from line counts — and
+a divergence would catch a timer that failed to pick up the new value. Diag-only,
+default-off (zero overhead when off); the first line after enabling shows `dt=0` (no
+prior sample — same "first line is special" character as the cold-start `total`
+outlier). Pure behavioural C#; no prefab/art/loc touch.
 
 **Iter-39 (Craftable filter misclassifies cooked dishes) — DONE (2026-07-13, branch
 `iter-39`).** A user-reported bug: cooked dishes (Gerichte) sat in the **Not craftable**
@@ -1807,17 +1805,18 @@ still fell 402 → ~200 because base containers unload while the base **workbenc
 (anchors 45–46 while `near`/`ledgerC` dropped). The `180 < ImmediateLoadRadius (200)` premise
 **conflated "loaded" with "observed"**.
 
-**The code-grounded reconciliation (user-directed research).** The old comment's "200" traces to
-the player's `KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250, ImmediateLoadRadius=200 }`
-(`Pug.ECS.Conversion.decompiled.cs:4985-4990`; named constants `Pug.Base.decompiled.cs:13282-13292`
-`PLAYER_DISTANCE_TO_LOAD=200` …; `defaultSimDistance`/`SimulationDistance` are dead → the bubble is
-not shrinkable by any setting). A measurement build (prune OFF as a control: `K` stayed constant
-→ proving the prune is the sole cause) logged the effective boundary: base containers leave the
-**observed** scan set at **~91–115** — well below the 200 chunk-load floor, matching no named
-constant (best explanation: DOTS ArchetypeChunk unload granularity + camera-frame offset). So
-**loaded (≤200) ≠ reliably observed (~91)**; the prune infers "unobserved ⇒ destroyed", so it must
-stay below the observation boundary, not the load radius. Distilled in the
-`reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
+**The code-grounded reconciliation (user-directed research).** The old comment's "200"
+traces to the player's `KeepAreaLoadedCD { KeepLoadedRadius=300, StartLoadRadius=250,
+ImmediateLoadRadius=200 }` (`Pug.ECS.Conversion.decompiled.cs:4985-4990`; named
+constants `Pug.Base.decompiled.cs:13282-13292` `PLAYER_DISTANCE_TO_LOAD=200` …;
+`defaultSimDistance`/`SimulationDistance` are dead → the bubble is not shrinkable by any
+setting). A measurement build (prune OFF as a control: `K` stayed constant → proving the
+prune is the sole cause) logged the effective boundary: base containers leave the
+**observed** scan set at **~91–115** — well below the 200 chunk-load floor, matching no
+named constant (best explanation: DOTS ArchetypeChunk unload granularity + camera-frame
+offset). So **loaded (≤200) ≠ reliably observed (~91)**; the prune infers "unobserved ⇒
+destroyed", so it must stay below the observation boundary, not the load radius.
+Distilled in the `reference_ck_entity_load_observe_radii` memory + `docs/gotchas.md`.
 
 **The fix — an airtight, two-condition self-heal prune.** A remembered tile is pruned iff it
 **would be counted this scan if a container were still there** — i.e. `dist(tile, player) ≤ 48`
@@ -2088,26 +2087,28 @@ transient over-count, the direction this codebase has repeatedly chosen). Known 
 in place: two containers on one tile with only one observed still shrinks the unobserved one —
 retiring that needs real provenance in the stored record, i.e. a schema change.
 
-**I5 — nothing that destroys data was reported.** Not the prune's removals, not the whole-file
-discard, not a null read, and the per-scan `ledgerC` was printed only *after* every mutation and
-only under a default-off flag, so a collapse was visible solely by hand-diffing two consecutive
-lines. New `PossessionIncidentStore` (modelled on `PhantomViolationStore`, same rationale one tier
-more serious) persists incidents to `mods/ItemChecklist/possession-incidents.txt`, **ungated by
-`ModConfig.Diagnostics`** — a data-loss report that only appears once someone already suspected a
-problem reports nothing when it matters. Deduped by a caller-supplied key, capped at 200 lines (the
+**I5 — nothing that destroys data was reported.** Not the prune's removals, not the
+whole-file discard, not a null read, and the per-scan `ledgerC` was printed only *after*
+every mutation and only under a default-off flag, so a collapse was visible solely by
+hand-diffing two consecutive lines. New `PossessionIncidentStore` (modelled on
+`PhantomViolationStore`, same rationale one tier more serious) persists incidents to
+`mods/ItemChecklist/possession-incidents.txt`, **ungated by `ModConfig.Diagnostics`** —
+a data-loss report that only appears once someone already suspected a problem reports
+nothing when it matters. Deduped by a caller-supplied key, capped at 200 lines (the
 Iter-28 unbounded-store lesson), timestamps from `Time.realtimeSinceStartup` rather than
-`System.DateTime` (unproven sandbox surface; not worth a whole-mod compile failure for a log
-field). The DIAG line now reports the **transition**: `ledgerC=<before>-><after>
+`System.DateTime` (unproven sandbox surface; not worth a whole-mod compile failure for a
+log field). The DIAG line now reports the **transition**: `ledgerC=<before>-><after>
 pairs=<before>-><after> pruned= shrunk= lostUnits=` — a single line reading
-`ledgerC=505->505 lostUnits=2677` would have made Iter-42 self-evident on the first far-from-base
-load. **The incident trigger was the hardest design call:** a confirmed shrink is *normal* (emptying
-a chest legitimately drops its whole content), so neither a unit threshold nor "any shrink" works
-without false positives — and a false alarm here would be worse than none. The chosen shape is one
-that cannot occur in normal play: **units lost on ≥5 tiles inside a single 3 s scan** (nobody empties
-five chests at once; the Iter-42 sweep hit exactly five). Plus two entry-path fixes: the
-`ResolveWorld` null case logged nothing ever (one warning per session now), and the max-count world
-pick started at `-1`, letting a world with **zero** `ContainedObjectsBuffer` entities win — it starts
-at 0 now, since the player entity always carries one.
+`ledgerC=505->505 lostUnits=2677` would have made Iter-42 self-evident on the first
+far-from-base load. **The incident trigger was the hardest design call:** a confirmed
+shrink is *normal* (emptying a chest legitimately drops its whole content), so neither a
+unit threshold nor "any shrink" works without false positives — and a false alarm here
+would be worse than none. The chosen shape is one that cannot occur in normal play:
+**units lost on ≥5 tiles inside a single 3 s scan** (nobody empties five chests at once;
+the Iter-42 sweep hit exactly five). Plus two entry-path fixes: the `ResolveWorld` null
+case logged nothing ever (one warning per session now), and the max-count world pick
+started at `-1`, letting a world with **zero** `ContainedObjectsBuffer` entities win —
+it starts at 0 now, since the player entity always carries one.
 
 **Verified in-game (1.2.1.5, fake-ID 9999997).** Build: 0 `error CS`, and the new
 `PossessionIncidentStore.cs` reached both the install `Scripts/` **and** the generated
@@ -2116,12 +2117,12 @@ file, since a missing manifest entry fails the *sandbox* compile invisibly to th
 Runtime: `Successfully compiled ItemChecklist safetyCheck=True`, 0 `CompileFailed`, 0 NRE.
 
 Four behavioural checks, all read from the ledger FILE rather than the UI:
-- **The Iter-42 regression holds:** all **21/21** formerly-deleted nature ids are present, Stalagmite
-  still exactly `1129`.
-- **The shrink is still honoured** — the check aimed at *this* iteration's own risk, not the old bug:
-  over-merging would have turned a deletion bug into a phantom-ownership bug. Real deltas across a
-  session: `1001: 814→764` (−50), `1610: 6683→6583` (−100), `301: +12`. Ordinary withdrawals and one
-  deposit, tracked exactly.
+- **The Iter-42 regression holds:** all **21/21** formerly-deleted nature ids are
+  present, Stalagmite still exactly `1129`.
+- **The shrink is still honoured** — the check aimed at *this* iteration's own risk, not
+  the old bug: over-merging would have turned a deletion bug into a phantom-ownership
+  bug. Real deltas across a session: `1001: 814→764` (−50), `1610: 6683→6583` (−100),
+  `301: +12`. Ordinary withdrawals and one deposit, tracked exactly.
 - **Pruning still runs:** 8 tiles removed / 7 added in a single write interval. This retired a real
   suspicion — the ledger had grown 504 → 681 tiles over ~1.5 h of play, which is what blocked
   cleanup would also look like; the removals prove the growth is newly-claimed base area, not
@@ -2133,14 +2134,15 @@ Four behavioural checks, all read from the ledger FILE rather than the UI:
 Pure behavioural C# + one new file; no prefab/art/loc touch, no schema change (the v3 marker is
 unchanged, so no migration and no player re-scan).
 
-**Iter-44 (possession subsystem — the shape, not the next point fix) — DONE (2026-07-31, branch
-`iter-44`).** Not a user report either: this is the **stock-take** the Iter-43 gate forced, then
-acted on. The chain to that point was Iter-42 fixing a data-loss bug → its review finding four more
-→ Iter-43 fixing those and **introducing three new Criticals of the same class** → the Iter-43 gate
-finding those, with three of four independent reviewers converging on one root cause. The user's call
-was to stop point-fixing and change the shape. Three further review rounds ran on the rebuild itself
-(ten agent reviews in total across the iteration), each finding real defects; the entry below is
-organised by what changed, with the measurement that forced each change.
+**Iter-44 (possession subsystem — the shape, not the next point fix) — DONE (2026-07-31,
+branch `iter-44`).** Not a user report either: this is the **stock-take** the Iter-43
+gate forced, then acted on. The chain to that point was Iter-42 fixing a data-loss bug →
+its review finding four more → Iter-43 fixing those and **introducing three new
+Criticals of the same class** → the Iter-43 gate finding those, with three of four
+independent reviewers converging on one root cause. The user's call was to stop
+point-fixing and change the shape. Three further review rounds ran on the rebuild itself
+(ten agent reviews in total across the iteration), each finding real defects; the entry
+below is organised by what changed, with the measurement that forced each change.
 
 **The core: one record, one entry point.** `_containers` + `_auxContainers` — two parallel per-tile
 dicts kept in step by hand — became one `TileEntry { Contents, Aux }`, and the three writers
@@ -2154,142 +2156,164 @@ part:
   and one of them was the *player-near AND anchor-covered* predicate that AUTHORIZES a destructive
   decision, written out twice: an `&&` chain in the caller and two early-`continue`s in the prune.
   Two copies of that, in a codebase with no automated tests.
-- **`BeginScan` / `Publish` / `PruneStaleNear` over ledger-held scan state.** This is where the
-  harness (below) found that a `Publish` **after** the prune could still shrink: `_scan.Active` was a
-  warning trigger and not part of the authorization. Patching the condition was not the lesson —
-  a multi-call protocol cannot be enforced at compile time in this language subset. With one entry
-  point, "no scan is open" and "the prune was skipped" stop being representable, and `Vector2` +
-  `pruneRadius` also retired three adjacent interchangeable `float` parameters where a transposition
-  would have been silent and destructive.
+- **`BeginScan` / `Publish` / `PruneStaleNear` over ledger-held scan state.** This is
+  where the harness (below) found that a `Publish` **after** the prune could still
+  shrink: `_scan.Active` was a warning trigger and not part of the authorization.
+  Patching the condition was not the lesson — a multi-call protocol cannot be enforced
+  at compile time in this language subset. With one entry point, "no scan is open" and
+  "the prune was skipped" stop being representable, and `Vector2` + `pruneRadius` also
+  retired three adjacent interchangeable `float` parameters where a transposition would
+  have been silent and destructive.
 
-**C-1 (the defect that opened the iteration): `containerTiles` cannot be a universal confirmation
-predicate.** It is filled only in the `isContainer` branch, and cattle colour aux is keyed to a
-*station* tile (which carries `CraftingCD`), so for cattle the flag was **structurally always
-false** — a pen losing its last animal of a colour, or a placeable repainted A→B, kept the stale key
-forever, serialized, surviving restarts, permanently inflating the Iter-36 owned counter `K` against
-Iter-41's "own ≥1 right now" contract. (Paint is only *usually* false: a **paintable container**
-writes its paint aux and adds its own tile in the same two branches, so that one subset was never
-frozen — an absolute that survived two review rounds before being scoped.) The shipped rule: a
-dimension may shrink only past the streaming grace AND on evidence for *itself* — contents when a
-container was observed on the tile OR the tile is one the scan would have seen anything on; aux only
-on the second test, because "some aux was observed here" would authorize dropping one producer's keys
-because a different one was seen, which is C-1's own shape one level down.
+**C-1 (the defect that opened the iteration): `containerTiles` cannot be a universal
+confirmation predicate.** It is filled only in the `isContainer` branch, and cattle
+colour aux is keyed to a *station* tile (which carries `CraftingCD`), so for cattle the
+flag was **structurally always false** — a pen losing its last animal of a colour, or a
+placeable repainted A→B, kept the stale key forever, serialized, surviving restarts,
+permanently inflating the Iter-36 owned counter `K` against Iter-41's "own ≥1 right now"
+contract. (Paint is only *usually* false: a **paintable container** writes its paint aux
+and adds its own tile in the same two branches, so that one subset was never frozen — an
+absolute that survived two review rounds before being scoped.) The shipped rule: a
+dimension may shrink only past the streaming grace AND on evidence for *itself* —
+contents when a container was observed on the tile OR the tile is one the scan would
+have seen anything on; aux only on the second test, because "some aux was observed here"
+would authorize dropping one producer's keys because a different one was seen, which is
+C-1's own shape one level down.
 
-**"One miss is not evidence" — the rule that came out of the second review round.** A count that is
-merely LOWER applies at once (the producer was seen, that is direct evidence). An entry that is
-ABSENT is removed only when the absence is CONFIRMED (a container was observed on the tile, so its
-buffer is authoritative) or when the same key was unconfirmed-absent on the **immediately preceding**
-scan too. This covers the two cases where one scan legitimately misses a producer that still exists:
-a co-located container absent from a single query — the residual the first draft had documented as
-acceptable, now **retired** — and a penned animal briefly outside `AnchorRadius` or mid growth-churn,
-which flickered a colour count to 0 and froze it there if the player then left. Three details are
-load-bearing and each was a review finding: the marks are **per key** (one counter per tile let a
-neighbour's miss spend another key's grace — routine on the aux axis, where a pen keys every colour to
-one tile), **adjacent** via a scan sequence number (otherwise "the previous scan" meant "the previous
-scan that merged this tile", an hour and a teleport earlier), and applied to the **prune as well** —
-without that the rule was cosmetic, because on most tiles the container is the only producer, so a
-flicker leaves the tile unobserved entirely, the merge never runs, and the prune took the whole tile
-in one scan.
+**"One miss is not evidence" — the rule that came out of the second review round.** A
+count that is merely LOWER applies at once (the producer was seen, that is direct
+evidence). An entry that is ABSENT is removed only when the absence is CONFIRMED (a
+container was observed on the tile, so its buffer is authoritative) or when the same key
+was unconfirmed-absent on the **immediately preceding** scan too. This covers the two
+cases where one scan legitimately misses a producer that still exists: a co-located
+container absent from a single query — the residual the first draft had documented as
+acceptable, now **retired** — and a penned animal briefly outside `AnchorRadius` or mid
+growth-churn, which flickered a colour count to 0 and froze it there if the player then
+left. Three details are load-bearing and each was a review finding: the marks are **per
+key** (one counter per tile let a neighbour's miss spend another key's grace — routine
+on the aux axis, where a pen keys every colour to one tile), **adjacent** via a scan
+sequence number (otherwise "the previous scan" meant "the previous scan that merged this
+tile", an hour and a teleport earlier), and applied to the **prune as well** — without
+that the rule was cosmetic, because on most tiles the container is the only producer, so
+a flicker leaves the tile unobserved entirely, the merge never runs, and the prune took
+the whole tile in one scan.
 
-**The critical finding of the third round came from the decompile, not from the mod's own source.**
-CK's `StandaloneFilesystem.Write` ends in `catch (IOException) { Debug.LogError(...) }` with **no
-rethrow**, and its inner `File.Replace`/`File.Move` retry loop gives up after ten attempts with only
-a `LogError`. So disk-full, a locked file, and the Wine faults this project ships six IL patches for
-never reach the mod — the "a failed write is now reported" fix of the previous commit covered only
-the throwing minority. Worse, and **pre-existing since Iter-31**: the FNV cache then recorded "the
-disk holds this" for content never written, so every later save with unchanged content hash-matched
-and was **skipped** — one poisoned entry could suppress saving for the rest of a session, and for pet
-skins `ClearDirty()` cancelled the retry its own placement after the write was meant to guarantee.
-Both stores now read the file back and compare before caching the hash or clearing `Dirty`; the
-incident store verifies its appends for the same reason, being the fallback channel whose only
+**The critical finding of the third round came from the decompile, not from the mod's
+own source.** CK's `StandaloneFilesystem.Write` ends in `catch (IOException) {
+Debug.LogError(...) }` with **no rethrow**, and its inner `File.Replace`/`File.Move`
+retry loop gives up after ten attempts with only a `LogError`. So disk-full, a locked
+file, and the Wine faults this project ships six IL patches for never reach the mod —
+the "a failed write is now reported" fix of the previous commit covered only the
+throwing minority. Worse, and **pre-existing since Iter-31**: the FNV cache then
+recorded "the disk holds this" for content never written, so every later save with
+unchanged content hash-matched and was **skipped** — one poisoned entry could suppress
+saving for the rest of a session, and for pet skins `ClearDirty()` cancelled the retry
+its own placement after the write was meant to guarantee. Both stores now read the file
+back and compare before caching the hash or clearing `Dirty`; the incident store
+verifies its appends for the same reason, being the fallback channel whose only
 justification is durability.
 
-**C-2 / C-3, the two paths the stock-take left open.** C-2: `PossessionIncidentStore` read its own
-file with a helper returning `null` for both "absent" and "unreadable" — the exact conflation
-`StoreLoadStatus` was introduced to end, one file deeper — and then rewrote the file from scratch,
-destroying the incident history, *triggered by the very fault it was reporting*. C-3: neither parser
-can throw, so a file truncated mid-write parsed into a **subset**, was reported as a successful load,
-left the store writable, and the next autosave persisted the subset while the one after took the
-`.pugbackup`. Both parsers now count unaccepted data lines and any such line makes the load FAILED;
-the pet file additionally gained a `#icl-petskins-v1 n=<count>` header, because its lines are ~8
-bytes and delimiter-free, so a cut exactly at a line boundary parsed as a valid *shorter* file —
-roughly 1-in-8, on the one store with no second source. Headerless files stay valid and are marked
-dirty on load so they gain the header, otherwise the detector would have stayed inert precisely for
-the characters with a stable complete collection.
+**C-2 / C-3, the two paths the stock-take left open.** C-2: `PossessionIncidentStore`
+read its own file with a helper returning `null` for both "absent" and "unreadable" —
+the exact conflation `StoreLoadStatus` was introduced to end, one file deeper — and then
+rewrote the file from scratch, destroying the incident history, *triggered by the very
+fault it was reporting*. C-3: neither parser can throw, so a file truncated mid-write
+parsed into a **subset**, was reported as a successful load, left the store writable,
+and the next autosave persisted the subset while the one after took the `.pugbackup`.
+Both parsers now count unaccepted data lines and any such line makes the load FAILED;
+the pet file additionally gained a `#icl-petskins-v1 n=<count>` header, because its
+lines are ~8 bytes and delimiter-free, so a cut exactly at a line boundary parsed as a
+valid *shorter* file — roughly 1-in-8, on the one store with no second source.
+Headerless files stay valid and are marked dirty on load so they gain the header,
+otherwise the detector would have stayed inert precisely for the characters with a
+stable complete collection.
 
-**Detector work, all three of the "the channel exists but cannot see the case it was built for"
-kind.** A **prune channel** now exists, per-scan and cumulative — Iter-43 watched only the shrink
-path while the largest ledger collapse this subsystem has ever MEASURED (Iter-41's `ledgerC` 402→0)
-came through the prune, where nothing but a default-off DIAG line existed. The cumulative one requires
-a **net** decline, because gross removals are healthy churn (Iter-43's own verification measured
-"8 removed / 7 added in one interval" in a session whose ledger GREW 504→681). The batched-scan
-override was 25× less sensitive than the only event of this class ever measured (Iter-42: 5 tiles of
-505; a `tilesBefore/4` bound needs 126), so `firstPostGrace` and "after a gap" were separated and the
-former keeps a low floor. Dedup keys carry the character GUID and bucket by magnitude — the flat
-`":session"` key let one benign five-tile reorganisation silence a later four-hundred-tile collapse,
-and a deduped `Record` reaches no channel at all, not even the log. Iter-43's "cannot false-positive"
-claim was refuted **four** ways, the fourth being CK **automation**, which moves items out of chests
-continuously and is exactly the benign bulk contents event the justification claimed did not exist.
+**Detector work, all three of the "the channel exists but cannot see the case it was
+built for" kind.** A **prune channel** now exists, per-scan and cumulative — Iter-43
+watched only the shrink path while the largest ledger collapse this subsystem has ever
+MEASURED (Iter-41's `ledgerC` 402→0) came through the prune, where nothing but a
+default-off DIAG line existed. The cumulative one requires a **net** decline, because
+gross removals are healthy churn (Iter-43's own verification measured "8 removed / 7
+added in one interval" in a session whose ledger GREW 504→681). The batched-scan
+override was 25× less sensitive than the only event of this class ever measured
+(Iter-42: 5 tiles of 505; a `tilesBefore/4` bound needs 126), so `firstPostGrace` and
+"after a gap" were separated and the former keeps a low floor. Dedup keys carry the
+character GUID and bucket by magnitude — the flat `":session"` key let one benign
+five-tile reorganisation silence a later four-hundred-tile collapse, and a deduped
+`Record` reaches no channel at all, not even the log. Iter-43's "cannot false-positive"
+claim was refuted **four** ways, the fourth being CK **automation**, which moves items
+out of chests continuously and is exactly the benign bulk contents event the
+justification claimed did not exist.
 
-**Also fixed, each a review finding:** the read-only mode is visible at last (a footer marker naming
-*which* store, plus one durable incident per character — Iter-43 built the mechanism and surfaced it
-nowhere, and for pet skins its symptom is indistinguishable from the loss it prevents); `LoadFrom`
-trims data lines, without which a file re-saved with CRLF marked a **healthy** character permanently
-read-only (a lone `\r` lands in the empty aux segment of nearly every line); a zero-byte store file
-counted as a clean, writable, EMPTY store; `_worldNullWarned` is re-armed on every successful resolve;
-the scan runs at most **once per frame** (`Update` has two call sites with no return between them, so
-pressing the toggle on the frame the timer fires ran two scans against an identical ECS world — and
-since the miss rule counts scans, the same read twice voided the delay); and `IReadOnlyDictionary`
-accessors on `TileEntry` were tried and **reverted** in favour of read methods, because the interface
-boxes a heap enumerator per `foreach` — ~1,400 allocations per scan at the measured ledger sizes, in
-the subsystem with three prior perf iterations.
+**Also fixed, each a review finding:** the read-only mode is visible at last (a footer
+marker naming *which* store, plus one durable incident per character — Iter-43 built the
+mechanism and surfaced it nowhere, and for pet skins its symptom is indistinguishable
+from the loss it prevents); `LoadFrom` trims data lines, without which a file re-saved
+with CRLF marked a **healthy** character permanently read-only (a lone `\r` lands in the
+empty aux segment of nearly every line); a zero-byte store file counted as a clean,
+writable, EMPTY store; `_worldNullWarned` is re-armed on every successful resolve; the
+scan runs at most **once per frame** (`Update` has two call sites with no return between
+them, so pressing the toggle on the frame the timer fires ran two scans against an
+identical ECS world — and since the miss rule counts scans, the same read twice voided
+the delay); and `IReadOnlyDictionary` accessors on `TileEntry` were tried and
+**reverted** in favour of read methods, because the interface boxes a heap enumerator
+per `foreach` — ~1,400 allocations per scan at the measured ledger sizes, in the
+subsystem with three prior perf iterations.
 
-**A test harness, for the first time in this repo.** `PossessionLedger` and `PetCollection` are pure
-logic — no ECS, no Harmony, no Unity API beyond `Debug.LogWarning` and `Vector2` — so ~40 lines of
-stubs make them runnable outside the game: `dotnet run --project tests/possession-harness`, 61
-assertions, with the real sources **compiled in** rather than copied. It found two defects that four
-review agents reading the same code did not (the post-prune publish, and the prune lacking the miss
-delay), and it round-trips the real shipped 681-tile ledger byte-identically — the assertion that
-matters most, since a false damage report would put a healthy character's store read-only. Everything
-else about the mod remains in-game-only; `docs/conventions.md § Testing` now carries both.
+**A test harness, for the first time in this repo.** `PossessionLedger` and
+`PetCollection` are pure logic — no ECS, no Harmony, no Unity API beyond
+`Debug.LogWarning` and `Vector2` — so ~40 lines of stubs make them runnable outside the
+game: `dotnet run --project tests/possession-harness`, 61 assertions, with the real
+sources **compiled in** rather than copied. It found two defects that four review agents
+reading the same code did not (the post-prune publish, and the prune lacking the miss
+delay), and it round-trips the real shipped 681-tile ledger byte-identically — the
+assertion that matters most, since a false damage report would put a healthy character's
+store read-only. Everything else about the mod remains in-game-only;
+`docs/conventions.md § Testing` now carries both.
 
-**The last defect was found by the in-game verification, not by any review.** The ledger diff over one
-save interval showed ~12 aux-only tiles removed and ~12 added against only 11 such tiles in
-existence — essentially all of them hopping, continuously — and the per-colour sums drifting **up**
-(cow/colour-2 2→4, goat/colour-1 5→6). Iter-41 had keyed penned-cattle aux to the anchor *nearest the
-animal*, calling it "a stable per-pen location (anchors don't move)": the anchors do not, the animal
-does. That had silently broken the Iter-31 save-write-skip for farm bases ever since, and once the
-miss delay existed it also double-counted colours. All cattle aux now goes to the **lowest packed
-anchor key of the scan** — deterministic and independent of where the animals stand; the locality was
-safe to give up because no reader looks at an aux tile's coordinates.
+**The last defect was found by the in-game verification, not by any review.** The ledger
+diff over one save interval showed ~12 aux-only tiles removed and ~12 added against only
+11 such tiles in existence — essentially all of them hopping, continuously — and the
+per-colour sums drifting **up** (cow/colour-2 2→4, goat/colour-1 5→6). Iter-41 had keyed
+penned-cattle aux to the anchor *nearest the animal*, calling it "a stable per-pen
+location (anchors don't move)": the anchors do not, the animal does. That had silently
+broken the Iter-31 save-write-skip for farm bases ever since, and once the miss delay
+existed it also double-counted colours. All cattle aux now goes to the **lowest packed
+anchor key of the scan** — deterministic and independent of where the animals stand; the
+locality was safe to give up because no reader looks at an aux tile's coordinates.
 
-**Verified in-game (1.2.1.5, fake-ID 9999997), reading the ledger FILE and the DIAG sequence rather
-than the UI.** `safetyCheck=True`, 0 `CompileFailed`, 0 NRE. The Iter-42 regression holds (no unit
-loss across the observed intervals). Contents shrink still works (`shrunkC=1 lostUnits=1` ×3,
-`lostUnits=3` once). **The prune delay is provable from the sequence rather than a constructed test:**
-the first scan with base contact pruned **0** with 551 tiles in range, and the one-off cleanup of the
-old scattered cattle tiles then spread across five consecutive scans (1, 18, 4, 1, 35) — exactly what
-"two adjacent stale scans per tile" produces, where no delay would have dropped everything at once.
-Those 60 removals were legitimate: `pruned=0` for the following 37 scans and the tile count stayed at
-495, and a wrongly pruned tile whose object still exists reappears on the very next scan. The cattle
-fix is confirmed to the byte: between the last two saves **0 tiles added, 0 removed, 0 units changed**,
-the colour sums **identical** (cow/2=2, goat/0=3, goat/1=4, roly/0=1, roly/1=3, roly/2=1), all base
-cattle aux on ONE tile, and the three remaining aux-only tiles ~300 tiles away at a second pen,
-correctly untouched. `possession-incidents.txt` stayed **absent** — no false alarm despite those 60
-prunes, which the gross version of the cumulative detector would have reported. The pet-skin header
-upgrade landed for real: the file now starts `#icl-petskins-v1 n=20` over 20 data lines while its
-`.pugbackup` still holds the headerless legacy format. Scan cost 1–8.7 ms at base with ~940 entities
-in anchor range, and `DIAG save SKIPPED unchanged` reappeared, i.e. the read-back verification did not
-break the save-skip and the cattle fix restored it. **Not exercised:** the same-frame double scan (the
-observed hotkey scan came 1 s after the timer scan, a different frame, so the dedup correctly did not
-suppress it; hitting the same frame needs ~1/180 luck at a 3 s interval).
+**Verified in-game (1.2.1.5, fake-ID 9999997), reading the ledger FILE and the DIAG
+sequence rather than the UI.** `safetyCheck=True`, 0 `CompileFailed`, 0 NRE. The Iter-42
+regression holds (no unit loss across the observed intervals). Contents shrink still
+works (`shrunkC=1 lostUnits=1` ×3, `lostUnits=3` once). **The prune delay is provable
+from the sequence rather than a constructed test:** the first scan with base contact
+pruned **0** with 551 tiles in range, and the one-off cleanup of the old scattered
+cattle tiles then spread across five consecutive scans (1, 18, 4, 1, 35) — exactly what
+"two adjacent stale scans per tile" produces, where no delay would have dropped
+everything at once. Those 60 removals were legitimate: `pruned=0` for the following 37
+scans and the tile count stayed at 495, and a wrongly pruned tile whose object still
+exists reappears on the very next scan. The cattle fix is confirmed to the byte: between
+the last two saves **0 tiles added, 0 removed, 0 units changed**, the colour sums
+**identical** (cow/2=2, goat/0=3, goat/1=4, roly/0=1, roly/1=3, roly/2=1), all base
+cattle aux on ONE tile, and the three remaining aux-only tiles ~300 tiles away at a
+second pen, correctly untouched. `possession-incidents.txt` stayed **absent** — no false
+alarm despite those 60 prunes, which the gross version of the cumulative detector would
+have reported. The pet-skin header upgrade landed for real: the file now starts
+`#icl-petskins-v1 n=20` over 20 data lines while its `.pugbackup` still holds the
+headerless legacy format. Scan cost 1–8.7 ms at base with ~940 entities in anchor range,
+and `DIAG save SKIPPED unchanged` reappeared, i.e. the read-back verification did not
+break the save-skip and the cattle fix restored it. **Not exercised:** the same-frame
+double scan (the observed hotkey scan came 1 s after the timer scan, a different frame,
+so the dedup correctly did not suppress it; hitting the same frame needs ~1/180 luck at
+a 3 s interval).
 
-**Process.** Ten agent reviews across three rounds, plus the harness, plus two in-game rounds. The
-refutations were as valuable as the findings — several of my own suspicions did not survive checking,
-and two of my *own* intermediate conclusions during verification were wrong because I read a log and
-a ledger while the game was still writing them (documented in `docs/gotchas.md § Iter-44`). No schema
-change for the ledger (the v3 marker is untouched, so no migration and no player re-scan); the pet
-file gains a header backward-compatibly.
+**Process.** Ten agent reviews across three rounds, plus the harness, plus two in-game
+rounds. The refutations were as valuable as the findings — several of my own suspicions
+did not survive checking, and two of my *own* intermediate conclusions during
+verification were wrong because I read a log and a ledger while the game was still
+writing them (documented in `docs/gotchas.md § Iter-44`). No schema change for the
+ledger (the v3 marker is untouched, so no migration and no player re-scan); the pet file
+gains a header backward-compatibly.
 
 **Iter-45 (possession provenance — stored vs placed, ledger v4) — DONE (2026-07-31, branch
 `iter-45`).** Two of the three residuals Iter-44 left open, done together because both are format
@@ -2369,14 +2393,15 @@ was always correct, only the WORDING was. So the reverse index counts both prove
 provenance is a real location), a container-only count feeds the wording, and the hint line has
 three cases — "in N chests" / "placed at N spots" / "N locations".
 
-**Also from the reviews:** under the v4 marker the count line is now MANDATORY, because treating its
-absence as "accepted unchecked" let a file cut to its first line load as a clean, WRITABLE, EMPTY
-ledger — the Iter-42 symptom with a green light on it; `Serialize` builds its data lines before
-declaring the count, so the "unreachable" empty-entry guard can no longer make a file self-report as
-damaged and stop the character saving; and every data line that yields no tile is subtracted from the
-count check, so a malformed line is reported once rather than twice — including a line that merges
-into an existing tile, where the naive check read a concatenated file as damaged although the merge
-path exists to salvage exactly that.
+**Also from the reviews:** under the v4 marker the count line is now MANDATORY, because
+treating its absence as "accepted unchecked" let a file cut to its first line load as a
+clean, WRITABLE, EMPTY ledger — the Iter-42 symptom with a green light on it;
+`Serialize` builds its data lines before declaring the count, so the "unreachable"
+empty-entry guard can no longer make a file self-report as damaged and stop the
+character saving; and every data line that yields no tile is subtracted from the count
+check, so a malformed line is reported once rather than twice — including a line that
+merges into an existing tile, where the naive check read a concatenated file as damaged
+although the merge path exists to salvage exactly that.
 
 **Harness: 89 assertions.** The migration test no longer passes `containers` — both reviewers caught
 that it forced the one case where the correction looks atomic, i.e. it asserted a behaviour the

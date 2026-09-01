@@ -246,15 +246,14 @@ debug scaffold *in front of* the reviewed core — then remove it via
 reviewed version.
 
 Iter-3.8 example: reaching the end of the list (~10,720 entries at Iter-3.8;
-~11,119 today) by scrolling takes
-too long to verify flush-geometry on the last row. A throwaway
-`DebugDiscoveredOnly` index-remap was added in front of the recycler
-(`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of the list
-reachable in seconds while exercising the identical flush-geometry path. The
-scaffold lived only in uncommitted working-tree edits; the reviewed row logic
-was already committed, so a `git restore` of the modified `.cs` removed the
-scaffold cleanly without touching reviewed code. (The same remap can later
-seed the real Iter-8 discovered-only filter.)
+~11,119 today) by scrolling takes too long to verify flush-geometry on the last
+row. A throwaway `DebugDiscoveredOnly` index-remap was added in front of the
+recycler (`catalogIdx = _useMap ? _indexMap[idx] : idx`), making any slice of
+the list reachable in seconds while exercising the identical flush-geometry
+path. The scaffold lived only in uncommitted working-tree edits; the reviewed
+row logic was already committed, so a `git restore` of the modified `.cs`
+removed the scaffold cleanly without touching reviewed code. (The same remap can
+later seed the real Iter-8 discovered-only filter.)
 
 Rule: scaffolds never get committed onto a *story* commit. In the **main
 checkout**, add them to the working tree, use them, then `git restore` before
@@ -547,13 +546,12 @@ undiscovered rows instead of the real item. Mechanism in `docs/architecture.md
 
 **Drive transient hover/selection visuals per-frame in `LateUpdate`, not the
 one-shot `OnSelected`/`OnDeselected` (Iter-22).** A highlight set from
-`OnSelected` and cleared from `OnDeselected` can leave a **stuck** highlight: the
-cursor can move onto an overlay without firing a selection change, so the deselect
-is skipped. Recompute the visual every frame instead
-(`highlight = selected && PointerInViewport()`), with an idempotent
-`if (highlight.enabled != show)` guard. `UIelement.LateUpdate` is `protected
-virtual`, so it is safely overridable (call `base.LateUpdate()` as the base
-contract requires).
+`OnSelected` and cleared from `OnDeselected` can leave a **stuck** highlight:
+the cursor can move onto an overlay without firing a selection change, so the
+deselect is skipped. Recompute the visual every frame instead (`highlight =
+selected && PointerInViewport()`), with an idempotent `if (highlight.enabled !=
+show)` guard. `UIelement.LateUpdate` is `protected virtual`, so it is safely
+overridable (call `base.LateUpdate()` as the base contract requires).
 
 **Match the exact CK virtual signature before overriding — grep the decompile
 first (Iter-22).** A CK override must mirror the base signature *exactly* (e.g.
@@ -632,13 +630,12 @@ old GO's list. References elsewhere (other components' serialized fields) are by
 `CharacterMarkBlinker.sr` needed no rewire (see the Iter-14.1 entry in
 `docs/iteration-history.md`).
 
-**Inspect prefab structure with the parser, not grep.**
-`utils/prefab_query.py <prefab> tree [Name]` prints the GameObject hierarchy
-(from a named GO, or all roots when omitted), marking `[inactive]` GOs. Added
-Iter-13 to verify prefab-**variant** structure, where grep/awk over the variant
-YAML is unreliable (variant fileID reassignment + stripped-object stubs defeat
-line-by-line greps). Use the structured loader/`tree` output instead — see
-`docs/gotchas.md`.
+**Inspect prefab structure with the parser, not grep.** `utils/prefab_query.py
+<prefab> tree [Name]` prints the GameObject hierarchy (from a named GO, or all
+roots when omitted), marking `[inactive]` GOs. Added Iter-13 to verify
+prefab-**variant** structure, where grep/awk over the variant YAML is unreliable
+(variant fileID reassignment + stripped-object stubs defeat line-by-line greps).
+Use the structured loader/`tree` output instead — see `docs/gotchas.md`.
 
 **Skeleton + one-level sibling variants for "same chrome, different contents."**
 When several UI elements share one chrome but differ in contents, author one base
