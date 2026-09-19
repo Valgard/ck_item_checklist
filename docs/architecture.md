@@ -1446,17 +1446,24 @@ variationUpdateCount = 0, auxDataIndex = 0 }`. Precedent: Item Browser's
 `ItemBrowserSlot : SlotUIBase` does exactly this for catalog items not in any
 inventory.
 
-### Selection is re-derived from the raycast every frame
+### Selection is owned by the raycast, and re-derived only when a gate opens
 
-`UIMouse.UpdateMouseUIInput()` (~355773) re-runs `Physics.RaycastNonAlloc`
-against `UILayerMask` every frame and `TrySelectNewElement` — so
-`currentSelectedUIElement` is owned by the raycast, and a manually-assigned
-selection is clobbered on the next frame. Selectability of a `UIelement`
-requires a 3D collider **on the same GameObject** (where `UIMouse`'s
-`GetComponent<UIelement>()` resolves), on the **UI layer**, passing
+`UIMouse.UpdateMouseUIInput()` (~355773) re-runs the UI-layer raycast through
+`Manager.physics.RaycastNonAlloc` on every frame it runs (at most once per
+frame); whether it then calls `TrySelectNewElement` is gated (~355919) on the
+pointer having moved, nothing being selected, the selection having become
+invisible, no visible `UIelement` under the ray, a button press, or a gamepad.
+So `currentSelectedUIElement` is owned by the raycast, and a manually-assigned
+selection is clobbered as soon as that gate next opens — but not, as this
+section said from Iter-22 until now, on the next frame regardless. Selectability
+of a `UIelement` requires a 3D collider **on the same GameObject** (where
+`UIMouse`'s `GetComponent<UIelement>()` resolves), on the **UI layer**, passing
 `isVisibleOnScreen` (active + enabled + non-zero lossy scale). There is **no**
-`isSelectable` flag — presence of the collider on a visible UI-layer GO *is* the
-gate. (Reusable for any further CK-UI hover/selection work; done in Iter-17.)
+`isSelectable` flag — presence of the collider on a visible UI-layer GO *is*
+what makes an element selectable **by the pointer** — the same fact the gate
+above states from the other side, as `uIelement2 != null`. Code can select any
+`UIelement`, collider or not. (Reusable for any further CK-UI hover/selection work;
+done in Iter-17.)
 
 ### ItemChecklist wiring
 
