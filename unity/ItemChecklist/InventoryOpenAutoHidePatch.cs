@@ -12,7 +12,7 @@ namespace ItemChecklist
     /// to it. When a Vanilla menu opens while our checklist is showing, hide
     /// the checklist so the two never overlap.
     ///
-    /// Deliberately a bare <c>HideUI()</c>, NOT HideAllInventoryAndCraftingUI:
+    /// Deliberately a bare <c>HideUI()</c>, NOT TryHideAllInventoryAndCraftingUI:
     /// we are inside the open of the Vanilla menu, so a full hide would close
     /// the menu being opened. The short-lived dangling
     /// <c>UserInterfaceModule.currentInterface</c> is harmless — the

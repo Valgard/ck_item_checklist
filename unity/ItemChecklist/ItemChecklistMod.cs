@@ -42,7 +42,7 @@ namespace ItemChecklist
         // Always-on HUD counter prefab, captured in ModObjectLoaded and
         // instantiated lazily in Update once the UIManager exists. NOT routed
         // through CoreLib's modal RegisterModUI (which hides on
-        // HideAllInventoryAndCraftingUI — the opposite of an always-on HUD).
+        // TryHideAllInventoryAndCraftingUI — the opposite of an always-on HUD).
         private static GameObject hudPrefab;
 
         // Iter-40: tracker arrow HUD prefab, captured in ModObjectLoaded, instantiated
@@ -489,7 +489,7 @@ namespace ItemChecklist
             {
                 // Fully inert: close the window if open, and skip scan + HUD work.
                 if (ItemChecklist.UI.ItemChecklistWindow.Instance != null && ItemChecklist.UI.ItemChecklistWindow.Instance.Root.activeSelf)
-                    Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false);
+                    Manager.ui.TryHideAllInventoryAndCraftingUI(forceClose: false);
                 return;
             }
 
@@ -650,14 +650,21 @@ namespace ItemChecklist
                 if (checklistOpen)
                 {
                     // Close via the exact E/ESC path: CoreLib's postfix on
-                    // HideAllInventoryAndCraftingUI hides our window AND clears
+                    // TryHideAllInventoryAndCraftingUI hides our window AND clears
                     // UserInterfaceModule.currentInterface. forceClose:false
                     // mirrors PlayerController.CloseAnyOpenInventory(). A bare
                     // HideUI() here would leave currentInterface dangling with
                     // no Vanilla menu to cover it, freezing the player in menu
                     // state (isAnyInventoryShowing stuck true).
+                    //
+                    // 1.3 renamed this from HideAllInventoryAndCraftingUI and gave it
+                    // a bool return: with forceClose:false it now hides NOTHING and
+                    // returns false while the mouse is in QuickTrash or Locking mode,
+                    // so the window stays open until the next keypress. Accepted --
+                    // forcing the close would reintroduce the dangling-interface bug
+                    // this whole comment is about.
                     Debug.Log("[ItemChecklist] Hotkey — closing UI");
-                    Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false);
+                    Manager.ui.TryHideAllInventoryAndCraftingUI(forceClose: false);
                 }
                 // Guard: not actually playing in a world (world-load screen or
                 // exit-to-menu fade — the Iter-15 loading-screen bug class, shared

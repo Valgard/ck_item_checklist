@@ -69,7 +69,7 @@ UI stack in general.
    **not** CoreLib's `currentInterface`, which the auto-hide patch can leave
    transiently stale):
    - window visible → close via
-     `Manager.ui.HideAllInventoryAndCraftingUI(forceClose: false)` (the same
+     `Manager.ui.TryHideAllInventoryAndCraftingUI(forceClose: false)` (the same
      path Escape/E use — see Close path);
    - else a Vanilla menu/inventory is open, a text field/chat is focused, or the
      world is not playable (`Manager.menu.IsAnyMenuActive()` /
@@ -89,9 +89,9 @@ UI stack in general.
 **Close path (Escape / E / F1 → hidden window):**
 
 7. Player presses Escape or E, **or** F1 while the window is open →
-   `HideAllInventoryAndCraftingUI` is called (F1 via the Iter-4 toggle,
+   `TryHideAllInventoryAndCraftingUI` is called (F1 via the Iter-4 toggle,
    with `forceClose: false` to mirror `PlayerController.CloseAnyOpenInventory`).
-8. CoreLib's postfix on `HideAllInventoryAndCraftingUI` calls
+8. CoreLib's postfix on `TryHideAllInventoryAndCraftingUI` calls
    `IModUI.HideUI()` for every registered mod UI **and** clears
    `UserInterfaceModule.currentInterface` (via `ClearModUIData`). Clearing
    it releases the player from menu-state — a bare `HideUI()` on the F1-close
@@ -106,7 +106,7 @@ postfixes `UIManager.OnPlayerInventoryOpen` — the single funnel every Vanilla
 inventory/crafting/vendor open routes through (plain TAB via
 `PlayerController.OpenPlayerInventory`; chests/stations/vendors via wrappers
 that all delegate to it). If the checklist is visible when a Vanilla menu
-opens, it calls a **bare** `HideUI()` (not `HideAllInventoryAndCraftingUI`,
+opens, it calls a **bare** `HideUI()` (not `TryHideAllInventoryAndCraftingUI`,
 which would re-close the just-opening menu). The briefly-dangling
 `currentInterface` is harmless: the Vanilla menu covers it and its close
 clears it, and the F1 toggle reads `Root.activeSelf`, not `currentInterface`.
