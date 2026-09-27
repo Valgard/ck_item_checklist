@@ -29,11 +29,11 @@ overrides it. What this mod's five settings *are* is the `ModConfig` row in
 
 Discovery state is split across four collaborating classes: `ItemCatalog` (the
 catalog of every discoverable item, baked once per world-load),
-`DiscoveredState` (the in-memory mirror of the character's discoveries), and
-two Harmony postfixes that feed it. Driving them is a load order in which
-three steps sit where they do because the obvious earlier place throws — the
-bake in particular hangs off `PlayerController.OnOccupied`, never off
-`IMod.Init`.
+`DiscoveredState` (the in-memory mirror of the character's discoveries), and two
+Harmony postfixes that feed it. Driving them is a load order in which three
+steps sit where they do because the obvious earlier place throws — the bake in
+particular hangs off `PlayerController.OnSpawn` (`OnOccupied` before CK 1.3),
+never off `IMod.Init`.
 
 `docs/architecture.md` carries all of it, and is **deliberately not an
 `@`-reference**: § Mod Lifecycle for the load order and the bake anchor,

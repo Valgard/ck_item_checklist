@@ -17,7 +17,7 @@ namespace ItemChecklist
     // IMPORTANT (learned the hard way): Harmony can only patch trusted GAME-DLL types
     // (Pug.Other: InputManager, TextInputField…), NOT the mod's own Roslyn-compiled
     // types. Patching ItemChecklistWindow/SearchBar throws "patching failed: unknown
-    // assembly" and aborts PatchAll for the WHOLE mod (no OnOccupied bake → empty
+    // assembly" and aborts PatchAll for the WHOLE mod (no OnSpawn bake → empty
     // catalog). So the two mod-side hooks below are PLAIN CALLS from mod code
     // (SearchBar.LateUpdate → DetectFrame, ItemChecklistWindow.ShowUI → Record),
     // never Harmony patches. Only CK types are patched here.

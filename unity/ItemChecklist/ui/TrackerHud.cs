@@ -77,7 +77,7 @@ namespace ItemChecklist.UI
                 // Explicit visibility (never CalcGameplayUITargetScaleMultiplier — (0,0,0) for
                 // mod HUDs, per Iter-11.5). Shown only while actually tracking, in gameplay.
                 // Gate on WorldState.IsInPlayableWorld (the sibling ItemChecklistHud's gate),
-                // NOT isInGame && player != null: the player exists at OnOccupied while the load
+                // NOT isInGame && player != null: the player exists at OnSpawn while the load
                 // screen is still up and survives the exit transition (Iter-11.6/15), so a raw
                 // player-null check lets the arrows flash over a teleport / Save-&-Quit fade.
                 bool show =

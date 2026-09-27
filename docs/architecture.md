@@ -17,14 +17,16 @@ do because the obvious earlier place throws.
   `UserInterfaceModule.RegisterModUI`.
 - **`IMod.Init`** subscribes the loc-change hook. **No `Bake()` call here** —
   it is too early, `PugDatabase.objectsByType` is still null.
-- **`PlayerController.OnOccupied`** (the "D2 anchor") is Harmony-postfixed to
-  kick the bake coroutine. `Manager.main.player` is non-null by this point,
-  whereas every earlier anchor tried — `PugDatabase.UpdateEntityMonos`,
-  `SaveManager.SetWorldId`, `IMod.Init` — produces an NRE. The postfix launches
-  it via `__instance.StartCoroutine`, and the coroutine waits on
-  `WaitUntil(() => ClientWorldStateSystem.HasRunAtLeastOnce)` before calling
-  `ItemCatalog.Bake()`. **Never call `Bake()` synchronously inside the
-  postfix** — that races ECS world readiness.
+- **`PlayerController.OnSpawn`** (the "D2 anchor"; `OnOccupied` before CK 1.3,
+  which moved the player's spawn logic into this protected override) is
+  Harmony-postfixed to kick the bake coroutine. `Manager.main.player` is
+  non-null by this point, whereas every earlier anchor tried —
+  `PugDatabase.UpdateEntityMonos`, `SaveManager.SetWorldId`, `IMod.Init` —
+  produces an NRE. The postfix launches it via `__instance.StartCoroutine`, and
+  the coroutine waits on `WaitUntil(() =>
+  ClientWorldStateSystem.HasRunAtLeastOnce)` before calling
+  `ItemCatalog.Bake()`. **Never call `Bake()` synchronously inside the postfix**
+  — that races ECS world readiness.
 - **`LocalizationManager.OnLocalizeEvent`** re-bakes synchronously, then
   triggers `ItemChecklistWindow.Instance.RebindRows()`.
 - **`ItemChecklistWindow.Awake`** subscribes `DiscoveredState.Changed` for the
@@ -453,7 +455,7 @@ piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`.
 ### ItemCatalog Four-Loop Bake (Iter-3.7 / Iter-16.1 / Iter-17)
 
 `ItemCatalog.Bake()` runs once per world-load, triggered from the
-`PlayerController.OnOccupied` coroutine (after
+`PlayerController.OnSpawn` coroutine (after
 `ClientWorldStateSystem.HasRunAtLeastOnce`).
 
 **Pre-cache phase** (before the loops):
@@ -515,7 +517,7 @@ on this machine for the full ~11,119-entry bake). Bake time is independent
 of the Iter-3.8 open/render-time work: Iter-3.8 virtualized the row
 *rendering* (the open-latency fix — see § Viewport Virtualization), not the
 catalog bake. The bake still runs once per world-load in the
-`PlayerController.OnOccupied` coroutine.
+`PlayerController.OnSpawn` coroutine.
 
 ### Per-Variation Tracking (Iter-17)
 
@@ -1285,7 +1287,7 @@ isSceneHandlerReady && !Manager.load.IsLoading()`; Iter-15 also appends
 `!cutsceneIsPlaying` to suppress the intro cutscene), which Iter-11.6
 substituted for the original `Manager.main.player != null` term: contrary to the
 earlier assumption, `player != null` does **not** suppress the world-load screen
-(the player object is instantiated at `PlayerController.OnOccupied` *while the
+(the player object is instantiated at `PlayerController.OnSpawn` *while the
 load screen is still up* and survives the exit-to-menu transition, so it is true
 across both load screens). See `docs/gotchas.md § Manager.main.player != null
 does NOT suppress a load screen (Iter-11.6)`.

@@ -6,12 +6,12 @@ using UnityEngine;
 namespace ItemChecklist
 {
     /// <summary>
-    /// Harmony postfix on <c>PlayerController.OnOccupied</c> — the D2 winner
+    /// Harmony postfix on <c>PlayerController.OnSpawn</c> — the D2 winner
     /// from the Iter-3.6 diagnose. Starts a coroutine that waits one frame
     /// (until <c>Manager.main.player</c> is confirmed non-null) before
     /// triggering <see cref="ItemCatalog.Bake"/>. The synchronous-postfix
     /// variant from the original plan-task-6 snippet is insufficient: even
-    /// though <c>Manager.main.player</c> is already non-null at <c>OnOccupied</c>,
+    /// though <c>Manager.main.player</c> is already non-null at <c>OnSpawn</c>,
     /// deferring bake to the next frame gives the ECS client world one update
     /// cycle to process singletons (localization sources, database bank) before
     /// <c>GetObjectName(localize:true)</c> is called.
@@ -27,16 +27,20 @@ namespace ItemChecklist
     /// Keeper game type. It is not accessible from this mod. The equivalent
     /// game-side signal is <c>Manager.main != null &amp;&amp;
     /// Manager.main.player != null</c>; this is already true when
-    /// <c>OnOccupied</c> fires (confirmed empirically by Iter-3.6 diagnose D2c),
+    /// the anchor fires (confirmed empirically by Iter-3.6 diagnose D2c on
+    /// 1.2's <c>OnOccupied</c>; on 1.3 it follows from the decompile, since
+    /// <c>OnSpawn</c> assigns <c>Manager.main.player</c> itself),
     /// so the <c>WaitUntil</c> resolves on the very next frame, producing the
     /// same one-frame ECS-settle guard that ItemBrowser's pattern intends.</para>
     /// <para><strong>CK 1.3:</strong> the player's spawn logic moved from
     /// <c>OnOccupied</c> into a <c>protected override OnSpawn()</c>, and
     /// <c>PlayerController</c> no longer overrides <c>OnOccupied</c> at all. So
     /// the target is named by string — <c>nameof</c> cannot reach a protected
-    /// member — and <c>nameof(PlayerController.OnOccupied)</c> must not come
-    /// back: it still compiles, through the inherited base method, and would
-    /// patch that base for every pooled object. <c>isLocal</c> and
+    /// member. <c>nameof(PlayerController.OnOccupied)</c> is no guard here:
+    /// it still compiles, through the inherited base method, but Harmony
+    /// resolves the target with <c>AccessTools.DeclaredMethod</c>, so on 1.3 it
+    /// fails at patch time ("Undefined target method") — and that failure
+    /// stops every patch class after it, not just this one. <c>isLocal</c> and
     /// <c>Manager.main.player</c> are both assigned inside <c>OnSpawn</c>, so
     /// the postfix sees the same state the old anchor gave it.</para>
     /// </summary>
@@ -66,9 +70,9 @@ namespace ItemChecklist
             // ItemBrowser-internal ISystem, not a Core Keeper game type.
             //
             // Manager.main.player != null is the equivalent world-ready signal:
-            // confirmed non-null at PlayerController.OnOccupied by Iter-3.6
-            // diagnose D2c. The WaitUntil therefore resolves on the first frame
-            // after OnOccupied, giving the ECS client world one update cycle
+            // confirmed non-null at the anchor by Iter-3.6 diagnose D2c (then
+            // OnOccupied; OnSpawn assigns it on 1.3). The WaitUntil therefore resolves on the first frame
+            // after OnSpawn, giving the ECS client world one update cycle
             // (localization singletons, database bank) before Bake() runs.
             yield return new WaitUntil(() => Manager.main != null && Manager.main.player != null);
 

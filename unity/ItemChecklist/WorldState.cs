@@ -8,9 +8,9 @@ namespace ItemChecklist
     /// !Manager.load.IsLoadingAndScreenBlack()</c>).
     ///
     /// <para><strong>Why not <c>Manager.main.player != null</c>:</strong> the
-    /// player object is instantiated at <c>PlayerController.OnOccupied</c> —
+    /// player object is instantiated at <c>PlayerController.OnSpawn</c> —
     /// the very anchor that kicks our catalog bake — which fires while the
-    /// world-load screen is still up, and it survives into the exit-to-menu
+    /// world-load screen is still up (observed on 1.2's <c>OnOccupied</c>), and it survives into the exit-to-menu
     /// transition. So <c>player != null</c> is true across BOTH load screens
     /// and cannot suppress them. The reliable signal is
     /// <c>!Manager.load.IsLoading()</c> (<c>loadingQueue != null</c>), which is

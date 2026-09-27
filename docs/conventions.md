@@ -402,7 +402,7 @@ unity/ItemChecklist/
   ModConfig.cs                    Mod Settings Menu config adapter (Enabled, Mode, AnchorRadius, ScanIntervalSeconds, Diagnostics; ex-possession/PossessionConfig)
   ItemCatalog.cs                  catalog bake + lookup
   ItemCatalogLocChangeHook.cs     Harmony patch — re-bake on language change
-  ItemCatalogWorldLoadHook.cs     Harmony patch — kick bake on world load (OnOccupied)
+  ItemCatalogWorldLoadHook.cs     Harmony patch — kick bake on world load (OnSpawn)
   DiscoveredState.cs              in-memory mirror of CK discovery state
   SaveManagerDiscoveryHook.cs     Harmony patch on SaveManager.SetObjectAsDiscovered
   SaveManagerActiveSelectHook.cs  Harmony patch for active-character resolution

@@ -778,13 +778,15 @@ on `WorldState.IsInPlayableWorld && !Manager.ui.isAnyInventoryShowing &&
 
 ### `Manager.main.player != null` does NOT suppress a load screen (Iter-11.6)
 Iter-11.5 originally gated the HUD on `isInGame && Manager.main.player != null`,
-believing `player != null` kept it off the world-load screen. **It does not** — and
-the same wrong assumption sat in the Iter-15 F1 guard. The player object is
-instantiated at `PlayerController.OnOccupied` (the very anchor that kicks our catalog
-bake — see `ItemCatalogWorldLoadHook`), which fires *while the load screen is still
-up*, and it survives into the exit-to-menu transition. So `player != null` is true
-across **both** load screens (entering and leaving) and suppresses neither: the HUD
-flashed on the entry load screen and lingered on the exit fade to the main menu.
+believing `player != null` kept it off the world-load screen. **It does not** —
+and the same wrong assumption sat in the Iter-15 F1 guard. The player object is
+instantiated at the very anchor that kicks our catalog bake (see
+`ItemCatalogWorldLoadHook`; `PlayerController.OnSpawn` since CK 1.3, observed
+here on 1.2's `OnOccupied`), which fires *while the load screen is still up*,
+and it survives into the exit-to-menu transition. So `player != null` is true
+across **both** load screens (entering and leaving) and suppresses neither: the
+HUD flashed on the entry load screen and lingered on the exit fade to the main
+menu.
 
 The fix (`WorldState.IsInPlayableWorld`) mirrors CK's own gameplay-active gate
 (`PlayerController.PlayerInputBlocked`, decompile `Pug.Other` ~line 130335):
