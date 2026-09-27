@@ -23,10 +23,11 @@ do because the obvious earlier place throws.
   non-null by this point, whereas every earlier anchor tried —
   `PugDatabase.UpdateEntityMonos`, `SaveManager.SetWorldId`, `IMod.Init` —
   produces an NRE. The postfix launches it via `__instance.StartCoroutine`, and
-  the coroutine waits on `WaitUntil(() =>
-  ClientWorldStateSystem.HasRunAtLeastOnce)` before calling
-  `ItemCatalog.Bake()`. **Never call `Bake()` synchronously inside the postfix**
-  — that races ECS world readiness.
+  the coroutine waits one frame on `WaitUntil(() => Manager.main.player !=
+  null)` before calling `ItemCatalog.Bake()` — ItemBrowser's
+  `ClientWorldStateSystem` gate is that mod's own type, not reachable from here.
+  **Never call `Bake()` synchronously inside the postfix** — that races ECS
+  world readiness.
 - **`LocalizationManager.OnLocalizeEvent`** re-bakes synchronously, then
   triggers `ItemChecklistWindow.Instance.RebindRows()`.
 - **`ItemChecklistWindow.Awake`** subscribes `DiscoveredState.Changed` for the
@@ -455,8 +456,7 @@ piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`.
 ### ItemCatalog Four-Loop Bake (Iter-3.7 / Iter-16.1 / Iter-17)
 
 `ItemCatalog.Bake()` runs once per world-load, triggered from the
-`PlayerController.OnSpawn` coroutine (after
-`ClientWorldStateSystem.HasRunAtLeastOnce`).
+`PlayerController.OnSpawn` coroutine (one frame after the postfix).
 
 **Pre-cache phase** (before the loops):
 
@@ -1287,8 +1287,9 @@ isSceneHandlerReady && !Manager.load.IsLoading()`; Iter-15 also appends
 `!cutsceneIsPlaying` to suppress the intro cutscene), which Iter-11.6
 substituted for the original `Manager.main.player != null` term: contrary to the
 earlier assumption, `player != null` does **not** suppress the world-load screen
-(the player object is instantiated at `PlayerController.OnSpawn` *while the
-load screen is still up* and survives the exit-to-menu transition, so it is true
+(the player object is instantiated at the bake anchor — observed on 1.2's
+`OnOccupied`, not re-measured for 1.3's `OnSpawn` — *while the load screen is
+still up* and survives the exit-to-menu transition, so it is true
 across both load screens). See `docs/gotchas.md § Manager.main.player != null
 does NOT suppress a load screen (Iter-11.6)`.
 
