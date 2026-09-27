@@ -864,6 +864,27 @@ remaining backlog.
   rather than looked for: the four show a character at 3,2 % discovery, so nearly every
   visible row in them reads `???`.
 
+- **Iter-50 -- say so when the catalog never bakes. OPEN.** The checklist has no
+  signal for the one failure a game update is most likely to cause: a Harmony target
+  that no longer exists. The CK 1.3 port found exactly that case before it shipped --
+  `PlayerController.OnOccupied` became `OnSpawn`, and the old `nameof` target kept
+  compiling. Read from the loader and Harmony sources, not measured: the missing
+  target throws at patch time, the loader logs only `failed to patch mod
+  ItemChecklist`, and the mod loads anyway. The player then sees an empty checklist
+  with no message, and the patch classes applied after the failing one are missing
+  too, the save hooks possibly among them.
+
+  **The idea.** A check in `IMod.Update`: once `WorldState.IsInPlayableWorld` has held
+  for some seconds and `ItemCatalog.Bake()` has not run, log one error that names the
+  bake anchor. That costs one flag and one timer, and it turns "the checklist is
+  empty" into a line a bug report can point at.
+
+  **To decide.** Whether a log line is enough or the player should see it too -- a
+  `PossessionIncidentStore` entry, or a line in the window's empty state -- since the
+  people who hit this are players, not the author. And the timeout: a large modded
+  catalog bakes in about 0.4 s here, but a slow machine's first world load is not
+  measured.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
