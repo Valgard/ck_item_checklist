@@ -658,11 +658,11 @@ namespace ItemChecklist
                     // state (isAnyInventoryShowing stuck true).
                     //
                     // 1.3 renamed this from HideAllInventoryAndCraftingUI and gave it
-                    // a bool return: with forceClose:false it now hides NOTHING and
-                    // returns false while the mouse is in QuickTrash or Locking mode,
-                    // so the window stays open until the next keypress. Accepted --
-                    // forcing the close would reintroduce the dangling-interface bug
-                    // this whole comment is about.
+                    // a bool return. With forceClose:false it returns false while the
+                    // mouse is in QuickTrash or Locking mode, resetting that mode and
+                    // leaving the Vanilla UI up -- but CoreLib's postfix ignores the
+                    // result and hides our window either way, so the return value
+                    // carries nothing this call needs.
                     Debug.Log("[ItemChecklist] Hotkey — closing UI");
                     Manager.ui.TryHideAllInventoryAndCraftingUI(forceClose: false);
                 }
