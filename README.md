@@ -51,7 +51,7 @@ Discovery is tracked **per world × per player**.
 
 ## Requirements
 
-- Core Keeper (verified on 1.2.1.5)
+- Core Keeper 1.3 (verified on 1.3.0.2) — for Core Keeper 1.2, use version 1.4.0
 - [CoreLib](https://mod.io/g/corekeeper/m/corelib) — required dependency
 - **Mod Settings Menu** — required dependency (drives the in-game settings)
 - **Complete Tiny Font** — required dependency (supplies the accented glyphs

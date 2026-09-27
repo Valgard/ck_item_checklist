@@ -5,6 +5,16 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), witho
 what shipped per release, not every commit. The topmost `## [x.y.z]` entry is
 the current published version.
 
+## [1.5.0] - 2026-09-27
+
+Works with Core Keeper 1.3. The update had stopped the mod from loading at all,
+so the checklist, its hotkey and the HUD counter were simply missing.
+
+### Changed
+
+- **Requires Core Keeper 1.3.** This version does not run on 1.2 any more; stay
+  on 1.4.0 for a 1.2 game.
+
 ## [1.4.0] - 2026-08-12
 
 The accented characters in the small chrome labels ("Gewöhnlich",
