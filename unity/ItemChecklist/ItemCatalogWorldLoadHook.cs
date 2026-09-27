@@ -30,8 +30,17 @@ namespace ItemChecklist
     /// <c>OnOccupied</c> fires (confirmed empirically by Iter-3.6 diagnose D2c),
     /// so the <c>WaitUntil</c> resolves on the very next frame, producing the
     /// same one-frame ECS-settle guard that ItemBrowser's pattern intends.</para>
+    /// <para><strong>CK 1.3:</strong> the player's spawn logic moved from
+    /// <c>OnOccupied</c> into a <c>protected override OnSpawn()</c>, and
+    /// <c>PlayerController</c> no longer overrides <c>OnOccupied</c> at all. So
+    /// the target is named by string — <c>nameof</c> cannot reach a protected
+    /// member — and <c>nameof(PlayerController.OnOccupied)</c> must not come
+    /// back: it still compiles, through the inherited base method, and would
+    /// patch that base for every pooled object. <c>isLocal</c> and
+    /// <c>Manager.main.player</c> are both assigned inside <c>OnSpawn</c>, so
+    /// the postfix sees the same state the old anchor gave it.</para>
     /// </summary>
-    [HarmonyPatch(typeof(PlayerController), nameof(PlayerController.OnOccupied))]
+    [HarmonyPatch(typeof(PlayerController), "OnSpawn")]
     internal static class ItemCatalogWorldLoadHook
     {
         [HarmonyPostfix]
