@@ -57,29 +57,31 @@ incompatibility. All 10 surveyed CK UI mods use `SpriteRenderer` + Layer 5 +
 
 ## Mod Loading
 
-### Opening the in-game Mods menu wipes the fake-ID dev install
+### Opening the in-game Mods menu unregisters the fake-ID dev install
 
 If the in-game **Mods menu** is opened while a fake-ID local dev build is
-installed, the mod.io client syncs subscriptions against the real catalog,
-finds no entry for the fake ID, and **deletes the local files + ZIP**. The
-game must then be restarted without the mod.
+installed, the mod.io client syncs subscriptions against the real catalog and
+drops the fake ID from `subscribedMods`, so the mod is no longer loaded. Since
+CK 1.3 that step alone leaves the files on disk — don't take their presence as
+proof the install survived. Pressing **Mod.io** in that screen also deletes
+the installed files.
 
-**Safe actions:** game start, world load, gameplay — none of these trigger
-the sync. **Only the Mods menu** triggers it.
+**Safe actions:** game start, world load — neither triggers the sync.
 
-**Recovery:** re-run the install script:
+**Recovery:** re-run the install script after any visit to the menu:
 ```bash
 source .envrc && ../utils/build.sh
 ```
 This rebuilds and re-installs all three fake-ID locations.
 
 **Two-step scenario** (subscribing to a real mod on mod.io): the new
-subscription lands only when the Mods menu is opened — the same sync that
-applies the subscription wipes every fake-ID mod. Plan for it as a two-step:
-open the menu, let the change land, then rebuild each fake-ID mod.
+subscription is downloaded only once **Mod.io** is pressed in the Mods menu —
+the same visit unregisters and deletes every fake-ID mod. Plan for it as a
+two-step: press Mod.io, let the change land, then rebuild each fake-ID mod.
 
 See the parent repo's `../docs/macos-crossover-loader.md § Fake-ID dev install`
-for the full fake-ID mechanism.
+for the full fake-ID mechanism, and `../docs/ck/mod-anatomy.md § The in-game
+mod menu, and when mod.io is contacted` for why the two steps differ.
 
 ## SpriteMask Clipping
 
@@ -1674,7 +1676,7 @@ lesson:
   never touched a gameplay frame.
 - **Isolate by toggling + the player's feel, not by a count.** The suspected
   render mod was disabled via `state.json`'s `disabledMods` array (NOT the
-  in-game mod menu — that triggers a mod.io resync that deletes fake-ID dev
+  in-game mod menu — that triggers a mod.io resync that unregisters fake-ID dev
   entries; edit `…/mod.io/5289/state.json`, add the modId string to
   `existingUsers/<uid>/disabledMods`, keep it in `subscribedMods`). The next
   session ran **with no spikes** — *that* confirmed the culprit (a per-enemy
