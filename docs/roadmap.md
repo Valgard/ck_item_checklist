@@ -885,6 +885,22 @@ remaining backlog.
   catalog bakes in about 0.4 s here, but a slow machine's first world load is not
   measured.
 
+- **Iter-51 -- active character never resolved when joining a remote or dedicated
+  server. OPEN, suspected, needs a play test.** Derived from the 1.3.0.5 decompile, not
+  observed. `SaveManagerActiveSelectHook.ActiveGuid` is set by the first
+  `CharacterData.OnAfterDeserialize` after `SetCharacterId`, and that deserialize is the
+  server world's decode of the joining player's data (`StartGameRPCSystem`), so a client
+  that joins someone else's world never sees it. `SaveManager.Init`'s startup decode
+  does not help: it runs before any `SetCharacterId`. And no 1.3 caller passes the
+  negative id that would clear `ActiveGuid` -- `OnSceneUnload` resets the id directly.
+  Expected outcomes: joined right after launch, `ActiveGuid` stays `null`, so no
+  possession ledger, no pet collection and no discovery snapshot. Joined after a local
+  session, the previous character's ledger stays active and absorbs this world's
+  containers. **To test:** join the dedicated server with a fresh client, then again
+  after playing a local world with a different character; watch `Player.log` for
+  `Snapshot applied`, and check which character's ledger file in the mod's config
+  directory changes.
+
 > **Out-of-sequence numbering is intentional.** Iteration numbers are assigned both
 > sequentially-by-merge and topic-reserved, so a DONE iter can sit before lower-numbered
 > tentative ones (e.g. Iter-16.1 done, Iter-16.2/17 still open) — timing ≠ number. See
