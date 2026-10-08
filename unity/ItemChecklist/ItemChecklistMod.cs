@@ -21,11 +21,10 @@ namespace ItemChecklist
     /// <para>The only non-trivial work this class does is bridge the
     /// timing gap between CK's <c>OnAfterDeserialize</c> (which fires
     /// before <c>Manager.main.player</c> exists) and the active player's
-    /// spawn. Each frame, if a player has spawned, look up the cached
-    /// snapshot by <c>playerName</c> and apply it. See
-    /// <see cref="CharacterDataDiscoverySnapshot"/> for the rationale
-    /// behind the name-based cache key (more accurate alternatives all
-    /// turned out sandbox-blocked).</para>
+    /// spawn. Each frame, look up the cached snapshot by the active
+    /// character's GUID (<see cref="SaveManagerActiveSelectHook.ActiveGuid"/>)
+    /// and apply it. See <see cref="CharacterDataDiscoverySnapshot"/> for
+    /// the rationale behind the GUID cache key.</para>
     /// </summary>
     public sealed class ItemChecklistMod : IMod
     {
@@ -575,6 +574,10 @@ namespace ItemChecklist
 
             // Iter-20: load/save the possession ledger on character (GUID) change.
             // Independent of the discovery-snapshot cache below (that can miss).
+            // ActiveGuid is only captured when this process hosts the world; on a
+            // remote/dedicated join it keeps its previous value, so the ledger may
+            // stay unloaded or stay on the previous session's character
+            // (SaveManagerActiveSelectHook; derived from the decompile, UNVERIFIED IN PLAY).
             if (activeGuid != s_ledgerGuid)
             {
                 ItemTracker.Clear(); // Iter-40: tracking is session-only — reset on any character/world switch

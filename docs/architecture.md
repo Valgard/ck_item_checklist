@@ -451,7 +451,11 @@ items the player already carries.
 directly via the `__instance.characterGuid` **field** — the sandbox-safe path,
 arrived at after several banned alternatives. Which of the deserialized
 characters is the active one is not knowable at that point, so the resolution
-piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`.
+piggybacks on `SaveManagerActiveSelectHook.AwaitingActiveDeserialize`. That
+pairing holds only in a process that hosts its own world: the deserialize after
+`SetCharacterId` is the server world's decode of the joining player's data, so
+on a remote or dedicated join it happens in the other process (derived from the
+1.3.0.5 decompile, unverified in play — see the hook's comment).
 
 ### ItemCatalog Four-Loop Bake (Iter-3.7 / Iter-16.1 / Iter-17)
 

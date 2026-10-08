@@ -14,9 +14,13 @@ namespace ItemChecklist
     /// <para>Cache key: <c>characterGuid</c> from <c>CharacterData</c>.
     /// The active-character resolution happens in
     /// <see cref="ItemChecklistMod.Update"/> via the
-    /// <c>SaveManagerActiveSelectHook.ActiveGuid</c> set by the
-    /// sequential <c>SetCharacterId</c> → file-read → <c>JsonOverwrite</c>
-    /// → <c>OnAfterDeserialize</c> path.</para>
+    /// <c>SaveManagerActiveSelectHook.ActiveGuid</c>, which this postfix
+    /// sets on the first deserialize after <c>SetCharacterId</c>. That
+    /// deserialize is the hosting process's server-world decode of the
+    /// joining player's data, not a file read — so the pairing holds only
+    /// when this process hosts its own world (see
+    /// <see cref="SaveManagerActiveSelectHook"/>; remote/dedicated join is
+    /// unverified in play).</para>
     ///
     /// <para><b>History:</b> the original Iter-3.6 cache keyed on
     /// <c>playerName</c> from <c>CharacterCustomization</c> — vulnerable
@@ -72,10 +76,13 @@ namespace ItemChecklist
             // Cache by guid for later lookup.
             Cache[guid] = packedKeys;
 
-            // Active-char detection: if SetCharacterId(id) was just called,
-            // this deserialize is for the active char (per CK's sequential
-            // code path: SetCharacterId → file read → JsonOverwrite →
-            // OnAfterDeserialize on that specific instance).
+            // Active-char detection: the first deserialize after SetCharacterId(id)
+            // is taken as the active char. SetCharacterId itself deserializes
+            // nothing; what follows it is the server world's decode of the
+            // joining player's data (StartGameRPCSystem → GetCharacterDataFromSerialized),
+            // which runs in THIS process only when it hosts the world. On a
+            // remote/dedicated join nothing here consumes the flag (derived from
+            // the 1.3.0.5 decompile, UNVERIFIED IN PLAY).
             if (SaveManagerActiveSelectHook.AwaitingActiveDeserialize)
             {
                 SaveManagerActiveSelectHook.ActiveGuid = guid;
