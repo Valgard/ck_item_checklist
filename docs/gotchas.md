@@ -1253,17 +1253,22 @@ synchronously on the main thread at every autosave**. If the persisted structure
 can grow unbounded, *that* — not the periodic read/scan — becomes the recurring
 frame spike. Iter-28: the possession ledger had grown to 5503 entries / 89 KB,
 and `PossessionLedger.Serialize()` of it was **12–37 ms** (serialize 8–24 ms +
-write 4–13 ms), firing ~10× in a short session. Because it runs on the main
-thread it also pushed CK's **host simulation** over its **55 ms** frame budget
-(`ServerUpdateFrequencyTracker` warnings: 626/1109 host frames over budget) —
-felt as *constant* rubber-banding, distinct from a per-3s scan hitch. **Diagnose
-the save, not just the scan:** the Iter-27 PERF data already showed `BuildView`
-was ~0.8 ms even at 5503 entries, so the read was never the peak. Budget the
-autosave serialize like any < 16.7 ms frame op, and **keep the persisted store
-small at the source** (the world-nature gate below). A radius-bounded self-heal
-(`PruneStaleNear`, then 180 tiles) does **not** retroactively clear a backlog an
-old bug accumulated, so Iter-28 paired the source fix with a one-time full
-eviction (`PossessionLedger.PruneByPredicate` at the first scan, gated by a
+write 4–13 ms), firing ~10× in a short session. The same session logged CK's
+**host simulation** over its **55 ms** frame budget
+(`ServerUpdateFrequencyTracker` warnings: 626/1109 host frames over budget),
+felt as *constant* rubber-banding, distinct from a per-3s scan hitch, and after
+Iter-31 a session showed 4. That the save *caused* the overruns was assumed, not
+isolated: no single save reached 55 ms, ten of them cannot make 626 slow frames,
+and Iter-28 to Iter-31 changed the scan scope, the store and the save-skip
+together (corrected 2026-10-17; the handbook's `../docs/ck/persistence.md`
+carries the same correction). **Diagnose the save, not just the scan:** the
+Iter-27 PERF data already showed `BuildView` was ~0.8 ms even at 5503 entries,
+so the read was never the peak. Budget the autosave serialize like any < 16.7 ms
+frame op, and **keep the persisted store small at the source** (the world-nature
+gate below). A radius-bounded self-heal (`PruneStaleNear`, then 180 tiles) does
+**not** retroactively clear a backlog an old bug accumulated, so Iter-28 paired
+the source fix with a one-time full eviction
+(`PossessionLedger.PruneByPredicate` at the first scan, gated by a
 `WorldNaturePruned` flag). **Iter-42 removed that eviction: it was a data-loss
 bug on two counts** — see the third section below, which is the durable lesson.
 The backlog-clearing need was real *then*; it no longer exists (the Iter-31/41

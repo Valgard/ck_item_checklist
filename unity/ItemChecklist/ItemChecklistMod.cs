@@ -432,15 +432,18 @@ namespace ItemChecklist
 
         public void Shutdown()
         {
-            // Backstop autosave on a clean quit (mods unload on "Beenden"), for any
-            // quit path that did not route through a CK character write.
+            // Not a quit backstop: the loader does not call Shutdown at game quit,
+            // and in CK 1.3.0.6 only for a failed load (../docs/ck/mod-anatomy.md,
+            // the IMod lifecycle table). Kept because it is harmless — a no-op
+            // without an active character — not because it saves anything at quit.
             SavePossessionLedger();
         }
 
         /// <summary>Persist the active character's possession ledger. Driven primarily
         /// by <see cref="SaveManagerWriteCharacterHook"/> (fires in lockstep with CK's
         /// own character save — autosave + "Save &amp; Quit"); also called on char-switch
-        /// and Shutdown as backstops. No-op when no character is active.
+        /// as a backstop, and from Shutdown, which is not reached at game quit.
+        /// No-op when no character is active.
         /// <para>Iter-43: each store is skipped when its load FAILED (<see cref="s_ledgerReadOnly"/>
         /// / <see cref="s_petsReadOnly"/>) — an empty-or-partial in-memory store must never
         /// overwrite a file we could not read. Not saving costs this session's changes; saving
