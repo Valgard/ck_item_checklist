@@ -59,8 +59,9 @@ drifted against it.
   trips it, and what to use instead: the parent handbook's
   `../docs/ck/sandbox.md`. It is deliberately *more careful* than the summary
   that stood here, which claimed `Manager.saves.*` is banned outright: the
-  handbook names published mods that call it cleanly and says to bisect the
-  expression rather than trust a deny list.
+  handbook shows that a call through it cannot trip the verifier by the code,
+  names a mod that makes such calls and passes, and says to bisect the rest of
+  a failing assembly rather than trust a deny list.
 - **CK's UI stack** — why uGUI cannot work at all: `../docs/ck/ui-framework.md`,
   with this mod's own consequences and the 10-mod survey in `docs/gotchas.md §
   uGUI (Canvas/Image) structurally fails in CK`.
